@@ -1,14 +1,16 @@
 {
-  "name": "code-review",
+  "name": "codereview",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A local CLI tool that provides a web UI to review GitHub PRs with AI assistance.",
   "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["code review", "ai", "github", "pr", "cli"],
+  "author": "thongvl",
+  "license": "MIT",
   "packageManager": "pnpm@10.28.2",
   "devDependencies": {
     "turbo": "^2.8.1"
