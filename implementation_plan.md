@@ -33,7 +33,6 @@ Create a local CLI tool (`codereview`) that spins up a web UI to review GitHub P
 ### [CLI]
 - Create a bin script `codereview <PR_NUMBER>`
 - Checks for `gh` CLI availability.
-- Fetches PR list of file changes using `gh` CLI.
 - Starts the Hono server on port 3000.
 - Opens the system browser to `http://localhost:3000`.
 
