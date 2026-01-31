@@ -78,9 +78,24 @@ export function App() {
   )
 
   const { messages, sendMessage, isStreaming } = useChat()
-  const { groups, generateGroups, isGeneratingGroups } = useAIReview(displayPR.number)
+  const { 
+    groups, 
+    generateGroups, 
+    isGeneratingGroups, 
+    error: groupingError,
+    items: aiReviewItems,
+    triggerReview,
+    isLoading: isReviewLoading,
+  } = useAIReview({
+    prNumber,
+    repo,
+    autoGenerate: true, // Auto-generate groups when page loads
+  })
 
-  const displayGroups = groups.length > 0 ? groups : mockChangeGroups
+  // Only fall back to mock data if no PR is specified and no groups exist
+  const displayGroups = groups.length > 0 ? groups : (prNumber ? [] : mockChangeGroups)
+  // Only fall back to mock data if no PR is specified and no review items exist
+  const displayAIReviewItems = aiReviewItems.length > 0 ? aiReviewItems : (prNumber ? [] : mockAIReviewItems)
 
   const scrollToFile = useCallback((filePath: string) => {
     const container = diffContainerRef.current
@@ -106,13 +121,7 @@ export function App() {
     }
   }, [scrollToFile])
 
-  const handleGroupClick = useCallback((groupId: string) => {
-    const allGroups = groups.length > 0 ? groups : mockChangeGroups
-    const group = allGroups.find((g) => g.id === groupId)
-    if (group && group.files.length > 0) {
-      scrollToFile(group.files[0])
-    }
-  }, [scrollToFile, groups])
+
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -187,6 +196,7 @@ export function App() {
                     ...(comments.length > 0 ? comments : mockComments),
                     ...draftComments,
                   ]}
+                  aiReviewItems={displayAIReviewItems}
                   onLineClick={(path, line, side) => {
                     console.log(`Clicked line ${line} (${side}) in ${path}`)
                   }}
@@ -210,14 +220,28 @@ export function App() {
               <SidePanelGroupingContent>
                 <IntelligentGrouping
                   groups={displayGroups}
-                  onGroupClick={handleGroupClick}
-                  onGenerateGroups={generateGroups}
+                  onFileClick={scrollToFile}
+                  onGenerateGroups={prNumber ? generateGroups : undefined}
                   isGenerating={isGeneratingGroups}
+                  error={groupingError}
                 />
               </SidePanelGroupingContent>
               <SidePanelAIReviewContent>
+                {prNumber && (
+                  <div className="mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={triggerReview}
+                      disabled={isReviewLoading}
+                      className="w-full"
+                    >
+                      {isReviewLoading ? "Generating AI Review..." : "Generate AI Review"}
+                    </Button>
+                  </div>
+                )}
                 <AIReviewSummary
-                  items={mockAIReviewItems}
+                  items={displayAIReviewItems}
                   onItemClick={(item) => {
                     scrollToAnnotation(item.filePath, item.lineNumber)
                   }}

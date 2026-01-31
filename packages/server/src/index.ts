@@ -8,6 +8,7 @@ import draftCommentRoutes from './routes/draft-comments.js';
 import aiReviewRoutes from './routes/ai-review.js';
 import prInfoRoutes from './routes/pr-info.js';
 import chatRoutes from './routes/chat.js';
+import groupingRoutes from './routes/grouping.js';
 
 const app = new Hono();
 
@@ -26,6 +27,7 @@ app.route('/api/draft-comments', draftCommentRoutes);
 app.route('/api/ai-review', aiReviewRoutes);
 app.route('/api/pr-info', prInfoRoutes);
 app.route('/api/chat', chatRoutes);
+app.route('/api/grouping', groupingRoutes);
 
 // Health check
 app.get('/api/health', (c) => {

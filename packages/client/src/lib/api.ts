@@ -162,4 +162,66 @@ export async function clearDraftComments(prNumber: number): Promise<void> {
   });
 }
 
-export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment };
+// Grouping API
+interface ServerChangeGroup {
+  id: string;
+  title: string;
+  summary: string;
+  files: string[];
+  totalAdditions: number;
+  totalDeletions: number;
+}
+
+interface GroupingResponse {
+  groups: ServerChangeGroup[];
+}
+
+interface GroupingStatusResponse {
+  available: boolean;
+}
+
+export async function fetchGroupingStatus(): Promise<GroupingStatusResponse> {
+  return fetchApi<GroupingStatusResponse>('/grouping/status');
+}
+
+export async function generateGrouping(prNumber: number, repo?: string): Promise<ServerChangeGroup[]> {
+  const response = await fetchApi<GroupingResponse>('/grouping/generate', {
+    method: 'POST',
+    body: JSON.stringify({ prNumber, repo }),
+  });
+  return response.groups;
+}
+
+// AI Review API
+interface ServerAIReviewItem {
+  id: string;
+  filePath: string;
+  lineNumber: number;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  suggestion?: string;
+}
+
+interface AIReviewPRResponse {
+  items: ServerAIReviewItem[];
+  summary: string;
+}
+
+interface AIReviewStatusResponse {
+  available: boolean;
+  binary: string;
+}
+
+export async function fetchAIReviewStatus(): Promise<AIReviewStatusResponse> {
+  return fetchApi<AIReviewStatusResponse>('/ai-review/status');
+}
+
+export async function generateAIReview(prNumber: number, repo?: string): Promise<AIReviewPRResponse> {
+  const response = await fetchApi<AIReviewPRResponse>('/ai-review/pr', {
+    method: 'POST',
+    body: JSON.stringify({ prNumber, repo }),
+  });
+  return response;
+}
+
+export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse };

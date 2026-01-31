@@ -7,7 +7,7 @@ import {
 } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import type { ReviewComment } from "@/types/review"
+import type { ReviewComment, AIReviewItem } from "@/types/review"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
 import { CommentThread } from "@/components/comment-thread"
 import { CommentForm } from "@/components/comment-thread/comment-form"
@@ -97,6 +97,8 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
     commentId: string,
     content: string
   ) => Promise<void>
+  /** AI review items to display as comment threads */
+  aiReviewItems?: AIReviewItem[]
 }
 
 /**
@@ -109,17 +111,33 @@ function toFileContents(path: string, content: string): FileContents {
   }
 }
 
-/** Metadata for annotations - can be either a comment or a draft form */
+/** Metadata for annotations - can be a comment, draft form, or AI review item */
 type AnnotationMetadata =
   | { type: "comment"; comment: ReviewComment }
   | { type: "draft"; draft: DraftAnnotation }
+  | { type: "ai-review"; item: AIReviewItem }
 
 /**
- * Converts comments and drafts to line annotations format.
+ * Check if two file paths match, handling different path formats.
+ * Matches if paths are equal, or if one ends with the other.
+ */
+function pathsMatch(path1: string, path2: string): boolean {
+  if (path1 === path2) return true
+  // Normalize paths by removing leading slashes
+  const normalized1 = path1.replace(/^\/+/, "")
+  const normalized2 = path2.replace(/^\/+/, "")
+  if (normalized1 === normalized2) return true
+  // Check if one path ends with the other (handles relative vs absolute paths)
+  return normalized1.endsWith(normalized2) || normalized2.endsWith(normalized1)
+}
+
+/**
+ * Converts comments, drafts, and AI review items to line annotations format.
  */
 function toLineAnnotations(
   comments: ReviewComment[],
   drafts: DraftAnnotation[],
+  aiReviewItems: AIReviewItem[],
   filePath: string
 ): DiffLineAnnotation<AnnotationMetadata>[] {
   const commentAnnotations: DiffLineAnnotation<AnnotationMetadata>[] = comments
@@ -138,7 +156,15 @@ function toLineAnnotations(
       metadata: { type: "draft" as const, draft: d },
     }))
 
-  return [...commentAnnotations, ...draftAnnotations]
+  const aiReviewAnnotations: DiffLineAnnotation<AnnotationMetadata>[] = aiReviewItems
+    .filter((item) => pathsMatch(item.filePath, filePath))
+    .map((item) => ({
+      side: "additions" as const,
+      lineNumber: item.lineNumber,
+      metadata: { type: "ai-review" as const, item },
+    }))
+
+  return [...commentAnnotations, ...draftAnnotations, ...aiReviewAnnotations]
 }
 
 /**
@@ -191,6 +217,7 @@ function DiffViewer({
   defaultViewedFiles,
   onCommentSubmit,
   onReplySubmit,
+  aiReviewItems = [],
   ...props
 }: DiffViewerProps) {
   // Track collapsed state for each file
@@ -425,6 +452,7 @@ function DiffViewer({
           const lineAnnotations = toLineAnnotations(
             annotations,
             draftAnnotations,
+            aiReviewItems,
             file.path
           )
 
@@ -514,6 +542,29 @@ function DiffViewer({
                             )
                           }
                           isLoading={isSubmitting}
+                        />
+                      )
+                    }
+
+                    if (meta.type === "ai-review") {
+                      // Convert AI review item to ReviewComment format for display
+                      const aiComment: ReviewComment = {
+                        id: meta.item.id,
+                        filePath: meta.item.filePath,
+                        lineNumber: meta.item.lineNumber,
+                        content: meta.item.suggestion
+                          ? `${meta.item.message}\n\n**Suggestion:** ${meta.item.suggestion}`
+                          : meta.item.message,
+                        author: { type: "ai", name: "AI Review" },
+                        severity: meta.item.severity,
+                        createdAt: new Date(),
+                        replies: [],
+                      }
+
+                      return (
+                        <CommentThread.Inline
+                          comment={aiComment}
+                          lineNumber={annotation.lineNumber}
                         />
                       )
                     }

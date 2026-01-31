@@ -75,3 +75,30 @@ export interface DraftComment {
   authorName: string;
   createdAt: string;
 }
+
+export interface ChangeGroup {
+  id: string;
+  title: string;
+  summary: string;
+  files: string[];
+  totalAdditions: number;
+  totalDeletions: number;
+}
+
+export interface GroupingResult {
+  groups: ChangeGroup[];
+}
+
+export interface AIReviewItem {
+  id: string;
+  filePath: string;
+  lineNumber: number;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  suggestion?: string;
+}
+
+export interface AIReviewPRResult {
+  items: AIReviewItem[];
+  summary: string;
+}

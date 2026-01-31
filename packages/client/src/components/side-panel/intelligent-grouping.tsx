@@ -3,21 +3,23 @@ import type { ChangeGroup } from "@/types/grouping"
 import { Button } from "@/components/ui/button"
 import { ChangeGroupCard } from "./change-group-card"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { AiGenerativeIcon, Loading03Icon } from "@hugeicons/core-free-icons"
+import { AiGenerativeIcon, Loading03Icon, AlertCircleIcon } from "@hugeicons/core-free-icons"
 
 export interface IntelligentGroupingProps extends React.ComponentProps<"div"> {
   groups: ChangeGroup[]
-  onGroupClick?: (groupId: string) => void
+  onFileClick?: (filePath: string) => void
   onGenerateGroups?: () => void
   isGenerating?: boolean
+  error?: Error | null
 }
 
 function IntelligentGrouping({
   className,
   groups,
-  onGroupClick,
+  onFileClick,
   onGenerateGroups,
   isGenerating = false,
+  error,
   ...props
 }: IntelligentGroupingProps) {
   return (
@@ -41,11 +43,32 @@ function IntelligentGrouping({
             className={cn(isGenerating && "animate-spin")}
             data-icon="inline-start"
           />
-          {isGenerating ? "Generating..." : "Generate AI Groupings"}
+          {isGenerating ? "Generating..." : groups.length > 0 ? "Regenerate Groupings" : "Generate AI Groupings"}
         </Button>
       )}
 
-      {isGenerating ? (
+      {error ? (
+        <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+          <div className="flex items-center gap-2 text-destructive">
+            <HugeiconsIcon icon={AlertCircleIcon} className="h-4 w-4" />
+            <span className="text-sm font-medium">Failed to generate groups</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {error.message}
+          </p>
+          {onGenerateGroups && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onGenerateGroups}
+              disabled={isGenerating}
+              className="mt-1"
+            >
+              Try Again
+            </Button>
+          )}
+        </div>
+      ) : isGenerating ? (
         <div className="flex flex-col gap-2">
           {[1, 2, 3].map((i) => (
             <div
@@ -68,7 +91,7 @@ function IntelligentGrouping({
             <ChangeGroupCard
               key={group.id}
               group={group}
-              onClick={() => onGroupClick?.(group.id)}
+              onFileClick={onFileClick}
             />
           ))}
         </div>
