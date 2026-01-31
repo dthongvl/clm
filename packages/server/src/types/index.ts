@@ -64,3 +64,14 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
+
+export interface DraftComment {
+  id: string;
+  prNumber: number;
+  filePath: string;
+  lineNumber: number;
+  side: 'additions' | 'deletions';
+  content: string;
+  authorName: string;
+  createdAt: string;
+}

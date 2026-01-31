@@ -11,7 +11,7 @@ import {
 } from "@/components/side-panel"
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
-import { useChat, useAIReview, usePR, useDiff, useComments } from "@/hooks"
+import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments } from "@/hooks"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import {
@@ -45,6 +45,7 @@ export function App() {
   const { pr, isLoading: isPRLoading, error: prError, refetch: refetchPR } = usePR({ prNumber, repo })
   const { files, isLoading: isDiffLoading, error: diffError, refetch: refetchDiff } = useDiff({ prNumber, repo })
   const { comments, isLoading: isCommentsLoading, refetch: refetchComments } = useComments({ prNumber, repo })
+  const { draftComments, addDraftComment, refetch: refetchDraftComments } = useDraftComments({ prNumber })
 
   // Use real PR data or fall back to mock
   const displayPR = pr ?? mockPR
@@ -59,7 +60,21 @@ export function App() {
     refetchPR()
     refetchDiff()
     refetchComments()
-  }, [refetchPR, refetchDiff, refetchComments])
+    refetchDraftComments()
+  }, [refetchPR, refetchDiff, refetchComments, refetchDraftComments])
+
+  // Handle comment submission
+  const handleCommentSubmit = useCallback(
+    async (
+      filePath: string,
+      lineNumber: number,
+      side: "additions" | "deletions",
+      content: string
+    ) => {
+      await addDraftComment(filePath, lineNumber, side, content)
+    },
+    [addDraftComment]
+  )
 
   const { messages, sendMessage, isStreaming } = useChat()
   const { groups, generateGroups, isGeneratingGroups } = useAIReview(displayPR.number)
@@ -166,10 +181,14 @@ export function App() {
               ) : (
                 <DiffPanel.Viewer
                   files={displayFiles}
-                  annotations={comments.length > 0 ? comments : mockComments}
+                  annotations={[
+                    ...(comments.length > 0 ? comments : mockComments),
+                    ...draftComments,
+                  ]}
                   onLineClick={(path, line, side) => {
                     console.log(`Clicked line ${line} (${side}) in ${path}`)
                   }}
+                  onCommentSubmit={handleCommentSubmit}
                 />
               )}
             </DiffPanel.Root>

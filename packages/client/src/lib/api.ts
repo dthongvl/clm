@@ -106,4 +106,60 @@ export async function fetchPRComments(prNumber: number, repo?: string): Promise<
   return response.comments;
 }
 
-export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment };
+// Draft comments API
+interface ServerDraftComment {
+  id: string;
+  prNumber: number;
+  filePath: string;
+  lineNumber: number;
+  side: 'additions' | 'deletions';
+  content: string;
+  authorName: string;
+  createdAt: string;
+}
+
+interface DraftCommentsResponse {
+  comments: ServerDraftComment[];
+}
+
+interface CreateDraftCommentResponse {
+  success: boolean;
+  comment: ServerDraftComment;
+}
+
+export async function fetchDraftComments(prNumber: number): Promise<ServerDraftComment[]> {
+  const params = new URLSearchParams({ pr: String(prNumber) });
+  const response = await fetchApi<DraftCommentsResponse>(`/draft-comments?${params}`);
+  return response.comments;
+}
+
+export async function createDraftComment(
+  prNumber: number,
+  filePath: string,
+  lineNumber: number,
+  side: 'additions' | 'deletions',
+  content: string,
+  authorName = 'You'
+): Promise<ServerDraftComment> {
+  const response = await fetchApi<CreateDraftCommentResponse>('/draft-comments', {
+    method: 'POST',
+    body: JSON.stringify({ prNumber, filePath, lineNumber, side, content, authorName }),
+  });
+  return response.comment;
+}
+
+export async function deleteDraftComment(prNumber: number, commentId: string): Promise<void> {
+  const params = new URLSearchParams({ pr: String(prNumber) });
+  await fetchApi<{ success: boolean }>(`/draft-comments/${commentId}?${params}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function clearDraftComments(prNumber: number): Promise<void> {
+  const params = new URLSearchParams({ pr: String(prNumber) });
+  await fetchApi<{ success: boolean }>(`/draft-comments?${params}`, {
+    method: 'DELETE',
+  });
+}
+
+export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment };

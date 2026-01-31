@@ -4,6 +4,7 @@ import { logger } from 'hono/logger';
 import { serveStatic } from 'hono/bun';
 import diffRoutes from './routes/diff.js';
 import commentRoutes from './routes/comments.js';
+import draftCommentRoutes from './routes/draft-comments.js';
 import aiReviewRoutes from './routes/ai-review.js';
 import prInfoRoutes from './routes/pr-info.js';
 import chatRoutes from './routes/chat.js';
@@ -21,6 +22,7 @@ app.use('*', cors({
 // API routes
 app.route('/api/diff', diffRoutes);
 app.route('/api/comments', commentRoutes);
+app.route('/api/draft-comments', draftCommentRoutes);
 app.route('/api/ai-review', aiReviewRoutes);
 app.route('/api/pr-info', prInfoRoutes);
 app.route('/api/chat', chatRoutes);
