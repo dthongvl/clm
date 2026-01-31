@@ -24,6 +24,22 @@
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
+
+    /* Review-specific tokens */
+    --severity-critical: oklch(0.6 0.22 27);
+    --severity-critical-foreground: oklch(1 0 0);
+    --severity-warning: oklch(0.75 0.15 75);
+    --severity-warning-foreground: oklch(0.2 0 0);
+    --severity-info: oklch(0.6 0.15 250);
+    --severity-info-foreground: oklch(1 0 0);
+
+    /* Diff colors */
+    --diff-added: oklch(0.55 0.15 145);
+    --diff-added-bg: oklch(0.95 0.05 145);
+    --diff-deleted: oklch(0.6 0.22 27);
+    --diff-deleted-bg: oklch(0.95 0.05 27);
+    --diff-modified: oklch(0.7 0.15 75);
+    --diff-renamed: oklch(0.6 0.15 250);
     --chart-1: oklch(0.809 0.105 251.813);
     --chart-2: oklch(0.623 0.214 259.815);
     --chart-3: oklch(0.546 0.245 262.881);
@@ -59,6 +75,10 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
+
+    /* Dark mode diff colors */
+    --diff-added-bg: oklch(0.25 0.08 145);
+    --diff-deleted-bg: oklch(0.25 0.08 27);
     --chart-1: oklch(0.809 0.105 251.813);
     --chart-2: oklch(0.623 0.214 259.815);
     --chart-3: oklch(0.546 0.245 262.881);
@@ -114,6 +134,20 @@
     --radius-2xl: calc(var(--radius) + 8px);
     --radius-3xl: calc(var(--radius) + 12px);
     --radius-4xl: calc(var(--radius) + 16px);
+
+    /* Review-specific color tokens */
+    --color-severity-critical: var(--severity-critical);
+    --color-severity-critical-foreground: var(--severity-critical-foreground);
+    --color-severity-warning: var(--severity-warning);
+    --color-severity-warning-foreground: var(--severity-warning-foreground);
+    --color-severity-info: var(--severity-info);
+    --color-severity-info-foreground: var(--severity-info-foreground);
+    --color-diff-added: var(--diff-added);
+    --color-diff-added-bg: var(--diff-added-bg);
+    --color-diff-deleted: var(--diff-deleted);
+    --color-diff-deleted-bg: var(--diff-deleted-bg);
+    --color-diff-modified: var(--diff-modified);
+    --color-diff-renamed: var(--diff-renamed);
 }
 
 @layer base {
