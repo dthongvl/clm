@@ -2,7 +2,7 @@
   "name": "@codereview/server",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
-    "build": "bun build src/index.ts --outdir dist",
+    "build": "bun build src/index.ts --outdir dist --target bun",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {

@@ -49,11 +49,12 @@ Create a local CLI tool (`codereview`) that spins up a web UI to review GitHub P
 ### [Frontend] (React)
 - **App Shell**: Layout with Top Bar (PR Info) and Two-Column View.
 - **Left Panel (Diff View)**:
-    - Renders diffs using `@pierre/diffs` MultiFileDiff.
-    - Supports clicking line numbers to trigger comment form.
+    - Renders diffs using `@pierre/diffs` MultiFileDiff. You can read docs at https://github.com/pierrecomputer/pierre/blob/main/apps/docs/
+    - Use the annotation of diffs package to display the comments and AI reviews and comment form. See example: https://github.com/pierrecomputer/pierre/blob/main/apps/docs/app/diff-examples/Annotations/Annotations.tsx
 - **Right Panel (AI & Summary)**:
-    - Lists AI findings (Critical, Warning, Info).
-    - "Intelligent Grouping": Displays grouped changes (summary of related changes).
+    - Display in two tabs: Intelligent Grouping and AI Review.
+    - [First tab] "Intelligent Grouping": Displays grouped changes (summary of related changes).
+    - [Second tab] Lists AI findings (Critical, Warning, Info).
 - **Chat**: Global chat popup for Q&A about the PR.
 
 ## Verification Plan
