@@ -575,6 +575,5 @@ Extend Shadcn's default tokens with review-specific colors:
    - AI-powered comment replies
 
 4. **Phase 4 - Polish**
-   - Keyboard shortcuts
    - Persistence (panel sizes, preferences)
    - Loading states and error boundaries
