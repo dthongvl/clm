@@ -11,6 +11,7 @@ import {
 } from "@/components/side-panel"
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
+import { ModeToggle } from "@/components/mode-toggle"
 import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments } from "@/hooks"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
@@ -139,6 +140,7 @@ export function App() {
           <Button variant="outline" size="sm">
             Settings
           </Button>
+          <ModeToggle />
         </TopBar.Actions>
       </TopBar.Root>
 
