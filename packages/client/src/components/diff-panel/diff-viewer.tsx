@@ -10,7 +10,7 @@ import { Markdown } from "@/components/ui/markdown"
 import { Button } from "@/components/ui/button"
 import type { ReviewComment } from "@/types/review"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
-import { InlineCommentForm } from "./inline-comment-form"
+import { CommentForm } from "@/components/comment-thread/comment-form"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon } from "@hugeicons/core-free-icons"
 
@@ -92,6 +92,11 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
     side: AnnotationSide,
     content: string
   ) => Promise<void>
+  /** Callback when a reply to an existing comment is submitted */
+  onReplySubmit?: (
+    commentId: string,
+    content: string
+  ) => Promise<void>
 }
 
 /**
@@ -159,6 +164,101 @@ function SeverityBadge({ severity }: { severity: ReviewComment["severity"] }) {
 }
 
 /**
+ * Single comment component for rendering individual comments in a thread.
+ */
+function CommentItem({
+  comment,
+  isReply = false,
+}: {
+  comment: ReviewComment
+  isReply?: boolean
+}) {
+  return (
+    <div
+      data-slot="comment-item"
+      className={cn("p-2", isReply && "border-t border-border/50")}
+      role="article"
+      aria-label={`${isReply ? "Reply" : "Comment"} by ${comment.author.name}`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="font-medium">{comment.author.name}</span>
+        <SeverityBadge severity={comment.severity} />
+      </div>
+      <Markdown className="mt-1">{comment.content}</Markdown>
+    </div>
+  )
+}
+
+/**
+ * Comment thread component for rendering a comment and all its replies.
+ */
+function CommentThread({
+  comment,
+  lineNumber,
+  onReplySubmit,
+  isSubmittingReply,
+}: {
+  comment: ReviewComment
+  lineNumber: number
+  onReplySubmit?: (commentId: string, content: string) => Promise<void>
+  isSubmittingReply?: boolean
+}) {
+  const [isReplyFormOpen, setIsReplyFormOpen] = useState(false)
+
+  const handleReplySubmit = async (content: string) => {
+    if (!onReplySubmit) return
+    await onReplySubmit(comment.id, content)
+    setIsReplyFormOpen(false)
+  }
+
+  return (
+    <div
+      data-slot="comment-annotation"
+      data-annotation-line={lineNumber}
+      className="border-l-2 border-primary bg-muted/50 text-sm"
+      role="region"
+      aria-label={`Comment thread started by ${comment.author.name}`}
+    >
+      <CommentItem comment={comment} />
+      {comment.replies && comment.replies.length > 0 && (
+        <div data-slot="comment-replies" className="ml-4 border-l border-border/50">
+          {comment.replies.map((reply) => (
+            <CommentItem key={reply.id} comment={reply} isReply />
+          ))}
+        </div>
+      )}
+      {/* Reply action and form */}
+      <div className="p-2 pt-0">
+        {!isReplyFormOpen ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setIsReplyFormOpen(true)}
+            aria-label="Reply to this thread"
+          >
+            Reply
+          </Button>
+        ) : (
+          <div className="mt-2">
+            <CommentForm
+              variant="default"
+              size="sm"
+              autoFocus
+              showKeyboardHints
+              placeholder="Write a reply..."
+              onSubmit={handleReplySubmit}
+              onCancel={() => setIsReplyFormOpen(false)}
+              isLoading={isSubmittingReply}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
  * A component for displaying code diffs with annotations and inline commenting.
  * 
  * Features:
@@ -207,6 +307,7 @@ function DiffViewer({
   viewedFiles: controlledViewedFiles,
   defaultViewedFiles,
   onCommentSubmit,
+  onReplySubmit,
   ...props
 }: DiffViewerProps) {
   // Track collapsed state for each file
@@ -226,8 +327,13 @@ function DiffViewer({
     []
   )
 
-  // Track submitting state
+  // Track submitting state for new comments
   const [submittingDrafts, setSubmittingDrafts] = useState<Set<string>>(
+    new Set()
+  )
+
+  // Track submitting state for replies
+  const [submittingReplies, setSubmittingReplies] = useState<Set<string>>(
     new Set()
   )
 
@@ -346,6 +452,28 @@ function DiffViewer({
       }
     },
     [onCommentSubmit, cancelDraftAnnotation]
+  )
+
+  // Submit a reply to an existing comment
+  const submitReply = useCallback(
+    async (commentId: string, content: string) => {
+      if (!onReplySubmit) return
+
+      setSubmittingReplies((prev) => new Set(prev).add(commentId))
+
+      try {
+        await onReplySubmit(commentId, content)
+      } catch (error) {
+        console.error("Failed to submit reply:", error)
+      } finally {
+        setSubmittingReplies((prev) => {
+          const next = new Set(prev)
+          next.delete(commentId)
+          return next
+        })
+      }
+    },
+    [onReplySubmit]
   )
 
   // Check if there's an open comment form for a file
@@ -481,7 +609,12 @@ function DiffViewer({
                       const isSubmitting = submittingDrafts.has(draftId)
 
                       return (
-                        <InlineCommentForm
+                        <CommentForm
+                          variant="inline"
+                          size="sm"
+                          autoFocus
+                          showKeyboardHints
+                          placeholder="Leave a comment..."
                           onSubmit={(content) =>
                             submitDraftAnnotation(
                               meta.draft.filePath,
@@ -497,27 +630,19 @@ function DiffViewer({
                               meta.draft.lineNumber
                             )
                           }
-                          isSubmitting={isSubmitting}
+                          isLoading={isSubmitting}
                         />
                       )
                     }
 
-                    // Render existing comment
-                    const comment = meta.comment
+                    // Render existing comment thread
                     return (
-                      <div
-                        data-slot="comment-annotation"
-                        data-annotation-line={annotation.lineNumber}
-                        className="border-l-2 border-primary bg-muted/50 p-2 text-sm"
-                        role="article"
-                        aria-label={`Comment by ${comment.author.name}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{comment.author.name}</span>
-                          <SeverityBadge severity={comment.severity} />
-                        </div>
-                        <Markdown className="mt-1">{comment.content}</Markdown>
-                      </div>
+                      <CommentThread
+                        comment={meta.comment}
+                        lineNumber={annotation.lineNumber}
+                        onReplySubmit={onReplySubmit ? submitReply : undefined}
+                        isSubmittingReply={submittingReplies.has(meta.comment.id)}
+                      />
                     )
                   }}
                 />
