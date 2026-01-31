@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Markdown } from "@/components/ui/markdown"
 import type { ReviewComment, Severity } from "@/types/review"
 
 const severityVariantMap: Record<Severity, "destructive" | "secondary" | "outline"> = {
@@ -50,9 +51,9 @@ function CommentItem({ comment, className, children, ...props }: CommentItemProp
           {formattedDate}
         </time>
       </div>
-      <div data-slot="comment-content" className="text-sm">
+      <Markdown data-slot="comment-content" className="text-sm">
         {comment.content}
-      </div>
+      </Markdown>
       {comment.replies.length > 0 && (
         <div data-slot="comment-replies" className="mt-2 flex flex-col gap-2 ml-4">
           {comment.replies.map((reply) => (

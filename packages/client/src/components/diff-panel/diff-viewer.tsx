@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react"
 import { MultiFileDiff, type DiffLineAnnotation, type FileContents } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
+import { Markdown } from "@/components/ui/markdown"
 import type { ReviewComment } from "@/types/review"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
 
@@ -203,7 +204,9 @@ function Viewer({
                           </span>
                         )}
                       </div>
-                      <p className="mt-1">{annotation.metadata?.content}</p>
+                      <Markdown className="mt-1">
+                        {annotation.metadata?.content ?? ""}
+                      </Markdown>
                     </div>
                   )}
                 />
