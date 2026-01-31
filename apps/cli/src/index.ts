@@ -15,6 +15,15 @@ async function checkGhCLI(): Promise<boolean> {
   }
 }
 
+async function getCurrentRepo(): Promise<string | null> {
+  try {
+    const { stdout } = await execa('gh', ['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']);
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
 async function startServer(prNumber: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const serverPath = path.resolve(__dirname, '../../../packages/server/src/index.ts');
@@ -41,7 +50,8 @@ async function main() {
     .description('Local CLI tool for reviewing GitHub PRs with AI assistance')
     .version('1.0.0')
     .argument('<pr-number>', 'GitHub PR number to review')
-    .action(async (prNumber: string) => {
+    .option('-r, --repo <owner/repo>', 'GitHub repository (defaults to current repo)')
+    .action(async (prNumber: string, options: { repo?: string }) => {
       console.log(`Starting code review for PR #${prNumber}...`);
 
       // Check for gh CLI
@@ -54,6 +64,16 @@ async function main() {
 
       console.log('✓ GitHub CLI found');
 
+      // Get repository
+      const repo = options.repo || await getCurrentRepo();
+      if (!repo) {
+        console.error('Error: Could not determine repository.');
+        console.error('Please run from a git repository or specify --repo owner/repo');
+        process.exit(1);
+      }
+
+      console.log(`✓ Repository: ${repo}`);
+
       // Start the server
       try {
         await startServer(prNumber);
@@ -63,13 +83,17 @@ async function main() {
         process.exit(1);
       }
 
+      // Build URL with PR number and repo
+      const params = new URLSearchParams({ pr: prNumber, repo });
+      const url = `http://localhost:3000?${params.toString()}`;
+
       // Open browser
       try {
-        await open('http://localhost:3000');
-        console.log('✓ Browser opened');
+        await open(url);
+        console.log(`✓ Browser opened: ${url}`);
       } catch (error) {
         console.log('Note: Could not open browser automatically');
-        console.log('Please open http://localhost:3000 manually');
+        console.log(`Please open ${url} manually`);
       }
 
       console.log('\nCode review UI is ready!');

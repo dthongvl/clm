@@ -110,7 +110,7 @@ function Viewer({
   const createDiffOptions = (filePath: string) =>
     ({
       diffStyle: "split",
-      expandUnchanged: true,
+      expandUnchanged: false,
       expansionLineCount: 20,
       lineDiffType: "word",
       hunkSeparators: "line-info",

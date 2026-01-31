@@ -11,16 +11,26 @@ import {
 } from "@/components/side-panel"
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
-import { useChat, useAIReview } from "@/hooks"
+import { useChat, useAIReview, usePR, useDiff } from "@/hooks"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import {
   mockPR,
   mockChangeGroups,
   mockAIReviewItems,
-  mockDiffFiles,
   mockComments,
 } from "@/lib/mock-data"
+
+// Get PR number from URL search params (e.g., ?pr=123&repo=owner/repo)
+function getPRParams() {
+  const params = new URLSearchParams(window.location.search)
+  const prNumber = params.get("pr")
+  const repo = params.get("repo") || undefined
+  return {
+    prNumber: prNumber ? parseInt(prNumber, 10) : undefined,
+    repo,
+  }
+}
 
 export function App() {
   const diffContainerRef = useRef<HTMLDivElement>(null)
@@ -28,13 +38,29 @@ export function App() {
     getStorageItem(StorageKeys.CHAT_OPEN, false)
   )
 
+  // Get PR params from URL
+  const { prNumber, repo } = getPRParams()
+
+  // Fetch real PR data
+  const { pr, isLoading: isPRLoading, error: prError, refetch: refetchPR } = usePR({ prNumber, repo })
+  const { files, isLoading: isDiffLoading, error: diffError, refetch: refetchDiff } = useDiff({ prNumber, repo })
+
+  // Use real PR data or fall back to mock
+  const displayPR = pr ?? mockPR
+  const displayFiles = files.length > 0 ? files : []
+
   const handleChatOpenChange = useCallback((open: boolean) => {
     setChatOpen(open)
     setStorageItem(StorageKeys.CHAT_OPEN, open)
   }, [])
 
+  const handleRefresh = useCallback(() => {
+    refetchPR()
+    refetchDiff()
+  }, [refetchPR, refetchDiff])
+
   const { messages, sendMessage, isStreaming } = useChat()
-  const { groups, generateGroups, isGeneratingGroups } = useAIReview(mockPR.number)
+  const { groups, generateGroups, isGeneratingGroups } = useAIReview(displayPR.number)
 
   const displayGroups = groups.length > 0 ? groups : mockChangeGroups
 
@@ -73,10 +99,25 @@ export function App() {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <TopBar.Root>
-        <TopBar.PRInfo pr={mockPR} />
+        {isPRLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <span className="animate-pulse">Loading PR info...</span>
+          </div>
+        ) : prError && !pr ? (
+          <div className="flex items-center gap-2 text-destructive">
+            <span>Failed to load PR: {prError.message}</span>
+          </div>
+        ) : (
+          <TopBar.PRInfo pr={displayPR} />
+        )}
         <TopBar.Actions>
-          <Button variant="outline" size="sm">
-            Refresh
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isPRLoading || isDiffLoading}
+          >
+            {isPRLoading || isDiffLoading ? "Loading..." : "Refresh"}
           </Button>
           <Button variant="outline" size="sm">
             Settings
@@ -97,13 +138,38 @@ export function App() {
             }
           >
             <DiffPanel.Root ref={diffContainerRef}>
-              <DiffPanel.Viewer
-                files={mockDiffFiles}
-                annotations={mockComments}
-                onLineClick={(path, line, side) => {
-                  console.log(`Clicked line ${line} (${side}) in ${path}`)
-                }}
-              />
+              {isDiffLoading ? (
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  <span className="animate-pulse">Loading diff...</span>
+                </div>
+              ) : diffError && displayFiles.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
+                  <p className="text-destructive">Failed to load diff</p>
+                  <p className="text-sm text-muted-foreground">{diffError.message}</p>
+                  {!prNumber && (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      Add <code className="rounded bg-muted px-1">?pr=NUMBER</code> to the URL to load a PR
+                    </p>
+                  )}
+                </div>
+              ) : displayFiles.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-muted-foreground">
+                  <p>No files to display</p>
+                  {!prNumber && (
+                    <p className="text-sm">
+                      Add <code className="rounded bg-muted px-1">?pr=NUMBER</code> to the URL to load a PR
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <DiffPanel.Viewer
+                  files={displayFiles}
+                  annotations={mockComments}
+                  onLineClick={(path, line, side) => {
+                    console.log(`Clicked line ${line} (${side}) in ${path}`)
+                  }}
+                />
+              )}
             </DiffPanel.Root>
           </ErrorBoundary>
         }

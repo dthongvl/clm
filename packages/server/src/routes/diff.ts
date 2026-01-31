@@ -24,15 +24,29 @@ app.get('/', async (c) => {
     // Optionally fetch full file content for base and head branches
     if (includeContent) {
       const prInfo = await import('../services/gh.js').then(m => m.getPRInfo(parseInt(prNumber, 10), repo));
+      console.log(`Fetching content for PR #${prNumber}, base: ${prInfo.baseBranch}, head: ${prInfo.headBranch}, repo: ${repo}`);
       
-      for (const file of files) {
+      // Fetch content for all files in parallel for better performance
+      await Promise.all(files.map(async (file) => {
+        const contentPromises: Promise<void>[] = [];
+        
         if (file.status !== 'removed') {
-          file.headContent = await getFileContent(file.filename, prInfo.headBranch, repo);
+          contentPromises.push(
+            getFileContent(file.filename, prInfo.headBranch, repo).then(content => {
+              file.headContent = content;
+            })
+          );
         }
         if (file.status !== 'added') {
-          file.baseContent = await getFileContent(file.filename, prInfo.baseBranch, repo);
+          contentPromises.push(
+            getFileContent(file.filename, prInfo.baseBranch, repo).then(content => {
+              file.baseContent = content;
+            })
+          );
         }
-      }
+        
+        await Promise.all(contentPromises);
+      }));
     }
 
     return c.json({ files });

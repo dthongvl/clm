@@ -80,18 +80,31 @@ export async function getFileContent(
   branch: string,
   repo?: string
 ): Promise<string> {
-  const repoFlag = repo ? `--repo ${repo}` : '';
+  if (!repo) {
+    console.error(`getFileContent called without repo for ${filename}`);
+    return '';
+  }
   
   try {
-    const command = `gh api repos/{owner}/{repo}/contents/${filename}?ref=${branch}`;
-    const { stdout } = await execAsync(`${command} ${repoFlag}`);
+    // URL encode each path segment of the filename to handle special characters
+    const encodedFilename = filename.split('/').map(encodeURIComponent).join('/');
+    
+    // Use gh api with proper repo path - the repo param should be "owner/repo" format
+    // Note: branch names with slashes (e.g., feature/xxx) work fine in the ref param without encoding
+    const command = `gh api "repos/${repo}/contents/${encodedFilename}?ref=${branch}"`;
+    
+    const { stdout } = await execAsync(command);
     const data = JSON.parse(stdout);
     
     if (data.content) {
-      return Buffer.from(data.content, 'base64').toString('utf-8');
+      // GitHub API returns base64 encoded content with newlines, need to remove them
+      const cleanedContent = data.content.replace(/\n/g, '');
+      return Buffer.from(cleanedContent, 'base64').toString('utf-8');
     }
     return '';
-  } catch {
+  } catch (error) {
+    // Log the error for debugging but return empty string to not break the flow
+    console.error(`Failed to fetch content for ${filename} at ${branch} in ${repo}:`, (error as Error).message);
     return '';
   }
 }
