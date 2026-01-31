@@ -6,10 +6,10 @@ import {
   type AnnotationSide,
 } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
-import { Markdown } from "@/components/ui/markdown"
 import { Button } from "@/components/ui/button"
 import type { ReviewComment } from "@/types/review"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
+import { CommentThread } from "@/components/comment-thread"
 import { CommentForm } from "@/components/comment-thread/comment-form"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon } from "@hugeicons/core-free-icons"
@@ -139,123 +139,6 @@ function toLineAnnotations(
     }))
 
   return [...commentAnnotations, ...draftAnnotations]
-}
-
-/**
- * Severity badge component for displaying comment severity.
- */
-function SeverityBadge({ severity }: { severity: ReviewComment["severity"] }) {
-  if (!severity) return null
-
-  return (
-    <span
-      role="status"
-      aria-label={`Severity: ${severity}`}
-      className={cn(
-        "rounded-full px-1.5 py-0.5 text-xs",
-        severity === "critical" && "bg-destructive text-destructive-foreground",
-        severity === "warning" && "bg-warning text-warning-foreground",
-        severity === "info" && "bg-muted text-muted-foreground"
-      )}
-    >
-      {severity}
-    </span>
-  )
-}
-
-/**
- * Single comment component for rendering individual comments in a thread.
- */
-function CommentItem({
-  comment,
-  isReply = false,
-}: {
-  comment: ReviewComment
-  isReply?: boolean
-}) {
-  return (
-    <div
-      data-slot="comment-item"
-      className={cn("p-2", isReply && "border-t border-border/50")}
-      role="article"
-      aria-label={`${isReply ? "Reply" : "Comment"} by ${comment.author.name}`}
-    >
-      <div className="flex items-center gap-2">
-        <span className="font-medium">{comment.author.name}</span>
-        <SeverityBadge severity={comment.severity} />
-      </div>
-      <Markdown className="mt-1">{comment.content}</Markdown>
-    </div>
-  )
-}
-
-/**
- * Comment thread component for rendering a comment and all its replies.
- */
-function CommentThread({
-  comment,
-  lineNumber,
-  onReplySubmit,
-  isSubmittingReply,
-}: {
-  comment: ReviewComment
-  lineNumber: number
-  onReplySubmit?: (commentId: string, content: string) => Promise<void>
-  isSubmittingReply?: boolean
-}) {
-  const [isReplyFormOpen, setIsReplyFormOpen] = useState(false)
-
-  const handleReplySubmit = async (content: string) => {
-    if (!onReplySubmit) return
-    await onReplySubmit(comment.id, content)
-    setIsReplyFormOpen(false)
-  }
-
-  return (
-    <div
-      data-slot="comment-annotation"
-      data-annotation-line={lineNumber}
-      className="border-l-2 border-primary bg-muted/50 text-sm"
-      role="region"
-      aria-label={`Comment thread started by ${comment.author.name}`}
-    >
-      <CommentItem comment={comment} />
-      {comment.replies && comment.replies.length > 0 && (
-        <div data-slot="comment-replies" className="ml-4 border-l border-border/50">
-          {comment.replies.map((reply) => (
-            <CommentItem key={reply.id} comment={reply} isReply />
-          ))}
-        </div>
-      )}
-      {/* Reply action and form */}
-      <div className="p-2 pt-0">
-        {!isReplyFormOpen ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setIsReplyFormOpen(true)}
-            aria-label="Reply to this thread"
-          >
-            Reply
-          </Button>
-        ) : (
-          <div className="mt-2">
-            <CommentForm
-              variant="default"
-              size="sm"
-              autoFocus
-              showKeyboardHints
-              placeholder="Write a reply..."
-              onSubmit={handleReplySubmit}
-              onCancel={() => setIsReplyFormOpen(false)}
-              isLoading={isSubmittingReply}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 /**
@@ -637,7 +520,7 @@ function DiffViewer({
 
                     // Render existing comment thread
                     return (
-                      <CommentThread
+                      <CommentThread.Inline
                         comment={meta.comment}
                         lineNumber={annotation.lineNumber}
                         onReplySubmit={onReplySubmit ? submitReply : undefined}

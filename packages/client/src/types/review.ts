@@ -10,6 +10,8 @@ export interface ReviewComment {
   createdAt: Date;
   replies: ReviewComment[];
   resolved?: boolean;
+  /** Whether this comment is currently being streamed */
+  isStreaming?: boolean;
 }
 
 export interface AIReviewItem {
