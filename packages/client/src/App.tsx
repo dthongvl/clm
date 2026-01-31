@@ -12,6 +12,8 @@ import {
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
 import { useChat, useAIReview } from "@/hooks"
+import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
+import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import {
   mockPR,
   mockChangeGroups,
@@ -22,7 +24,14 @@ import {
 
 export function App() {
   const diffContainerRef = useRef<HTMLDivElement>(null)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(() =>
+    getStorageItem(StorageKeys.CHAT_OPEN, false)
+  )
+
+  const handleChatOpenChange = useCallback((open: boolean) => {
+    setChatOpen(open)
+    setStorageItem(StorageKeys.CHAT_OPEN, open)
+  }, [])
 
   const { messages, sendMessage, isStreaming } = useChat()
   const { groups, generateGroups, isGeneratingGroups } = useAIReview(mockPR.number)
@@ -78,39 +87,59 @@ export function App() {
       <MainLayout
         className="min-h-0 flex-1"
         leftPanel={
-          <DiffPanel.Root ref={diffContainerRef}>
-            <DiffPanel.Viewer
-              files={mockDiffFiles}
-              annotations={mockComments}
-              onLineClick={(path, line, side) => {
-                console.log(`Clicked line ${line} (${side}) in ${path}`)
-              }}
-            />
-          </DiffPanel.Root>
-        }
-        rightPanel={
-          <SidePanel className="h-full">
-            <SidePanelGroupingContent>
-              <IntelligentGrouping
-                groups={displayGroups}
-                onGroupClick={handleGroupClick}
-                onGenerateGroups={generateGroups}
-                isGenerating={isGeneratingGroups}
+          <ErrorBoundary
+            fallback={
+              <ErrorFallback
+                title="Failed to load diff"
+                description="There was an error loading the diff content."
+                className="m-4"
               />
-            </SidePanelGroupingContent>
-            <SidePanelAIReviewContent>
-              <AIReviewSummary
-                items={mockAIReviewItems}
-                onItemClick={(item) => {
-                  scrollToAnnotation(item.filePath, item.lineNumber)
+            }
+          >
+            <DiffPanel.Root ref={diffContainerRef}>
+              <DiffPanel.Viewer
+                files={mockDiffFiles}
+                annotations={mockComments}
+                onLineClick={(path, line, side) => {
+                  console.log(`Clicked line ${line} (${side}) in ${path}`)
                 }}
               />
-            </SidePanelAIReviewContent>
-          </SidePanel>
+            </DiffPanel.Root>
+          </ErrorBoundary>
+        }
+        rightPanel={
+          <ErrorBoundary
+            fallback={
+              <ErrorFallback
+                title="Failed to load panel"
+                description="There was an error loading the side panel."
+                className="m-4"
+              />
+            }
+          >
+            <SidePanel className="h-full">
+              <SidePanelGroupingContent>
+                <IntelligentGrouping
+                  groups={displayGroups}
+                  onGroupClick={handleGroupClick}
+                  onGenerateGroups={generateGroups}
+                  isGenerating={isGeneratingGroups}
+                />
+              </SidePanelGroupingContent>
+              <SidePanelAIReviewContent>
+                <AIReviewSummary
+                  items={mockAIReviewItems}
+                  onItemClick={(item) => {
+                    scrollToAnnotation(item.filePath, item.lineNumber)
+                  }}
+                />
+              </SidePanelAIReviewContent>
+            </SidePanel>
+          </ErrorBoundary>
         }
       />
 
-      <ChatPopup.Root open={chatOpen} onOpenChange={setChatOpen}>
+      <ChatPopup.Root open={chatOpen} onOpenChange={handleChatOpenChange}>
         <ChatPopup.Trigger />
         <ChatPopup.Content title="Ask about this PR">
           <ChatPopup.Messages>

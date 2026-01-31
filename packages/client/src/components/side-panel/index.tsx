@@ -1,11 +1,38 @@
+import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
+
+type TabValue = "grouping" | "ai-review"
 
 interface SidePanelProps extends React.ComponentProps<"aside"> {
-  defaultTab?: "grouping" | "ai-review"
+  defaultTab?: TabValue
+  persistTab?: boolean
 }
 
-function SidePanel({ className, defaultTab = "grouping", children, ...props }: SidePanelProps) {
+function SidePanel({
+  className,
+  defaultTab = "grouping",
+  persistTab = true,
+  children,
+  ...props
+}: SidePanelProps) {
+  const [tab, setTab] = React.useState<TabValue>(() => {
+    if (!persistTab) return defaultTab
+    return getStorageItem<TabValue>(StorageKeys.SIDE_PANEL_TAB, defaultTab)
+  })
+
+  const handleTabChange = React.useCallback(
+    (value: string) => {
+      const newTab = value as TabValue
+      setTab(newTab)
+      if (persistTab) {
+        setStorageItem(StorageKeys.SIDE_PANEL_TAB, newTab)
+      }
+    },
+    [persistTab]
+  )
+
   return (
     <aside
       data-slot="side-panel"
@@ -14,7 +41,7 @@ function SidePanel({ className, defaultTab = "grouping", children, ...props }: S
       className={cn("flex min-h-0 flex-col overflow-hidden", className)}
       {...props}
     >
-      <Tabs defaultValue={defaultTab} className="flex flex-1 flex-col">
+      <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col">
         <TabsList variant="line">
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>

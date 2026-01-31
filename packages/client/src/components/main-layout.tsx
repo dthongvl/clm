@@ -3,106 +3,64 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable"
+import type { Layout } from "react-resizable-panels"
 
-const STORAGE_KEY = "main-layout-width"
-const MIN_WIDTH_PX = 300
-const RESIZE_STEP = 2
+const STORAGE_KEY = "code-review:main-layout-sizes"
+const LEFT_PANEL_ID = "left"
+const RIGHT_PANEL_ID = "right"
 
 export type MainLayoutProps = React.ComponentProps<"main"> & {
   leftPanel: React.ReactNode
   rightPanel: React.ReactNode
-  defaultLeftWidth?: number
+  defaultLeftSize?: number
 }
 
-function getInitialWidth(defaultWidth: number): number {
-  if (typeof window === "undefined") return defaultWidth
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored) {
-    const parsed = parseFloat(stored)
-    if (!isNaN(parsed) && parsed >= 10 && parsed <= 90) {
-      return parsed
+function getPersistedLayout(): Layout | undefined {
+  if (typeof window === "undefined") return undefined
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored) as Layout
+      if (
+        typeof parsed === "object" &&
+        LEFT_PANEL_ID in parsed &&
+        RIGHT_PANEL_ID in parsed
+      ) {
+        return parsed
+      }
     }
+  } catch {
+    // Ignore parse errors
   }
-  return defaultWidth
+  return undefined
+}
+
+function persistLayout(layout: Layout): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
+  } catch {
+    // Ignore storage errors
+  }
 }
 
 export function MainLayout({
   leftPanel,
   rightPanel,
-  defaultLeftWidth = 70,
+  defaultLeftSize = 70,
   className,
   ...props
 }: MainLayoutProps) {
-  const [leftWidth, setLeftWidth] = React.useState(() =>
-    getInitialWidth(defaultLeftWidth)
-  )
-  const [isDragging, setIsDragging] = React.useState(false)
-  const containerRef = React.useRef<HTMLDivElement>(null)
-  const mainRef = React.useRef<HTMLElement>(null)
-
-  const updateWidth = React.useCallback((newWidth: number) => {
-    if (!containerRef.current) return
-
-    const containerWidth = containerRef.current.offsetWidth
-    const minPercent = (MIN_WIDTH_PX / containerWidth) * 100
-    const maxPercent = 100 - minPercent
-
-    const clampedWidth = Math.max(minPercent, Math.min(maxPercent, newWidth))
-    setLeftWidth(clampedWidth)
-    localStorage.setItem(STORAGE_KEY, String(clampedWidth))
-  }, [])
-
-  const handleMouseDown = React.useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      setIsDragging(true)
-    },
-    []
-  )
-
-  React.useEffect(() => {
-    if (!isDragging) return
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return
-
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
-      updateWidth(newWidth)
-    }
-
-    const handleMouseUp = () => {
-      setIsDragging(false)
-    }
-
-    document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mouseup", handleMouseUp)
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [isDragging, updateWidth])
-
-  const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowLeft":
-          e.preventDefault()
-          updateWidth(leftWidth - RESIZE_STEP)
-          break
-        case "ArrowRight":
-          e.preventDefault()
-          updateWidth(leftWidth + RESIZE_STEP)
-          break
-        case "Home":
-          e.preventDefault()
-          updateWidth(defaultLeftWidth)
-          break
-      }
-    },
-    [leftWidth, defaultLeftWidth, updateWidth]
-  )
+  const persistedLayout = React.useMemo(() => getPersistedLayout(), [])
+  const defaultLayout: Layout = persistedLayout ?? {
+    [LEFT_PANEL_ID]: defaultLeftSize,
+    [RIGHT_PANEL_ID]: 100 - defaultLeftSize,
+  }
 
   return (
     <>
@@ -112,47 +70,28 @@ export function MainLayout({
       >
         Skip to main content
       </a>
-      <div ref={containerRef} className="flex min-h-0 h-full w-full">
-        <main
-          ref={mainRef}
-          id="main-content"
-          role="main"
-          data-slot="main-layout"
-          className={cn("flex min-h-0 h-full w-full", className)}
-          {...props}
+      <main
+        id="main-content"
+        role="main"
+        data-slot="main-layout"
+        className={cn("flex min-h-0 h-full w-full", className)}
+        {...props}
+      >
+        <ResizablePanelGroup
+          orientation="horizontal"
+          defaultLayout={defaultLayout}
+          onLayoutChanged={persistLayout}
+          className="h-full w-full"
         >
-          <div
-            className="h-full overflow-hidden"
-            style={{ width: `${leftWidth}%` }}
-          >
-            {leftPanel}
-          </div>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-valuenow={Math.round(leftWidth)}
-            aria-valuemin={10}
-            aria-valuemax={90}
-            aria-label="Resize panels"
-            tabIndex={0}
-            onMouseDown={handleMouseDown}
-            onKeyDown={handleKeyDown}
-            className={cn(
-              "relative flex w-1 shrink-0 cursor-col-resize items-center justify-center bg-border transition-colors",
-              "hover:bg-primary/50 focus:bg-primary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              isDragging && "bg-primary/50"
-            )}
-          >
-            <div className="absolute inset-y-0 -left-1 -right-1" />
-          </div>
-          <div
-            className="h-full overflow-hidden"
-            style={{ width: `${100 - leftWidth}%` }}
-          >
-            {rightPanel}
-          </div>
-        </main>
-      </div>
+          <ResizablePanel id={LEFT_PANEL_ID} minSize="20%" maxSize="80%">
+            <div className="h-full overflow-hidden">{leftPanel}</div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel id={RIGHT_PANEL_ID} minSize="20%" maxSize="80%">
+            <div className="h-full overflow-hidden">{rightPanel}</div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </main>
     </>
   )
 }
