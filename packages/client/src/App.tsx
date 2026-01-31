@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useCallback } from "react"
 import { TopBar } from "@/components/top-bar"
 import { MainLayout } from "@/components/main-layout"
 import { DiffPanel } from "@/components/diff-panel"
@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button"
 import {
   mockPR,
-  mockFileTree,
   mockChangeGroups,
   mockAIReviewItems,
   mockDiffFiles,
@@ -20,7 +19,38 @@ import {
 } from "@/lib/mock-data"
 
 export function App() {
-  const [selectedFile, setSelectedFile] = useState<string | undefined>()
+  const diffContainerRef = useRef<HTMLDivElement>(null)
+
+  const scrollToFile = useCallback((filePath: string) => {
+    const container = diffContainerRef.current
+    if (!container) return
+
+    const fileElement = container.querySelector(`[data-file-path="${CSS.escape(filePath)}"]`)
+    if (fileElement) {
+      fileElement.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+  }, [])
+
+  const scrollToAnnotation = useCallback((filePath: string, lineNumber: number) => {
+    const container = diffContainerRef.current
+    if (!container) return
+
+    const annotationElement = container.querySelector(
+      `[data-file-path="${CSS.escape(filePath)}"] [data-annotation-line="${lineNumber}"]`
+    )
+    if (annotationElement) {
+      annotationElement.scrollIntoView({ behavior: "smooth", block: "center" })
+    } else {
+      scrollToFile(filePath)
+    }
+  }, [scrollToFile])
+
+  const handleGroupClick = useCallback((groupId: string) => {
+    const group = mockChangeGroups.find((g) => g.id === groupId)
+    if (group && group.files.length > 0) {
+      scrollToFile(group.files[0])
+    }
+  }, [scrollToFile])
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -37,13 +67,9 @@ export function App() {
       </TopBar.Root>
 
       <MainLayout
+        className="min-h-0 flex-1"
         leftPanel={
-          <DiffPanel.Root>
-            <DiffPanel.FileTree
-              files={mockFileTree}
-              selectedPath={selectedFile}
-              onSelectFile={setSelectedFile}
-            />
+          <DiffPanel.Root ref={diffContainerRef}>
             <DiffPanel.Viewer
               files={mockDiffFiles}
               annotations={mockComments}
@@ -58,15 +84,14 @@ export function App() {
             <SidePanelGroupingContent>
               <IntelligentGrouping
                 groups={mockChangeGroups}
-                onGroupClick={(groupId) => console.log("Group clicked:", groupId)}
+                onGroupClick={handleGroupClick}
               />
             </SidePanelGroupingContent>
             <SidePanelAIReviewContent>
               <AIReviewSummary
                 items={mockAIReviewItems}
                 onItemClick={(item) => {
-                  console.log("Review item clicked:", item)
-                  setSelectedFile(item.filePath)
+                  scrollToAnnotation(item.filePath, item.lineNumber)
                 }}
               />
             </SidePanelAIReviewContent>

@@ -112,17 +112,17 @@ export function MainLayout({
       >
         Skip to main content
       </a>
-      <div ref={containerRef} className="flex h-full w-full">
+      <div ref={containerRef} className="flex min-h-0 h-full w-full">
         <main
           ref={mainRef}
           id="main-content"
           role="main"
           data-slot="main-layout"
-          className={cn("flex h-full w-full", className)}
+          className={cn("flex min-h-0 h-full w-full", className)}
           {...props}
         >
           <div
-            className="h-full overflow-auto"
+            className="h-full overflow-hidden"
             style={{ width: `${leftWidth}%` }}
           >
             {leftPanel}
@@ -146,7 +146,7 @@ export function MainLayout({
             <div className="absolute inset-y-0 -left-1 -right-1" />
           </div>
           <div
-            className="h-full overflow-auto"
+            className="h-full overflow-hidden"
             style={{ width: `${100 - leftWidth}%` }}
           >
             {rightPanel}

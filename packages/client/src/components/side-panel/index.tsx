@@ -11,7 +11,7 @@ function SidePanel({ className, defaultTab = "grouping", children, ...props }: S
       data-slot="side-panel"
       role="complementary"
       aria-label="Side panel"
-      className={cn("flex flex-col", className)}
+      className={cn("flex min-h-0 flex-col overflow-hidden", className)}
       {...props}
     >
       <Tabs defaultValue={defaultTab} className="flex flex-1 flex-col">

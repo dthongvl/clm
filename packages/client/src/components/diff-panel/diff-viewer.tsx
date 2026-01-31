@@ -80,7 +80,7 @@ function Viewer({
   return (
     <div
       data-slot="diff-viewer"
-      className={cn("flex-1 overflow-auto bg-background", className)}
+      className={cn("min-h-0 flex-1 overflow-auto bg-background", className)}
     >
       <div className="flex flex-col gap-4 p-4">
         {files.map((file) => {
@@ -103,7 +103,10 @@ function Viewer({
                 options={createDiffOptions(file.path)}
                 lineAnnotations={lineAnnotations}
                 renderAnnotation={(annotation) => (
-                  <div className="border-l-2 border-primary bg-muted/50 p-2 text-sm">
+                  <div
+                    data-annotation-line={annotation.lineNumber}
+                    className="border-l-2 border-primary bg-muted/50 p-2 text-sm"
+                  >
                     <div className="flex items-center gap-2">
                       <span className="font-medium">
                         {annotation.metadata?.author.name}
