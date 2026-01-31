@@ -1,6 +1,8 @@
+import { useState, useCallback } from "react"
 import { MultiFileDiff, type DiffLineAnnotation, type FileContents } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
 import type { ReviewComment } from "@/types/review"
+import { CollapsibleFileHeader } from "./collapsible-file-header"
 
 export interface DiffFileData {
   path: string
@@ -21,6 +23,10 @@ export interface DiffPanelViewerProps {
     side: "additions" | "deletions"
   ) => void
   className?: string
+  /** Callback when a file's viewed state changes */
+  onFileViewedChange?: (filePath: string, isViewed: boolean) => void
+  /** Initial state for viewed files (file paths that are already viewed) */
+  viewedFiles?: Set<string>
 }
 
 function toFileContents(path: string, content: string): FileContents {
@@ -48,7 +54,59 @@ function Viewer({
   annotations = [],
   onLineClick,
   className,
+  onFileViewedChange,
+  viewedFiles: controlledViewedFiles,
 }: DiffPanelViewerProps) {
+  // Track collapsed state for each file
+  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set())
+  
+  // Internal viewed files state (used when not controlled)
+  const [internalViewedFiles, setInternalViewedFiles] = useState<Set<string>>(new Set())
+  
+  // Use controlled state if provided, otherwise use internal state
+  const viewedFiles = controlledViewedFiles ?? internalViewedFiles
+
+  const handleToggleCollapse = useCallback((filePath: string) => {
+    setCollapsedFiles((prev) => {
+      const next = new Set(prev)
+      if (next.has(filePath)) {
+        next.delete(filePath)
+      } else {
+        next.add(filePath)
+      }
+      return next
+    })
+  }, [])
+
+  const handleToggleViewed = useCallback((filePath: string) => {
+    const newViewedState = !viewedFiles.has(filePath)
+    
+    // Update internal state if not controlled
+    if (controlledViewedFiles === undefined) {
+      setInternalViewedFiles((prev) => {
+        const next = new Set(prev)
+        if (newViewedState) {
+          next.add(filePath)
+        } else {
+          next.delete(filePath)
+        }
+        return next
+      })
+    }
+    
+    // Auto-collapse when marking as viewed
+    if (newViewedState) {
+      setCollapsedFiles((prev) => {
+        const next = new Set(prev)
+        next.add(filePath)
+        return next
+      })
+    }
+    
+    // Notify parent if callback provided
+    onFileViewedChange?.(filePath, newViewedState)
+  }, [viewedFiles, controlledViewedFiles, onFileViewedChange])
+
   const createDiffOptions = (filePath: string) =>
     ({
       diffStyle: "split",
@@ -56,6 +114,7 @@ function Viewer({
       expansionLineCount: 20,
       lineDiffType: "word",
       hunkSeparators: "line-info",
+      disableFileHeader: true, // Disable default header to use our custom one
       onLineClick: onLineClick
         ? (props: { lineNumber: number; annotationSide: "additions" | "deletions" }) => {
             onLineClick(filePath, props.lineNumber, props.annotationSide)
@@ -91,67 +150,64 @@ function Viewer({
           const newFile = toFileContents(file.path, file.newContent)
           const lineAnnotations = toLineAnnotations(annotations, file.path)
 
+          const isCollapsed = collapsedFiles.has(file.path)
+          const isViewed = viewedFiles.has(file.path)
+
           return (
             <div
               key={file.path}
               data-file-path={file.path}
               className="overflow-hidden rounded-lg border border-border"
             >
-              <MultiFileDiff<ReviewComment>
-                oldFile={oldFile}
-                newFile={newFile}
-                options={createDiffOptions(file.path)}
-                lineAnnotations={lineAnnotations}
-                renderAnnotation={(annotation) => (
-                  <div
-                    data-annotation-line={annotation.lineNumber}
-                    className="border-l-2 border-primary bg-muted/50 p-2 text-sm"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">
-                        {annotation.metadata?.author.name}
-                      </span>
-                      {annotation.metadata?.severity && (
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-xs",
-                            annotation.metadata.severity === "critical" &&
-                              "bg-destructive text-destructive-foreground",
-                            annotation.metadata.severity === "warning" &&
-                              "bg-warning text-warning-foreground",
-                            annotation.metadata.severity === "info" &&
-                              "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {annotation.metadata.severity}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1">{annotation.metadata?.content}</p>
-                  </div>
-                )}
-                renderHeaderMetadata={() => (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5",
-                        file.status === "added" &&
-                          "bg-green-500/20 text-green-600",
-                        file.status === "deleted" &&
-                          "bg-red-500/20 text-red-600",
-                        file.status === "modified" &&
-                          "bg-blue-500/20 text-blue-600",
-                        file.status === "renamed" &&
-                          "bg-yellow-500/20 text-yellow-600"
-                      )}
-                    >
-                      {file.status}
-                    </span>
-                    <span className="text-green-500">+{file.additions}</span>
-                    <span className="text-red-500">−{file.deletions}</span>
-                  </div>
-                )}
+              {/* Custom collapsible file header */}
+              <CollapsibleFileHeader
+                filePath={file.path}
+                status={file.status}
+                additions={file.additions}
+                deletions={file.deletions}
+                isCollapsed={isCollapsed}
+                isViewed={isViewed}
+                onToggleCollapse={() => handleToggleCollapse(file.path)}
+                onToggleViewed={() => handleToggleViewed(file.path)}
               />
+              
+              {/* Diff content - hidden when collapsed */}
+              {!isCollapsed && (
+                <MultiFileDiff<ReviewComment>
+                  oldFile={oldFile}
+                  newFile={newFile}
+                  options={createDiffOptions(file.path)}
+                  lineAnnotations={lineAnnotations}
+                  renderAnnotation={(annotation) => (
+                    <div
+                      data-annotation-line={annotation.lineNumber}
+                      className="border-l-2 border-primary bg-muted/50 p-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                          {annotation.metadata?.author.name}
+                        </span>
+                        {annotation.metadata?.severity && (
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 text-xs",
+                              annotation.metadata.severity === "critical" &&
+                                "bg-destructive text-destructive-foreground",
+                              annotation.metadata.severity === "warning" &&
+                                "bg-warning text-warning-foreground",
+                              annotation.metadata.severity === "info" &&
+                                "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            {annotation.metadata.severity}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1">{annotation.metadata?.content}</p>
+                    </div>
+                  )}
+                />
+              )}
             </div>
           )
         })}
