@@ -77,4 +77,33 @@ export async function fetchStatus(): Promise<StatusResponse> {
   return fetchApi<StatusResponse>('/pr-info/status');
 }
 
-export type { ServerPRInfo, ServerFileDiff, StatusResponse };
+// Server response type for PR comments
+interface ServerPRComment {
+  id: number;
+  body: string;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+  created_at: string;
+  updated_at: string;
+  path?: string;
+  line?: number;
+  original_line?: number;
+  side?: 'LEFT' | 'RIGHT';
+  in_reply_to_id?: number;
+  diff_hunk?: string;
+}
+
+interface CommentsResponse {
+  comments: ServerPRComment[];
+}
+
+export async function fetchPRComments(prNumber: number, repo?: string): Promise<ServerPRComment[]> {
+  const params = new URLSearchParams({ pr: String(prNumber) });
+  if (repo) params.set('repo', repo);
+  const response = await fetchApi<CommentsResponse>(`/comments?${params}`);
+  return response.comments;
+}
+
+export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment };

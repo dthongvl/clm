@@ -142,3 +142,41 @@ export async function getCurrentRepo(): Promise<string | null> {
     return null;
   }
 }
+
+export interface PRComment {
+  id: number;
+  body: string;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+  created_at: string;
+  updated_at: string;
+  path?: string;
+  line?: number;
+  original_line?: number;
+  side?: 'LEFT' | 'RIGHT';
+  in_reply_to_id?: number;
+  diff_hunk?: string;
+}
+
+export async function getPRComments(prNumber: number, repo: string): Promise<PRComment[]> {
+  try {
+    // Fetch review comments (comments on specific lines in the diff)
+    const reviewCmd = `gh api repos/${repo}/pulls/${prNumber}/comments --paginate`;
+    const { stdout: reviewStdout } = await execAsync(reviewCmd);
+    const reviewComments: PRComment[] = reviewStdout.trim() ? JSON.parse(reviewStdout) : [];
+
+    // Fetch issue comments (general PR comments not tied to specific lines)
+    const issueCmd = `gh api repos/${repo}/issues/${prNumber}/comments --paginate`;
+    const { stdout: issueStdout } = await execAsync(issueCmd);
+    const issueComments: PRComment[] = issueStdout.trim() ? JSON.parse(issueStdout) : [];
+
+    // Combine and return all comments
+    // Review comments have path/line, issue comments don't
+    return [...reviewComments, ...issueComments];
+  } catch (error) {
+    console.error('Failed to fetch PR comments:', (error as Error).message);
+    return [];
+  }
+}

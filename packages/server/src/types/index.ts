@@ -28,6 +28,23 @@ export interface Comment {
   replies?: Comment[];
 }
 
+export interface PRCommentResponse {
+  id: number;
+  body: string;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+  created_at: string;
+  updated_at: string;
+  path?: string;
+  line?: number;
+  original_line?: number;
+  side?: 'LEFT' | 'RIGHT';
+  in_reply_to_id?: number;
+  diff_hunk?: string;
+}
+
 export interface AIReviewSuggestion {
   file: string;
   line: number;

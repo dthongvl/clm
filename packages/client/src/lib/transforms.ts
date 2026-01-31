@@ -2,7 +2,8 @@
 
 import type { PRInfo, PRState } from '@/types/pr';
 import type { DiffFileData } from '@/components/diff-panel';
-import type { ServerPRInfo, ServerFileDiff } from './api';
+import type { ReviewComment } from '@/types/review';
+import type { ServerPRInfo, ServerFileDiff, ServerPRComment } from './api';
 
 /**
  * Transform server PR info to client PR info format
@@ -62,4 +63,53 @@ export function transformFileDiff(serverFile: ServerFileDiff): DiffFileData {
  */
 export function transformFileDiffs(serverFiles: ServerFileDiff[]): DiffFileData[] {
   return serverFiles.map(transformFileDiff);
+}
+
+/**
+ * Transform a single server PR comment to client ReviewComment format
+ */
+export function transformComment(serverComment: ServerPRComment): ReviewComment {
+  return {
+    id: String(serverComment.id),
+    filePath: serverComment.path || '',
+    lineNumber: serverComment.line || serverComment.original_line || 0,
+    content: serverComment.body,
+    author: {
+      type: 'human',
+      name: serverComment.user.login,
+    },
+    createdAt: new Date(serverComment.created_at),
+    replies: [],
+    resolved: false,
+  };
+}
+
+/**
+ * Transform array of server PR comments to client ReviewComment format
+ * Groups replies with their parent comments
+ */
+export function transformComments(serverComments: ServerPRComment[]): ReviewComment[] {
+  // Separate top-level comments from replies
+  const topLevelComments: ServerPRComment[] = [];
+  const repliesByParentId = new Map<number, ServerPRComment[]>();
+
+  for (const comment of serverComments) {
+    if (comment.in_reply_to_id) {
+      const replies = repliesByParentId.get(comment.in_reply_to_id) || [];
+      replies.push(comment);
+      repliesByParentId.set(comment.in_reply_to_id, replies);
+    } else {
+      topLevelComments.push(comment);
+    }
+  }
+
+  // Transform top-level comments and attach their replies
+  return topLevelComments.map((comment) => {
+    const transformed = transformComment(comment);
+    const replies = repliesByParentId.get(comment.id) || [];
+    transformed.replies = replies
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .map(transformComment);
+    return transformed;
+  });
 }
