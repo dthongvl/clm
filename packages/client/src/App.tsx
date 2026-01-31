@@ -44,7 +44,7 @@ export function App() {
 
     const fileElement = container.querySelector(`[data-file-path="${CSS.escape(filePath)}"]`)
     if (fileElement) {
-      fileElement.scrollIntoView({ behavior: "smooth", block: "start" })
+      fileElement.scrollIntoView({ behavior: "instant", block: "start" })
     }
   }, [])
 
@@ -56,7 +56,7 @@ export function App() {
       `[data-file-path="${CSS.escape(filePath)}"] [data-annotation-line="${lineNumber}"]`
     )
     if (annotationElement) {
-      annotationElement.scrollIntoView({ behavior: "smooth", block: "center" })
+      annotationElement.scrollIntoView({ behavior: "instant", block: "center" })
     } else {
       scrollToFile(filePath)
     }
