@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import {
   MultiFileDiff,
   type DiffLineAnnotation,
@@ -13,6 +13,7 @@ import { CommentThread } from "@/components/comment-thread"
 import { CommentForm } from "@/components/comment-thread/comment-form"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon } from "@hugeicons/core-free-icons"
+import { useTheme } from "@/components/theme-provider"
 
 /**
  * Data structure representing a file diff.
@@ -220,6 +221,19 @@ function DiffViewer({
   aiReviewItems = [],
   ...props
 }: DiffViewerProps) {
+  // Get current theme from theme provider
+  const { theme } = useTheme()
+
+  // Resolve theme (handle "system" by checking media query)
+  const resolvedTheme = useMemo(() => {
+    if (theme === "system") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+    }
+    return theme
+  }, [theme])
+
   // Track collapsed state for each file
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set())
 
@@ -404,6 +418,7 @@ function DiffViewer({
         hunkSeparators: "line-info" as const,
         disableFileHeader: true, // Disable default header to use our custom one
         enableHoverUtility: !hasOpenForm, // Disable hover utility when comment form is open
+        themeType: resolvedTheme, // Pass the current theme to the diff component
         onLineClick: onLineClick
           ? (lineProps: {
               lineNumber: number
@@ -414,7 +429,7 @@ function DiffViewer({
           : undefined,
       }
     },
-    [hasOpenCommentForm, onLineClick]
+    [hasOpenCommentForm, onLineClick, resolvedTheme]
   )
 
   if (files.length === 0) {

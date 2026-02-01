@@ -3,8 +3,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Card } from "@/components/ui/card"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Loading03Icon } from "@hugeicons/core-free-icons"
+import { Loading03Icon, SparklesIcon } from "@hugeicons/core-free-icons"
 
 /**
  * Props for the CommentForm component.
@@ -164,12 +165,16 @@ function CommentForm({
         aria-describedby={showKeyboardHints ? "comment-form-hint" : undefined}
         rows={3}
         className={cn(
+          "border-transparent bg-muted/50 focus-visible:border-input focus-visible:bg-transparent",
           variant === "inline" && "min-h-[60px] resize-none"
         )}
       />
       <div
         data-slot="comment-form-actions"
-        className={cn("flex items-center gap-2", variant === "inline" && "mt-3")}
+        className={cn(
+          "flex items-center gap-2",
+          variant === "inline" ? "mt-3" : "mt-2"
+        )}
       >
         <Button
           type="submit"
@@ -185,7 +190,7 @@ function CommentForm({
                 className={cn(size === "sm" ? "size-3" : "size-4", "animate-spin")}
                 aria-hidden="true"
               />
-              Submitting...
+              <span>Submitting...</span>
             </>
           ) : (
             "Comment"
@@ -207,13 +212,22 @@ function CommentForm({
                   className={cn(size === "sm" ? "size-3" : "size-4", "animate-spin")}
                   aria-hidden="true"
                 />
-                Thinking...
+                <span>Thinking...</span>
               </>
             ) : (
-              "Ask AI"
+              <>
+                <HugeiconsIcon
+                  icon={SparklesIcon}
+                  className={cn(size === "sm" ? "size-3" : "size-4")}
+                  data-icon="inline-start"
+                  aria-hidden="true"
+                />
+                <span>Ask AI</span>
+              </>
             )}
           </Button>
         )}
+        <div className="flex-1" />
         {onCancel && (
           <Button
             type="button"
@@ -229,17 +243,20 @@ function CommentForm({
       {showKeyboardHints && (
         <p
           id="comment-form-hint"
-          className="mt-2 text-xs text-muted-foreground"
+          className="mt-3 text-xs text-muted-foreground"
         >
-          Press <kbd className="rounded bg-muted px-1">Cmd+Enter</kbd> to submit
+          <kbd className="border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘+Enter</kbd>
+          <span className="ml-1 mr-3">submit</span>
           {onAskAI && (
             <>
-              , <kbd className="rounded bg-muted px-1">Cmd+Shift+Enter</kbd> to ask AI
+              <kbd className="border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘+Shift+Enter</kbd>
+              <span className="ml-1 mr-3">ask AI</span>
             </>
           )}
           {onCancel && (
             <>
-              , <kbd className="rounded bg-muted px-1">Esc</kbd> to cancel
+              <kbd className="border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd>
+              <span className="ml-1">cancel</span>
             </>
           )}
         </p>
@@ -257,15 +274,17 @@ function CommentForm({
         aria-label="Add a comment"
       >
         <div className="m-4 max-w-[95%] sm:max-w-[70%]">
-          <form
-            data-slot="comment-form"
-            aria-busy={isDisabled}
-            onSubmit={handleSubmit}
-            className="bg-card p-3 ring-1 ring-foreground/10"
-            {...props}
-          >
-            {formContent}
-          </form>
+          <Card size="sm" className="border-l-2 border-l-primary py-0">
+            <form
+              data-slot="comment-form"
+              aria-busy={isDisabled}
+              onSubmit={handleSubmit}
+              className="p-3"
+              {...props}
+            >
+              {formContent}
+            </form>
+          </Card>
         </div>
       </div>
     )
