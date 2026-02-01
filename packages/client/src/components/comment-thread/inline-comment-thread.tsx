@@ -1,18 +1,14 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { SeverityBadge } from "@/components/ui/severity-badge"
 import { Markdown } from "@/components/ui/markdown"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Loading03Icon } from "@hugeicons/core-free-icons"
-import type { ReviewComment, Severity } from "@/types/review"
+import type { ReviewComment } from "@/types/review"
 import { CommentForm } from "./comment-form"
-
-const severityVariantMap: Record<Severity, "destructive" | "secondary" | "outline"> = {
-  critical: "destructive",
-  warning: "secondary",
-  info: "outline",
-}
 
 /**
  * Props for the InlineCommentThread component.
@@ -50,23 +46,26 @@ function CommentItem({
       data-slot="comment-item"
       data-author-type={comment.author.type}
       data-streaming={comment.isStreaming || undefined}
-      className={cn("p-2", isReply && "border-t border-border/50")}
+      className={cn(
+        "px-3 py-2",
+        isReply && "border-t border-border"
+      )}
       role="article"
       aria-label={`${isReply ? "Reply" : "Comment"} by ${comment.author.name}`}
     >
       <div className="flex items-center gap-2">
-        <span className={cn("font-medium", isAI && "text-primary")}>
+        <span className={cn("text-xs font-medium", isAI && "text-primary")}>
           {comment.author.name}
         </span>
         {isAI && (
-          <Badge variant="secondary" className="text-xs" aria-label="AI generated">
+          <Badge variant="secondary" aria-label="AI generated">
             AI
           </Badge>
         )}
         {comment.severity && (
-          <Badge variant={severityVariantMap[comment.severity]}>
+          <SeverityBadge severity={comment.severity}>
             {comment.severity}
-          </Badge>
+          </SeverityBadge>
         )}
         {comment.isStreaming ? (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -87,11 +86,11 @@ function CommentItem({
           </time>
         )}
       </div>
-      <div data-slot="comment-content" className="mt-1">
+      <div data-slot="comment-content" className="mt-1.5">
         {comment.isStreaming && !comment.content ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-block h-4 w-4 animate-pulse rounded bg-muted" />
-            <span className="inline-block h-4 w-24 animate-pulse rounded bg-muted" />
+          <div className="flex flex-col gap-1.5">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-3/4" />
           </div>
         ) : (
           <Markdown>{comment.content}</Markdown>
@@ -134,32 +133,31 @@ function InlineCommentThread({
     <div
       data-slot="comment-annotation"
       data-annotation-line={lineNumber}
-      className="border-l-2 border-primary bg-muted/50 text-sm"
+      className="bg-card text-sm ring-1 ring-foreground/10"
       role="region"
       aria-label={`Comment thread started by ${comment.author.name}`}
     >
-      <CommentItem comment={comment} />
-      {comment.replies && comment.replies.length > 0 && (
-        <div data-slot="comment-replies" className="ml-4 border-l border-border/50">
-          {comment.replies.map((reply) => (
-            <CommentItem key={reply.id} comment={reply} isReply />
-          ))}
-        </div>
-      )}
-      {/* Reply action and form */}
-      <div className="p-2 pt-0">
-        {!isReplyFormOpen ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setIsReplyFormOpen(true)}
-            aria-label="Reply to this thread"
-          >
-            Reply
-          </Button>
-        ) : (
-          <div className="mt-2">
+      <div className="border-l-2 border-primary">
+        <CommentItem comment={comment} />
+        {comment.replies && comment.replies.length > 0 && (
+          <div data-slot="comment-replies" className="border-t border-border">
+            {comment.replies.map((reply) => (
+              <CommentItem key={reply.id} comment={reply} isReply />
+            ))}
+          </div>
+        )}
+        <div className="border-t border-border px-3 py-2">
+          {!isReplyFormOpen ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setIsReplyFormOpen(true)}
+              aria-label="Reply to this thread"
+            >
+              Reply
+            </Button>
+          ) : (
             <CommentForm
               variant="default"
               size="sm"
@@ -170,8 +168,8 @@ function InlineCommentThread({
               onCancel={() => setIsReplyFormOpen(false)}
               isLoading={isSubmittingReply}
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

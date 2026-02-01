@@ -261,7 +261,7 @@ function CommentForm({
             data-slot="comment-form"
             aria-busy={isDisabled}
             onSubmit={handleSubmit}
-            className="rounded-lg border bg-card p-4 shadow-sm"
+            className="bg-card p-3 ring-1 ring-foreground/10"
             {...props}
           >
             {formContent}
