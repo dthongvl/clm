@@ -254,31 +254,51 @@ export function App() {
 
       <ChatPopup.Root open={chatOpen} onOpenChange={handleChatOpenChange}>
         <ChatPopup.Trigger />
-        <ChatPopup.Content title="Ask about this PR">
+        <ChatPopup.Content title="Lily">
           <ChatPopup.Messages>
             {messages.length === 0 ? (
-              <p className="text-center text-xs text-muted-foreground">
-                Ask any question about this pull request...
-              </p>
-            ) : (
-              messages.map((message) => (
-                <ChatPopup.Message
-                  key={message.id}
-                  role={message.role}
-                  content={message.content}
+              <>
+                <ChatPopup.Welcome
+                  message="Hey! I'm Lily. I've reviewed this PR and I'm ready to help. Ask me anything about the changes, potential issues, or how the code works."
                 />
-              ))
-            )}
-            {isStreaming && (
-              <div className="text-xs text-muted-foreground animate-pulse">
-                AI is thinking...
-              </div>
+                <div className="flex-1" />
+                <ChatPopup.Suggestions
+                  prompts={[
+                    {
+                      label: "Summarize changes",
+                      onClick: () => sendMessage("Summarize the changes in this PR"),
+                    },
+                    {
+                      label: "Find potential issues",
+                      onClick: () => sendMessage("Find potential issues in this PR"),
+                    },
+                    {
+                      label: "Explain architecture",
+                      onClick: () => sendMessage("Explain the architecture of the changes"),
+                    },
+                  ]}
+                />
+              </>
+            ) : (
+              <>
+                {messages.map((message) => (
+                  <ChatPopup.Message
+                    key={message.id}
+                    role={message.role}
+                    content={message.content}
+                  />
+                ))}
+                {isStreaming && (
+                  <div className="text-xs text-muted-foreground animate-pulse">
+                    AI is thinking...
+                  </div>
+                )}
+              </>
             )}
           </ChatPopup.Messages>
-          <ChatPopup.Input
+          <ChatPopup.InputField
             onSend={sendMessage}
-            isLoading={isStreaming}
-            placeholder="Ask a question..."
+            placeholder="Ask Lily anything about this PR"
           />
         </ChatPopup.Content>
       </ChatPopup.Root>

@@ -457,7 +457,7 @@ function DiffViewer({
       className={cn("min-h-0 flex-1 overflow-auto bg-background", className)}
       {...props}
     >
-      <div className="flex flex-col gap-4 p-4" role="list" aria-label="File diffs">
+      <div className="flex flex-col gap-4 p-4 pb-24" role="list" aria-label="File diffs">
         {files.map((file) => {
           const oldFile = toFileContents(
             file.oldPath ?? file.path,
@@ -599,6 +599,11 @@ function DiffViewer({
             </div>
           )
         })}
+
+        {/* Footer spacer to avoid overlap with floating chat trigger */}
+        <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
+          <span>🎉 You've reached the end — happy reviewing!</span>
+        </div>
       </div>
     </div>
   )
