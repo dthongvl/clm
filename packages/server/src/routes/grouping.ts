@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
 import { generateGrouping, buildPRLink, checkOpencodeBinary } from '../services/grouping.js';
 import { getCurrentRepo } from '../services/gh.js';
+import { safeJson, isPositiveInt } from '../utils/request.js';
 
 const app = new Hono();
+
+interface GroupingBody {
+  prNumber: number;
+  repo?: string;
+}
 
 // GET /api/grouping/status - Check if opencode binary is available
 app.get('/status', async (c) => {
@@ -12,18 +18,20 @@ app.get('/status', async (c) => {
 
 // POST /api/grouping/generate - Generate intelligent grouping for a PR
 app.post('/generate', async (c) => {
+  const result = await safeJson<GroupingBody>(c);
+  if (!result.ok) return result.response;
+  
+  const { prNumber, repo } = result.data;
+
+  if (!isPositiveInt(prNumber)) {
+    return c.json({ error: 'prNumber must be a positive integer' }, 400);
+  }
+
   try {
-    const body = await c.req.json();
-    const { prNumber, repo } = body;
-
-    if (!prNumber) {
-      return c.json({ error: 'PR number is required' }, 400);
-    }
-
     // Get repo from body or try to detect current repo
     let targetRepo = repo;
     if (!targetRepo) {
-      targetRepo = await getCurrentRepo();
+      targetRepo = await getCurrentRepo() ?? undefined;
     }
 
     if (!targetRepo) {
@@ -36,9 +44,9 @@ app.post('/generate', async (c) => {
     console.log(`Generating grouping for PR: ${prLink}`);
 
     // Generate grouping using opencode CLI
-    const result = await generateGrouping(prLink);
+    const groupingResult = await generateGrouping(prLink);
 
-    return c.json(result);
+    return c.json(groupingResult);
   } catch (error) {
     console.error('Grouping generation failed:', error);
     return c.json(

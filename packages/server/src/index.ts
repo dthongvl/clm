@@ -14,8 +14,21 @@ const app = new Hono();
 
 // Middleware
 app.use('*', logger());
+
+// CORS configuration - restrict to known origins
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'];
+
 app.use('*', cors({
-  origin: '*',
+  origin: (origin) => {
+    // Allow requests with no origin (same-origin, curl, etc.)
+    if (!origin) return null;
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) return origin;
+    // Reject unknown origins
+    return null;
+  },
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -39,8 +52,13 @@ app.get('/api/health', (c) => {
 const clientDistPath = import.meta.resolve('../../client/dist').replace('file://', '');
 app.use('/*', serveStatic({ root: clientDistPath }));
 
-// Fallback to index.html for client-side routing
+// Fallback to index.html for client-side routing (non-API routes only)
 app.get('*', async (c) => {
+  // Return JSON 404 for unknown API routes
+  if (c.req.path.startsWith('/api/')) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+  
   try {
     const indexPath = import.meta.resolve('../../client/dist/index.html').replace('file://', '');
     const file = Bun.file(indexPath);

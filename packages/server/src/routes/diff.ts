@@ -1,17 +1,61 @@
 import { Hono } from 'hono';
-import { getPRDiff, getFileContent, getCurrentRepo } from '../services/gh.js';
+import { getPRDiff, getFileContent, getCurrentRepo, getPRInfo } from '../services/gh.js';
+import { parsePositiveInt } from '../utils/request.js';
 import type { FileDiff } from '../types/index.js';
 
 const app = new Hono();
 
-// GET /api/diff?pr={number}&repo={owner/repo}
+// Concurrency limit for file content fetching to avoid rate limits
+const MAX_CONCURRENT_FETCHES = 5;
+
+/**
+ * Process items with limited concurrency
+ */
+async function processWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  const executing: Promise<void>[] = [];
+
+  for (const item of items) {
+    const promise = processor(item).then((result) => {
+      results.push(result);
+    });
+    
+    executing.push(promise);
+
+    if (executing.length >= concurrency) {
+      await Promise.race(executing);
+      // Remove completed promises
+      for (let i = executing.length - 1; i >= 0; i--) {
+        const p = executing[i];
+        // Check if promise is settled by racing with an immediate resolve
+        const settled = await Promise.race([
+          p.then(() => true).catch(() => true),
+          Promise.resolve(false),
+        ]);
+        if (settled) {
+          executing.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  await Promise.all(executing);
+  return results;
+}
+
+// GET /api/diff?pr={number}&repo={owner/repo}&includeContent={true|false}
 app.get('/', async (c) => {
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
   const repo = c.req.query('repo') || await getCurrentRepo();
   const includeContent = c.req.query('includeContent') === 'true';
 
+  const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'PR number is required' }, 400);
+    return c.json({ error: 'PR number must be a positive integer' }, 400);
   }
 
   if (!repo) {
@@ -19,34 +63,34 @@ app.get('/', async (c) => {
   }
 
   try {
-    const files = await getPRDiff(parseInt(prNumber, 10), repo);
+    const files = await getPRDiff(prNumber, repo);
 
     // Optionally fetch full file content for base and head branches
     if (includeContent) {
-      const prInfo = await import('../services/gh.js').then(m => m.getPRInfo(parseInt(prNumber, 10), repo));
+      const prInfo = await getPRInfo(prNumber, repo);
       console.log(`Fetching content for PR #${prNumber}, base: ${prInfo.baseBranch}, head: ${prInfo.headBranch}, repo: ${repo}`);
       
-      // Fetch content for all files in parallel for better performance
-      await Promise.all(files.map(async (file) => {
-        const contentPromises: Promise<void>[] = [];
-        
+      // Build list of content fetch tasks
+      const fetchTasks: { file: FileDiff; branch: string; type: 'base' | 'head' }[] = [];
+      
+      for (const file of files) {
         if (file.status !== 'removed') {
-          contentPromises.push(
-            getFileContent(file.filename, prInfo.headBranch, repo).then(content => {
-              file.headContent = content;
-            })
-          );
+          fetchTasks.push({ file, branch: prInfo.headBranch, type: 'head' });
         }
         if (file.status !== 'added') {
-          contentPromises.push(
-            getFileContent(file.filename, prInfo.baseBranch, repo).then(content => {
-              file.baseContent = content;
-            })
-          );
+          fetchTasks.push({ file, branch: prInfo.baseBranch, type: 'base' });
         }
-        
-        await Promise.all(contentPromises);
-      }));
+      }
+
+      // Fetch with concurrency limit to avoid rate limiting
+      await processWithConcurrency(fetchTasks, MAX_CONCURRENT_FETCHES, async (task) => {
+        const content = await getFileContent(task.file.filename, task.branch, repo);
+        if (task.type === 'head') {
+          task.file.headContent = content;
+        } else {
+          task.file.baseContent = content;
+        }
+      });
     }
 
     return c.json({ files });
@@ -58,12 +102,17 @@ app.get('/', async (c) => {
 
 // GET /api/diff/file?pr={number}&repo={owner/repo}&filename={path}
 app.get('/file', async (c) => {
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
   const repo = c.req.query('repo') || await getCurrentRepo();
   const filename = c.req.query('filename');
 
-  if (!prNumber || !filename) {
-    return c.json({ error: 'PR number and filename are required' }, 400);
+  const prNumber = parsePositiveInt(prNumberStr);
+  if (!prNumber) {
+    return c.json({ error: 'PR number must be a positive integer' }, 400);
+  }
+
+  if (!filename) {
+    return c.json({ error: 'filename is required' }, 400);
   }
 
   if (!repo) {
@@ -71,8 +120,7 @@ app.get('/file', async (c) => {
   }
 
   try {
-    const { getPRInfo } = await import('../services/gh.js');
-    const prInfo = await getPRInfo(parseInt(prNumber, 10), repo);
+    const prInfo = await getPRInfo(prNumber, repo);
     
     const [baseContent, headContent] = await Promise.all([
       getFileContent(filename, prInfo.baseBranch, repo),

@@ -1,9 +1,26 @@
 import { Hono } from 'hono';
 import { reviewDiff, reviewLine, checkAIBinary } from '../services/ai.js';
 import { generatePRReview, buildPRLink, checkAIReviewBinary } from '../services/ai-review.js';
-import type { AIReviewResult } from '../types/index.js';
+import { safeJson, isPositiveInt } from '../utils/request.js';
 
 const app = new Hono();
+
+interface DiffReviewBody {
+  diff: string;
+  fileContext?: Array<{ filename: string; content: string }>;
+}
+
+interface LineReviewBody {
+  filename: string;
+  line: number;
+  code: string;
+  diff?: string;
+}
+
+interface PRReviewBody {
+  prNumber: number;
+  repo?: string;
+}
 
 // POST /api/ai-review
 // Body: { diff: string, fileContext?: Array<{filename, content}> }
@@ -13,16 +30,22 @@ app.post('/', async (c) => {
     return c.json({ error: 'AI binary not available. Please install and configure the AI CLI.' }, 503);
   }
 
-  const body = await c.req.json();
-  const { diff, fileContext } = body;
+  const result = await safeJson<DiffReviewBody>(c);
+  if (!result.ok) return result.response;
+  
+  const { diff, fileContext } = result.data;
 
-  if (!diff) {
-    return c.json({ error: 'diff is required' }, 400);
+  if (!diff || typeof diff !== 'string') {
+    return c.json({ error: 'diff is required and must be a string' }, 400);
+  }
+
+  if (diff.length > 500000) {
+    return c.json({ error: 'diff exceeds maximum length of 500000 characters' }, 400);
   }
 
   try {
-    const result = await reviewDiff(diff, fileContext);
-    return c.json(result);
+    const reviewResult = await reviewDiff(diff, fileContext);
+    return c.json(reviewResult);
   } catch (error) {
     console.error('AI review failed:', error);
     return c.json({ error: 'AI review failed', details: (error as Error).message }, 500);
@@ -37,11 +60,21 @@ app.post('/line', async (c) => {
     return c.json({ error: 'AI binary not available' }, 503);
   }
 
-  const body = await c.req.json();
-  const { filename, line, code, diff } = body;
+  const result = await safeJson<LineReviewBody>(c);
+  if (!result.ok) return result.response;
+  
+  const { filename, line, code, diff } = result.data;
 
-  if (!filename || !line || !code) {
-    return c.json({ error: 'filename, line, and code are required' }, 400);
+  if (!filename || typeof filename !== 'string') {
+    return c.json({ error: 'filename is required and must be a string' }, 400);
+  }
+
+  if (!isPositiveInt(line)) {
+    return c.json({ error: 'line must be a positive integer' }, 400);
+  }
+
+  if (!code || typeof code !== 'string') {
+    return c.json({ error: 'code is required and must be a string' }, 400);
   }
 
   try {
@@ -62,18 +95,20 @@ app.post('/pr', async (c) => {
     return c.json({ error: 'AI binary not available. Please install and configure opencode CLI.' }, 503);
   }
 
-  const body = await c.req.json();
-  const { prNumber, repo } = body;
+  const result = await safeJson<PRReviewBody>(c);
+  if (!result.ok) return result.response;
+  
+  const { prNumber, repo } = result.data;
 
-  if (!prNumber) {
-    return c.json({ error: 'prNumber is required' }, 400);
+  if (!isPositiveInt(prNumber)) {
+    return c.json({ error: 'prNumber must be a positive integer' }, 400);
   }
 
   try {
     // Build PR link - repo is optional if running from within a git repo
     const prLink = repo ? buildPRLink(repo, prNumber) : buildPRLink('', prNumber);
-    const result = await generatePRReview(prLink);
-    return c.json(result);
+    const reviewResult = await generatePRReview(prLink);
+    return c.json(reviewResult);
   } catch (error) {
     console.error('AI PR review failed:', error);
     return c.json({ error: 'AI PR review failed', details: (error as Error).message }, 500);
@@ -83,7 +118,7 @@ app.post('/pr', async (c) => {
 // GET /api/ai-review/status
 app.get('/status', async (c) => {
   const hasAI = await checkAIReviewBinary();
-  const aiBinary = process.env.AI_BINARY || 'opencode';
+  const aiBinary = process.env.OPENCODE_BINARY || process.env.AI_BINARY || 'opencode';
   
   return c.json({
     available: hasAI,

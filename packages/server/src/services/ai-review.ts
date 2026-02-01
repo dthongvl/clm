@@ -1,13 +1,21 @@
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
 
 // Default AI binary - can be overridden via environment variable
-const AI_BINARY = process.env.AI_BINARY || 'opencode';
+const AI_BINARY = process.env.OPENCODE_BINARY || process.env.AI_BINARY || 'opencode';
 
 // Model to use for review - can be overridden via environment variable
-// const AI_MODEL = process.env.AI_MODEL || 'anthropic/claude-haiku-4-5-20251001';
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
+// Cached binary check result (cache for 30 seconds)
+let binaryCheckCache: { available: boolean; expiresAt: number } | null = null;
+const BINARY_CHECK_TTL_MS = 30_000;
+
 export async function checkAIReviewBinary(): Promise<boolean> {
+  // Return cached result if still valid
+  if (binaryCheckCache && Date.now() < binaryCheckCache.expiresAt) {
+    return binaryCheckCache.available;
+  }
+
   try {
     const proc = Bun.spawn([AI_BINARY, '--version'], {
       stdin: null,
@@ -15,8 +23,10 @@ export async function checkAIReviewBinary(): Promise<boolean> {
       stderr: 'pipe',
     });
     await proc.exited;
+    binaryCheckCache = { available: true, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
     return true;
   } catch {
+    binaryCheckCache = { available: false, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
     return false;
   }
 }

@@ -1,17 +1,53 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import type { AIReviewResult, AIReviewSuggestion } from '../types/index.js';
 
-const execAsync = promisify(exec);
-
 // Default AI binary - can be overridden via environment variable
-const AI_BINARY = process.env.AI_BINARY || 'claude';
+const AI_BINARY = process.env.CLAUDE_BINARY || process.env.AI_BINARY || 'claude';
+
+// Cached binary check result (cache for 30 seconds)
+let binaryCheckCache: { available: boolean; expiresAt: number } | null = null;
+const BINARY_CHECK_TTL_MS = 30_000;
+
+/**
+ * Run AI CLI command safely using Bun.spawn with stdin (no shell injection)
+ */
+async function runAIWithStdin(prompt: string, opts?: { timeoutMs?: number }): Promise<string> {
+  const proc = Bun.spawn([AI_BINARY, '-p', prompt], {
+    stdin: null,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    timeout: opts?.timeoutMs ?? 120_000,
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  if (exitCode !== 0) {
+    throw new Error(stderr || stdout || `${AI_BINARY} exited with code ${exitCode}`);
+  }
+
+  return stdout;
+}
 
 export async function checkAIBinary(): Promise<boolean> {
+  // Return cached result if still valid
+  if (binaryCheckCache && Date.now() < binaryCheckCache.expiresAt) {
+    return binaryCheckCache.available;
+  }
+
   try {
-    await execAsync(`${AI_BINARY} --version`);
+    const proc = Bun.spawn([AI_BINARY, '--version'], {
+      stdin: null,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    await proc.exited;
+    binaryCheckCache = { available: true, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
     return true;
   } catch {
+    binaryCheckCache = { available: false, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
     return false;
   }
 }
@@ -23,10 +59,7 @@ export async function reviewDiff(
   const prompt = buildReviewPrompt(diff, fileContext);
   
   try {
-    // Execute AI binary with the prompt
-    const command = `echo ${JSON.stringify(prompt)} | ${AI_BINARY}`;
-    const { stdout } = await execAsync(command, { timeout: 120000 });
-    
+    const stdout = await runAIWithStdin(prompt, { timeoutMs: 120_000 });
     return parseAIReviewOutput(stdout);
   } catch (error) {
     console.error('AI review failed:', error);
@@ -44,8 +77,7 @@ export async function chatWithAI(
   const prompt = buildChatPrompt(message, context);
   
   try {
-    const command = `echo ${JSON.stringify(prompt)} | ${AI_BINARY}`;
-    const { stdout } = await execAsync(command, { timeout: 60000 });
+    const stdout = await runAIWithStdin(prompt, { timeoutMs: 60_000 });
     return stdout.trim();
   } catch (error) {
     console.error('AI chat failed:', error);
@@ -69,8 +101,7 @@ ${diff ? `\nDiff context:\n${diff}` : ''}
 Provide a brief review comment about this line. Be concise and actionable.`;
 
   try {
-    const command = `echo ${JSON.stringify(prompt)} | ${AI_BINARY}`;
-    const { stdout } = await execAsync(command, { timeout: 30000 });
+    const stdout = await runAIWithStdin(prompt, { timeoutMs: 30_000 });
     return stdout.trim();
   } catch (error) {
     console.error('Line review failed:', error);

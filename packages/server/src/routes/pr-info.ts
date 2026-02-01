@@ -1,15 +1,17 @@
 import { Hono } from 'hono';
 import { getPRInfo, checkGhCli, getCurrentRepo } from '../services/gh.js';
+import { parsePositiveInt } from '../utils/request.js';
 
 const app = new Hono();
 
 // GET /api/pr-info?pr={number}&repo={owner/repo}
 app.get('/', async (c) => {
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
   const repo = c.req.query('repo') || await getCurrentRepo();
 
+  const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'PR number is required' }, 400);
+    return c.json({ error: 'PR number must be a positive integer' }, 400);
   }
 
   if (!repo) {
@@ -17,7 +19,7 @@ app.get('/', async (c) => {
   }
 
   try {
-    const prInfo = await getPRInfo(parseInt(prNumber, 10), repo);
+    const prInfo = await getPRInfo(prNumber, repo);
     return c.json(prInfo);
   } catch (error) {
     console.error('Failed to fetch PR info:', error);

@@ -1,11 +1,23 @@
 import { Hono } from 'hono';
 import { chatWithAI, checkAIBinary } from '../services/ai.js';
+import { safeJson } from '../utils/request.js';
+import { BoundedArrayStore } from '../utils/bounded-store.js';
 import type { ChatMessage } from '../types/index.js';
 
 const app = new Hono();
 
-// Store chat history in memory (in production, use a database)
-const chatHistories: Map<string, ChatMessage[]> = new Map();
+// Bounded chat history store (max 200 sessions, 100 messages each, 1 hour TTL)
+const chatHistories = new BoundedArrayStore<string, ChatMessage>({
+  maxKeys: 200,
+  maxItemsPerKey: 100,
+  ttlMs: 60 * 60 * 1000, // 1 hour
+});
+
+interface ChatRequestBody {
+  message: string;
+  sessionId?: string;
+  context?: { diff?: string; filename?: string; line?: number };
+}
 
 // POST /api/chat
 // Body: { message: string, sessionId?: string, context?: { diff?: string, filename?: string, line?: number } }
@@ -15,17 +27,20 @@ app.post('/', async (c) => {
     return c.json({ error: 'AI binary not available' }, 503);
   }
 
-  const body = await c.req.json();
-  const { message, sessionId = 'default', context } = body;
+  const result = await safeJson<ChatRequestBody>(c);
+  if (!result.ok) return result.response;
+  
+  const { message, sessionId = 'default', context } = result.data;
 
-  if (!message) {
-    return c.json({ error: 'message is required' }, 400);
+  if (!message || typeof message !== 'string') {
+    return c.json({ error: 'message is required and must be a string' }, 400);
+  }
+
+  if (message.length > 50000) {
+    return c.json({ error: 'message exceeds maximum length of 50000 characters' }, 400);
   }
 
   try {
-    // Get or create chat history
-    const history = chatHistories.get(sessionId) || [];
-    
     // Add user message to history
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -33,7 +48,7 @@ app.post('/', async (c) => {
       content: message,
       timestamp: new Date().toISOString(),
     };
-    history.push(userMessage);
+    chatHistories.push(sessionId, userMessage);
 
     // Get AI response
     const response = await chatWithAI(message, context);
@@ -45,10 +60,7 @@ app.post('/', async (c) => {
       content: response,
       timestamp: new Date().toISOString(),
     };
-    history.push(aiMessage);
-
-    // Save history
-    chatHistories.set(sessionId, history);
+    chatHistories.push(sessionId, aiMessage);
 
     return c.json({
       response,
@@ -64,9 +76,9 @@ app.post('/', async (c) => {
 // GET /api/chat/history?sessionId={id}
 app.get('/history', (c) => {
   const sessionId = c.req.query('sessionId') || 'default';
-  const history = chatHistories.get(sessionId) || [];
+  const messages = chatHistories.get(sessionId);
   
-  return c.json({ sessionId, messages: history });
+  return c.json({ sessionId, messages });
 });
 
 // DELETE /api/chat/history?sessionId={id}

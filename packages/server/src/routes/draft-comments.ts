@@ -1,15 +1,21 @@
 import { Hono } from 'hono';
+import { safeJson, parsePositiveInt } from '../utils/request.js';
+import { BoundedArrayStore } from '../utils/bounded-store.js';
 import type { DraftComment } from '../types/index.js';
 
 const app = new Hono();
 
-// In-memory storage for draft comments
-// In production, this would be stored in a database or session storage
-const draftCommentsStore = new Map<number, DraftComment[]>();
+// Bounded draft comments store (max 500 PRs, 200 comments each, 24 hour TTL)
+// Key is "repo:prNumber" to avoid collisions across repos
+const draftCommentsStore = new BoundedArrayStore<string, DraftComment>({
+  maxKeys: 500,
+  maxItemsPerKey: 200,
+  ttlMs: 24 * 60 * 60 * 1000, // 24 hours
+});
 
-// Helper to get draft comments for a PR
-function getDraftComments(prNumber: number): DraftComment[] {
-  return draftCommentsStore.get(prNumber) ?? [];
+// Helper to build store key
+function buildKey(prNumber: number, repo?: string): string {
+  return repo ? `${repo}:${prNumber}` : `default:${prNumber}`;
 }
 
 // Helper to generate unique ID
@@ -17,34 +23,63 @@ function generateId(): string {
   return `draft-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
-// GET /api/draft-comments?pr={number}
+interface DraftCommentBody {
+  prNumber: number;
+  filePath: string;
+  lineNumber: number;
+  side: 'additions' | 'deletions';
+  content: string;
+  authorName?: string;
+  repo?: string;
+}
+
+// GET /api/draft-comments?pr={number}&repo={owner/repo}
 // Fetch all draft comments for a PR
 app.get('/', (c) => {
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
+  const repo = c.req.query('repo');
 
+  const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'pr query parameter is required' }, 400);
+    return c.json({ error: 'pr query parameter must be a positive integer' }, 400);
   }
 
-  const comments = getDraftComments(parseInt(prNumber, 10));
+  const key = buildKey(prNumber, repo);
+  const comments = draftCommentsStore.get(key);
   return c.json({ comments });
 });
 
 // POST /api/draft-comments
 // Add a new draft comment
-// Body: { prNumber: number, filePath: string, lineNumber: number, side: 'additions' | 'deletions', content: string, authorName?: string }
+// Body: { prNumber: number, filePath: string, lineNumber: number, side: 'additions' | 'deletions', content: string, authorName?: string, repo?: string }
 app.post('/', async (c) => {
-  const body = await c.req.json();
-  const { prNumber, filePath, lineNumber, side, content, authorName = 'You' } = body;
+  const result = await safeJson<DraftCommentBody>(c);
+  if (!result.ok) return result.response;
+  
+  const { prNumber, filePath, lineNumber, side, content, authorName = 'You', repo } = result.data;
 
-  if (!prNumber || !filePath || lineNumber == null || !side || !content) {
-    return c.json({
-      error: 'prNumber, filePath, lineNumber, side, and content are required',
-    }, 400);
+  if (!prNumber || typeof prNumber !== 'number' || prNumber < 1) {
+    return c.json({ error: 'prNumber must be a positive integer' }, 400);
+  }
+
+  if (!filePath || typeof filePath !== 'string') {
+    return c.json({ error: 'filePath is required and must be a string' }, 400);
+  }
+
+  if (typeof lineNumber !== 'number' || lineNumber < 1) {
+    return c.json({ error: 'lineNumber must be a positive integer' }, 400);
   }
 
   if (side !== 'additions' && side !== 'deletions') {
     return c.json({ error: 'side must be "additions" or "deletions"' }, 400);
+  }
+
+  if (!content || typeof content !== 'string') {
+    return c.json({ error: 'content is required and must be a string' }, 400);
+  }
+
+  if (content.length > 10000) {
+    return c.json({ error: 'content exceeds maximum length of 10000 characters' }, 400);
   }
 
   const newComment: DraftComment = {
@@ -58,59 +93,69 @@ app.post('/', async (c) => {
     createdAt: new Date().toISOString(),
   };
 
-  const existingComments = getDraftComments(prNumber);
-  draftCommentsStore.set(prNumber, [...existingComments, newComment]);
+  const key = buildKey(prNumber, repo);
+  const added = draftCommentsStore.push(key, newComment);
+  
+  if (!added) {
+    return c.json({ error: 'Maximum draft comments limit reached for this PR' }, 429);
+  }
 
   return c.json({ success: true, comment: newComment });
 });
 
-// DELETE /api/draft-comments/:id?pr={number}
+// DELETE /api/draft-comments/:id?pr={number}&repo={owner/repo}
 // Delete a specific draft comment
 app.delete('/:id', (c) => {
   const id = c.req.param('id');
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
+  const repo = c.req.query('repo');
 
+  const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'pr query parameter is required' }, 400);
+    return c.json({ error: 'pr query parameter must be a positive integer' }, 400);
   }
 
-  const prNum = parseInt(prNumber, 10);
-  const existingComments = getDraftComments(prNum);
-  const filteredComments = existingComments.filter((comment) => comment.id !== id);
+  const key = buildKey(prNumber, repo);
+  const beforeCount = draftCommentsStore.get(key).length;
+  const remaining = draftCommentsStore.filter(key, (comment) => comment.id !== id);
 
-  if (filteredComments.length === existingComments.length) {
+  if (remaining.length === beforeCount) {
     return c.json({ error: 'Comment not found' }, 404);
   }
 
-  draftCommentsStore.set(prNum, filteredComments);
   return c.json({ success: true });
 });
 
-// DELETE /api/draft-comments?pr={number}
+// DELETE /api/draft-comments?pr={number}&repo={owner/repo}
 // Clear all draft comments for a PR (useful when submitting to GitHub)
 app.delete('/', (c) => {
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
+  const repo = c.req.query('repo');
 
+  const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'pr query parameter is required' }, 400);
+    return c.json({ error: 'pr query parameter must be a positive integer' }, 400);
   }
 
-  draftCommentsStore.delete(parseInt(prNumber, 10));
+  const key = buildKey(prNumber, repo);
+  draftCommentsStore.delete(key);
   return c.json({ success: true, message: 'All draft comments cleared' });
 });
 
-// POST /api/draft-comments/submit?pr={number}
+// POST /api/draft-comments/submit?pr={number}&repo={owner/repo}
 // Submit all draft comments to GitHub (placeholder - just clears for now)
 // In a full implementation, this would call the GitHub API to post each comment
 app.post('/submit', async (c) => {
-  const prNumber = c.req.query('pr');
+  const prNumberStr = c.req.query('pr');
+  const repo = c.req.query('repo');
 
+  const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'pr query parameter is required' }, 400);
+    return c.json({ error: 'pr query parameter must be a positive integer' }, 400);
   }
 
-  const prNum = parseInt(prNumber, 10);
-  const comments = getDraftComments(prNum);
+  const key = buildKey(prNumber, repo);
+  const comments = draftCommentsStore.get(key);
 
   if (comments.length === 0) {
     return c.json({ success: true, message: 'No draft comments to submit', submitted: 0 });
