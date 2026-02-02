@@ -212,4 +212,22 @@ export async function generateAIReview(prNumber: number, repo?: string): Promise
   return response;
 }
 
-export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse };
+// Related Files API
+interface ServerRelatedFile {
+  filePath: string;
+  explanation: string;
+}
+
+interface RelatedFilesResponse {
+  files: ServerRelatedFile[];
+}
+
+export async function findRelatedFiles(prNumber: number, repo?: string): Promise<ServerRelatedFile[]> {
+  const response = await fetchApi<RelatedFilesResponse>('/related-files/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ prNumber, repo }),
+  });
+  return response.files;
+}
+
+export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile };

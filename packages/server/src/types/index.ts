@@ -102,3 +102,12 @@ export interface AIReviewPRResult {
   items: AIReviewItem[];
   summary: string;
 }
+
+export interface RelatedFile {
+  filePath: string;
+  explanation: string;
+}
+
+export interface RelatedFilesResult {
+  files: RelatedFile[];
+}

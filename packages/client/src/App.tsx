@@ -6,13 +6,15 @@ import {
   SidePanel,
   SidePanelGroupingContent,
   SidePanelAIReviewContent,
+  SidePanelRelatedFilesContent,
   IntelligentGrouping,
   AIReviewSummary,
+  RelatedFiles,
 } from "@/components/side-panel"
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams } from "@/hooks"
+import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams, useRelatedFiles } from "@/hooks"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import {
@@ -80,6 +82,17 @@ export function App() {
     prNumber,
     repo,
     autoGenerate: false, // Only generate when button is clicked
+  })
+
+  const {
+    files: relatedFiles,
+    findFiles: findRelatedFiles,
+    isLoading: isLoadingRelatedFiles,
+    error: relatedFilesError,
+  } = useRelatedFiles({
+    prNumber,
+    repo,
+    autoGenerate: false,
   })
 
   const annotations = useMemo(
@@ -243,6 +256,15 @@ export function App() {
                   }}
                 />
               </SidePanelAIReviewContent>
+              <SidePanelRelatedFilesContent>
+                <RelatedFiles
+                  files={relatedFiles}
+                  onFileClick={scrollToFile}
+                  onFindFiles={prNumber ? findRelatedFiles : undefined}
+                  isLoading={isLoadingRelatedFiles}
+                  error={relatedFilesError}
+                />
+              </SidePanelRelatedFilesContent>
             </SidePanel>
           </ErrorBoundary>
         }

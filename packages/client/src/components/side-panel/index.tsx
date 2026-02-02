@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 
-type TabValue = "grouping" | "ai-review"
+type TabValue = "grouping" | "ai-review" | "related-files"
 
 interface SidePanelProps extends React.ComponentProps<"aside"> {
   defaultTab?: TabValue
@@ -45,6 +45,7 @@ function SidePanel({
         <TabsList variant="line">
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>
+          <TabsTrigger value="related-files">Related Files</TabsTrigger>
         </TabsList>
         {children}
       </Tabs>
@@ -78,8 +79,22 @@ function SidePanelAIReviewContent({
   )
 }
 
-export { SidePanel, SidePanelGroupingContent, SidePanelAIReviewContent }
+function SidePanelRelatedFilesContent({
+  className,
+  ...props
+}: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
+  return (
+    <TabsContent
+      {...props}
+      value="related-files"
+      className={cn("flex-1 overflow-auto p-4", className)}
+    />
+  )
+}
+
+export { SidePanel, SidePanelGroupingContent, SidePanelAIReviewContent, SidePanelRelatedFilesContent }
 export { IntelligentGrouping } from "./intelligent-grouping"
 export { AIReviewSummary } from "./ai-review-summary"
 export { ChangeGroupCard } from "./change-group-card"
 export { ReviewItemCard } from "./review-item-card"
+export { RelatedFiles } from "./related-files"

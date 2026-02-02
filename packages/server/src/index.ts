@@ -9,6 +9,7 @@ import aiReviewRoutes from './routes/ai-review.js';
 import prInfoRoutes from './routes/pr-info.js';
 import chatRoutes from './routes/chat.js';
 import groupingRoutes from './routes/grouping.js';
+import relatedFilesRoutes from './routes/related-files.js';
 
 const app = new Hono();
 
@@ -41,6 +42,7 @@ app.route('/api/ai-review', aiReviewRoutes);
 app.route('/api/pr-info', prInfoRoutes);
 app.route('/api/chat', chatRoutes);
 app.route('/api/grouping', groupingRoutes);
+app.route('/api/related-files', relatedFilesRoutes);
 
 // Health check
 app.get('/api/health', (c) => {
