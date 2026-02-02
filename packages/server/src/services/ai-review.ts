@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml';
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
 import { opencodeManager } from './opencode-manager.js';
 
@@ -31,7 +32,6 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
 }
 
 function buildReviewPrompt(prLink: string): string {
-  // Extract PR number and repo from the link
   const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
@@ -46,43 +46,60 @@ Step 2: Read and analyze the diff carefully. Look for:
 - Warnings: code smells, potential improvements, best practice violations, error handling issues
 - Info: suggestions, style improvements, documentation needs, minor optimizations
 
-Step 3: Return ONLY this XML format (no other text):
+Step 3: Return ONLY a YAML code block in this exact format (no other text):
 
-<review>
-<summary>Brief overall summary of the PR and key findings</summary>
-<items>
-<item>
-<severity>critical|warning|info</severity>
-<filePath>path/to/file.ts</filePath>
-<lineNumber>42</lineNumber>
-<message>Clear description of the issue or suggestion</message>
-<suggestion>Optional: suggested code fix or improvement</suggestion>
-</item>
-</items>
-</review>
+\`\`\`yaml
+summary: Brief overall summary of the PR and key findings
+items:
+  - severity: critical  # must be: critical, warning, or info
+    file_path: path/to/file.ts
+    line_number: 42
+    message: Clear description of the issue or suggestion
+    suggestion: Optional suggested code fix or improvement
+\`\`\`
 
 Rules:
 - severity must be one of: critical, warning, info
-- lineNumber must reference the actual line in the changed file (use the new line numbers from the diff)
+- line_number must reference the actual line in the changed file (use the new line numbers from the diff)
 - message should be actionable and explain why this is important
 - suggestion is optional but helpful when applicable
 - Focus on meaningful issues, not trivial style preferences
 - Include context about why something is problematic
-- Return ONLY the XML, nothing else`;
+- Return ONLY the YAML code block, nothing else`;
+}
+
+interface YamlReviewItem {
+  severity?: string;
+  file_path?: string;
+  filePath?: string;
+  line_number?: number;
+  lineNumber?: number;
+  message?: string;
+  suggestion?: string;
+}
+
+interface YamlReviewResult {
+  summary?: string;
+  items?: YamlReviewItem[];
 }
 
 function parseReviewOutput(output: string): AIReviewPRResult {
   try {
-    // Find XML content in the output
-    const xmlMatch = output.match(/<review>[\s\S]*<\/review>/);
+    // Extract YAML from code block or raw YAML
+    const yamlMatch = output.match(/```ya?ml\n([\s\S]*?)```/)
+      || output.match(/^(summary:\n[\s\S]*)/m)
+      || output.match(/^(items:\n[\s\S]*)/m);
     
-    if (!xmlMatch) {
-      console.error('No XML review found in output:', output.slice(0, 500));
+    if (!yamlMatch) {
+      console.error('No YAML review found in output:', output.slice(0, 500));
       return { items: [], summary: '' };
     }
     
-    const xmlContent = xmlMatch[0];
-    const { items, summary } = parseXMLReview(xmlContent);
+    const yamlContent = yamlMatch[1];
+    const parsed = parseYaml(yamlContent) as YamlReviewResult;
+    
+    const summary = parsed?.summary || '';
+    const items = parseYamlReviewItems(parsed?.items || []);
     
     return { items, summary };
   } catch (error) {
@@ -92,64 +109,45 @@ function parseReviewOutput(output: string): AIReviewPRResult {
   }
 }
 
-function parseXMLReview(xml: string): { items: AIReviewItem[]; summary: string } {
+function parseYamlReviewItems(yamlItems: YamlReviewItem[]): AIReviewItem[] {
+  if (!Array.isArray(yamlItems)) {
+    return [];
+  }
+  
   const items: AIReviewItem[] = [];
-  
-  // Extract summary
-  const summaryMatch = xml.match(/<summary>([\s\S]*?)<\/summary>/);
-  const summary = summaryMatch ? summaryMatch[1].trim() : '';
-  
-  // Match each item element
-  const itemMatches = xml.matchAll(/<item>([\s\S]*?)<\/item>/g);
-  
   let itemId = 1;
-  for (const match of itemMatches) {
-    const itemContent = match[1];
-    
-    // Extract severity
-    const severityMatch = itemContent.match(/<severity>(.*?)<\/severity>/);
-    const severityRaw = severityMatch ? severityMatch[1].trim().toLowerCase() : 'info';
+  
+  for (const item of yamlItems) {
+    const severityRaw = (item.severity || 'info').toLowerCase();
     const severity = ['critical', 'warning', 'info'].includes(severityRaw)
       ? (severityRaw as AIReviewItem['severity'])
       : 'info';
     
-    // Extract filePath
-    const filePathMatch = itemContent.match(/<filePath>(.*?)<\/filePath>/);
-    const filePath = filePathMatch ? filePathMatch[1].trim() : '';
+    // Support both snake_case and camelCase field names
+    const filePath = item.file_path || item.filePath || '';
+    const lineNumber = item.line_number || item.lineNumber || 1;
+    const message = item.message || '';
+    const suggestion = item.suggestion || undefined;
     
-    // Extract lineNumber
-    const lineNumberMatch = itemContent.match(/<lineNumber>(.*?)<\/lineNumber>/);
-    const lineNumber = lineNumberMatch ? parseInt(lineNumberMatch[1].trim(), 10) : 0;
-    
-    // Extract message
-    const messageMatch = itemContent.match(/<message>([\s\S]*?)<\/message>/);
-    const message = messageMatch ? messageMatch[1].trim() : '';
-    
-    // Extract suggestion (optional)
-    const suggestionMatch = itemContent.match(/<suggestion>([\s\S]*?)<\/suggestion>/);
-    const suggestion = suggestionMatch ? suggestionMatch[1].trim() : undefined;
-    
-    // Only add if we have the required fields
     if (filePath && message) {
       items.push({
         id: `ai-review-${itemId++}`,
         severity,
         filePath,
-        lineNumber: lineNumber || 1,
+        lineNumber,
         message,
         suggestion,
       });
     }
   }
   
-  return { items, summary };
+  return items;
 }
 
 /**
  * Build a PR link from repo and PR number
  */
 export function buildPRLink(repo: string, prNumber: number): string {
-  // Handle both "owner/repo" and full URL formats
   if (repo.startsWith('http')) {
     return `${repo}/pull/${prNumber}`;
   }

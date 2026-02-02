@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml';
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { opencodeManager } from './opencode-manager.js';
 
@@ -31,7 +32,6 @@ export async function generateGrouping(prLink: string): Promise<GroupingResult> 
 }
 
 function buildGroupingPrompt(prLink: string): string {
-  // Extract PR number and repo from the link
   const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
@@ -43,46 +43,69 @@ gh pr view ${prNumber} --repo ${repo} --json title,body,files
 
 Step 2: Read the PR description to understand the intent and context of the changes. Then analyze the diff and group logically connected changes. Order groups so reviewers can understand the PR from top to bottom.
 
-Step 3: Return ONLY this XML format (no other text):
+Step 3: Return ONLY a YAML code block in this exact format (no other text):
 
-<grouping>
-<group>
-<id>group-1</id>
-<title>Short descriptive title</title>
-<explanation>
-Quick explanation of this group:
-- Why these files are grouped together
-- What functionality or feature they implement/modify
-- Key changes in each file and how they relate
-- Any important context for reviewers (dependencies, side effects, etc.)
-</explanation>
-<files>
-<file path="path/to/file.ts" additions="10" deletions="5"/>
-</files>
-</group>
-</grouping>
+\`\`\`yaml
+groups:
+  - id: group-1
+    title: Short descriptive title
+    explanation: |
+      Quick explanation of this group:
+      - Why these files are grouped together
+      - What functionality or feature they implement/modify
+      - Key changes in each file and how they relate
+      - Any important context for reviewers (dependencies, side effects, etc.)
+    files:
+      - path: path/to/file.ts
+        additions: 10
+        deletions: 5
+\`\`\`
 
 Rules:
 - Files can appear in multiple groups if they serve multiple purposes
 - Order groups logically (e.g., core changes first, then dependent changes, tests last)
 - Provide detailed explanations that help reviewers understand the changes without reading all the code
 - Use actual additions/deletions from the gh output for each file
-- Return ONLY the XML, nothing else`;
+- Return ONLY the YAML code block, nothing else`;
+}
+
+interface YamlFileEntry {
+  path: string;
+  additions?: number;
+  deletions?: number;
+}
+
+interface YamlGroup {
+  id?: string;
+  title?: string;
+  explanation?: string;
+  files?: (YamlFileEntry | string)[];
+}
+
+interface YamlGroupingResult {
+  groups?: YamlGroup[];
 }
 
 function parseGroupingOutput(output: string): GroupingResult {
   try {
-    // Find XML content in the output
-    const xmlMatch = output.match(/<grouping>[\s\S]*<\/grouping>/);
+    // Extract YAML from code block or raw YAML
+    const yamlMatch = output.match(/```ya?ml\n([\s\S]*?)```/) 
+      || output.match(/^(groups:\n[\s\S]*)/m);
     
-    if (!xmlMatch) {
-      console.error('No XML grouping found in output:', output.slice(0, 500));
+    if (!yamlMatch) {
+      console.error('No YAML grouping found in output:', output.slice(0, 500));
       return { groups: [] };
     }
     
-    const xmlContent = xmlMatch[0];
-    const groups = parseXMLGroups(xmlContent);
+    const yamlContent = yamlMatch[1];
+    const parsed = parseYaml(yamlContent) as YamlGroupingResult;
     
+    if (!parsed?.groups || !Array.isArray(parsed.groups)) {
+      console.error('Invalid YAML structure:', parsed);
+      return { groups: [] };
+    }
+    
+    const groups = parseYamlGroups(parsed.groups);
     return { groups };
   } catch (error) {
     console.error('Failed to parse grouping output:', error);
@@ -91,74 +114,39 @@ function parseGroupingOutput(output: string): GroupingResult {
   }
 }
 
-function parseXMLGroups(xml: string): ChangeGroup[] {
-  const groups: ChangeGroup[] = [];
-  
-  // Match each group element
-  const groupMatches = xml.matchAll(/<group>([\s\S]*?)<\/group>/g);
-  
-  for (const match of groupMatches) {
-    const groupContent = match[1];
-    
-    // Extract id
-    const idMatch = groupContent.match(/<id>(.*?)<\/id>/);
-    const id = idMatch ? idMatch[1].trim() : `group-${groups.length + 1}`;
-    
-    // Extract title
-    const titleMatch = groupContent.match(/<title>(.*?)<\/title>/);
-    const title = titleMatch ? titleMatch[1].trim() : 'Unnamed Group';
-    
-    // Extract explanation
-    const explanationMatch = groupContent.match(/<explanation>([\s\S]*?)<\/explanation>/);
-    const summary = explanationMatch ? explanationMatch[1].trim() : '';
-    
-    // Extract files and calculate totals
+function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
+  return yamlGroups.map((group, index) => {
     const files: string[] = [];
     let totalAdditions = 0;
     let totalDeletions = 0;
     
-    // Match <file path="..." additions="..." deletions="..."/>
-    const fileWithStatsMatches = groupContent.matchAll(/<file\s+path="([^"]+)"\s+additions="(\d+)"\s+deletions="(\d+)"(?:\s*\/>|>.*?<\/file>)/g);
-    for (const fileMatch of fileWithStatsMatches) {
-      files.push(fileMatch[1]);
-      totalAdditions += parseInt(fileMatch[2], 10);
-      totalDeletions += parseInt(fileMatch[3], 10);
-    }
-    
-    // Also handle <file path="..."/> without stats
-    if (files.length === 0) {
-      const pathOnlyMatches = groupContent.matchAll(/<file\s+path="([^"]+)"(?:\s*\/>|>.*?<\/file>)/g);
-      for (const fileMatch of pathOnlyMatches) {
-        files.push(fileMatch[1]);
+    if (Array.isArray(group.files)) {
+      for (const file of group.files) {
+        if (typeof file === 'string') {
+          files.push(file);
+        } else if (file && typeof file === 'object') {
+          files.push(file.path);
+          totalAdditions += file.additions || 0;
+          totalDeletions += file.deletions || 0;
+        }
       }
     }
     
-    // Also handle <file>path</file> format
-    if (files.length === 0) {
-      const simpleFileMatches = groupContent.matchAll(/<file>(.*?)<\/file>/g);
-      for (const fileMatch of simpleFileMatches) {
-        files.push(fileMatch[1].trim());
-      }
-    }
-    
-    groups.push({
-      id,
-      title,
-      summary,
+    return {
+      id: group.id || `group-${index + 1}`,
+      title: group.title || 'Unnamed Group',
+      summary: group.explanation || '',
       files,
       totalAdditions,
       totalDeletions,
-    });
-  }
-  
-  return groups;
+    };
+  });
 }
 
 /**
  * Build a PR link from repo and PR number
  */
 export function buildPRLink(repo: string, prNumber: number): string {
-  // Handle both "owner/repo" and full URL formats
   if (repo.startsWith('http')) {
     return `${repo}/pull/${prNumber}`;
   }

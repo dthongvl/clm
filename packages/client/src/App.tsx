@@ -79,7 +79,7 @@ export function App() {
   } = useAIReview({
     prNumber,
     repo,
-    autoGenerate: true, // Auto-generate groups when page loads
+    autoGenerate: false, // Only generate when button is clicked
   })
 
   const annotations = useMemo(
