@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import type { ReviewComment } from '@/types/review';
 import { fetchPRComments } from '@/lib/api';
 import { transformComments } from '@/lib/transforms';
@@ -19,21 +19,25 @@ export function useComments({ prNumber, repo }: UseCommentsOptions = {}): UseCom
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!prNumber) {
-      setError(new Error('PR number is required'));
       return;
     }
+
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const serverComments = await fetchPRComments(prNumber, repo);
+      const serverComments = await fetchPRComments(prNumber, repo, abortControllerRef.current.signal);
       const clientComments = transformComments(serverComments);
       setComments(clientComments);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setError(err instanceof Error ? err : new Error('Failed to fetch comments'));
       setComments([]);
     } finally {
@@ -45,6 +49,9 @@ export function useComments({ prNumber, repo }: UseCommentsOptions = {}): UseCom
     if (prNumber) {
       fetchData();
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [prNumber, fetchData]);
 
   return {

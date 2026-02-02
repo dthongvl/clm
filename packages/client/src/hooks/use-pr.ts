@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import type { PRInfo } from '@/types/pr';
 import { fetchPRInfo, fetchStatus } from '@/lib/api';
 import { transformPRInfo } from '@/lib/transforms';
@@ -19,21 +19,25 @@ export function usePR({ prNumber, repo }: UsePROptions = {}): UsePRReturn {
   const [pr, setPR] = useState<PRInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!prNumber) {
-      setError(new Error('PR number is required'));
       return;
     }
+
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const serverPR = await fetchPRInfo(prNumber, repo);
+      const serverPR = await fetchPRInfo(prNumber, repo, abortControllerRef.current.signal);
       const clientPR = transformPRInfo(serverPR);
       setPR(clientPR);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setError(err instanceof Error ? err : new Error('Failed to fetch PR info'));
       setPR(null);
     } finally {
@@ -45,6 +49,9 @@ export function usePR({ prNumber, repo }: UsePROptions = {}): UsePRReturn {
     if (prNumber) {
       fetchData();
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [prNumber, fetchData]);
 
   return {

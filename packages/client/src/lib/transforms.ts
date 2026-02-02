@@ -2,8 +2,9 @@
 
 import type { PRInfo, PRState } from '@/types/pr';
 import type { DiffFileData } from '@/components/diff-panel';
-import type { ReviewComment } from '@/types/review';
-import type { ServerPRInfo, ServerFileDiff, ServerPRComment } from './api';
+import type { ReviewComment, AIReviewItem } from '@/types/review';
+import type { ChangeGroup } from '@/types/grouping';
+import type { ServerPRInfo, ServerFileDiff, ServerPRComment, ServerAIReviewItem, ServerChangeGroup } from './api';
 
 /**
  * Transform server PR info to client PR info format
@@ -112,4 +113,46 @@ export function transformComments(serverComments: ServerPRComment[]): ReviewComm
       .map(transformComment);
     return transformed;
   });
+}
+
+/**
+ * Transform a server AI review item to client AIReviewItem format
+ */
+export function transformAIReviewItem(item: ServerAIReviewItem): AIReviewItem {
+  return {
+    id: item.id,
+    filePath: item.filePath,
+    lineNumber: item.lineNumber,
+    severity: item.severity,
+    message: item.message,
+    suggestion: item.suggestion,
+  };
+}
+
+/**
+ * Transform array of server AI review items to client format
+ */
+export function transformAIReviewItems(items: ServerAIReviewItem[]): AIReviewItem[] {
+  return items.map(transformAIReviewItem);
+}
+
+/**
+ * Transform a server change group to client ChangeGroup format
+ */
+export function transformChangeGroup(group: ServerChangeGroup): ChangeGroup {
+  return {
+    id: group.id,
+    title: group.title,
+    summary: group.summary,
+    files: group.files,
+    totalAdditions: group.totalAdditions,
+    totalDeletions: group.totalDeletions,
+  };
+}
+
+/**
+ * Transform array of server change groups to client format
+ */
+export function transformChangeGroups(groups: ServerChangeGroup[]): ChangeGroup[] {
+  return groups.map(transformChangeGroup);
 }

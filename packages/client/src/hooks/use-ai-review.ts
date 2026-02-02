@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import type { AIReviewItem, ChangeGroup } from '@/types';
 import { generateGrouping, generateAIReview } from '@/lib/api';
+import { transformAIReviewItems, transformChangeGroups } from '@/lib/transforms';
 
 interface UseAIReviewOptions {
   prNumber?: number;
@@ -42,18 +43,7 @@ export function useAIReview(options: UseAIReviewOptions = {}): UseAIReviewReturn
 
     try {
       const response = await generateAIReview(prNumber, repo);
-      
-      // Transform server items to client AIReviewItem type
-      const clientItems: AIReviewItem[] = response.items.map((item) => ({
-        id: item.id,
-        filePath: item.filePath,
-        lineNumber: item.lineNumber,
-        severity: item.severity,
-        message: item.message,
-        suggestion: item.suggestion,
-      }));
-
-      setItems(clientItems);
+      setItems(transformAIReviewItems(response.items));
       setSummary(response.summary);
     } catch (err) {
       console.error('Failed to generate AI review:', err);
@@ -74,18 +64,7 @@ export function useAIReview(options: UseAIReviewOptions = {}): UseAIReviewReturn
 
     try {
       const serverGroups = await generateGrouping(prNumber, repo);
-      
-      // Transform server groups to client ChangeGroup type
-      const clientGroups: ChangeGroup[] = serverGroups.map((group) => ({
-        id: group.id,
-        title: group.title,
-        summary: group.summary,
-        files: group.files,
-        totalAdditions: group.totalAdditions,
-        totalDeletions: group.totalDeletions,
-      }));
-
-      setGroups(clientGroups);
+      setGroups(transformChangeGroups(serverGroups));
     } catch (err) {
       console.error('Failed to generate groups:', err);
       setError(err instanceof Error ? err : new Error('Failed to generate groups'));

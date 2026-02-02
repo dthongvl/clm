@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import type { DiffFileData } from '@/components/diff-panel';
 import { fetchPRDiff } from '@/lib/api';
 import { transformFileDiffs } from '@/lib/transforms';
@@ -20,21 +20,25 @@ export function useDiff({ prNumber, repo, includeContent = true }: UseDiffOption
   const [files, setFiles] = useState<DiffFileData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!prNumber) {
-      setError(new Error('PR number is required'));
       return;
     }
+
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const serverFiles = await fetchPRDiff(prNumber, repo, includeContent);
+      const serverFiles = await fetchPRDiff(prNumber, repo, includeContent, abortControllerRef.current.signal);
       const clientFiles = transformFileDiffs(serverFiles);
       setFiles(clientFiles);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       setError(err instanceof Error ? err : new Error('Failed to fetch diff'));
       setFiles([]);
     } finally {
@@ -46,6 +50,9 @@ export function useDiff({ prNumber, repo, includeContent = true }: UseDiffOption
     if (prNumber) {
       fetchData();
     }
+    return () => {
+      abortControllerRef.current?.abort();
+    };
   }, [prNumber, fetchData]);
 
   return {

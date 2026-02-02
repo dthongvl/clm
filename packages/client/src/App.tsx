@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react"
+import { useRef, useCallback, useState, useMemo } from "react"
 import { TopBar } from "@/components/top-bar"
 import { MainLayout } from "@/components/main-layout"
 import { DiffPanel } from "@/components/diff-panel"
@@ -12,7 +12,7 @@ import {
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments } from "@/hooks"
+import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams } from "@/hooks"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import {
@@ -22,17 +22,6 @@ import {
   mockComments,
 } from "@/lib/mock-data"
 
-// Get PR number from URL search params (e.g., ?pr=123&repo=owner/repo)
-function getPRParams() {
-  const params = new URLSearchParams(window.location.search)
-  const prNumber = params.get("pr")
-  const repo = params.get("repo") || undefined
-  return {
-    prNumber: prNumber ? parseInt(prNumber, 10) : undefined,
-    repo,
-  }
-}
-
 export function App() {
   const diffContainerRef = useRef<HTMLDivElement>(null)
   const [chatOpen, setChatOpen] = useState(() =>
@@ -40,7 +29,8 @@ export function App() {
   )
 
   // Get PR params from URL
-  const { prNumber, repo } = getPRParams()
+  const { prNumber, repo } = usePRParams()
+  const isDemo = !prNumber
 
   // Fetch real PR data
   const { pr, isLoading: isPRLoading, error: prError, refetch: refetchPR } = usePR({ prNumber, repo })
@@ -48,9 +38,9 @@ export function App() {
   const { comments, isLoading: isCommentsLoading, refetch: refetchComments } = useComments({ prNumber, repo })
   const { draftComments, addDraftComment, refetch: refetchDraftComments } = useDraftComments({ prNumber })
 
-  // Use real PR data or fall back to mock
-  const displayPR = pr ?? mockPR
-  const displayFiles = files.length > 0 ? files : []
+  // Use real PR data or fall back to mock in demo mode
+  const displayPR = isDemo ? mockPR : (pr ?? null)
+  const displayFiles = isDemo ? [] : files
 
   const handleChatOpenChange = useCallback((open: boolean) => {
     setChatOpen(open)
@@ -92,10 +82,20 @@ export function App() {
     autoGenerate: true, // Auto-generate groups when page loads
   })
 
-  // Only fall back to mock data if no PR is specified and no groups exist
-  const displayGroups = groups.length > 0 ? groups : (prNumber ? [] : mockChangeGroups)
-  // Only fall back to mock data if no PR is specified and no review items exist
-  const displayAIReviewItems = aiReviewItems.length > 0 ? aiReviewItems : (prNumber ? [] : mockAIReviewItems)
+  const annotations = useMemo(
+    () => [...(isDemo ? mockComments : comments), ...draftComments],
+    [isDemo, comments, draftComments]
+  )
+
+  const displayGroups = useMemo(
+    () => groups.length > 0 ? groups : (isDemo ? mockChangeGroups : []),
+    [groups, isDemo]
+  )
+
+  const displayAIReviewItems = useMemo(
+    () => aiReviewItems.length > 0 ? aiReviewItems : (isDemo ? mockAIReviewItems : []),
+    [aiReviewItems, isDemo]
+  )
 
   const scrollToFile = useCallback((filePath: string) => {
     const container = diffContainerRef.current
@@ -134,9 +134,9 @@ export function App() {
           <div className="flex items-center gap-2 text-destructive">
             <span>Failed to load PR: {prError.message}</span>
           </div>
-        ) : (
+        ) : displayPR ? (
           <TopBar.PRInfo pr={displayPR} />
-        )}
+        ) : null}
         <TopBar.Actions>
             <Button 
               variant="outline" 
@@ -157,6 +157,7 @@ export function App() {
         className="min-h-0 flex-1"
         leftPanel={
           <ErrorBoundary
+            resetKeys={[prNumber]}
             fallback={
               <ErrorFallback
                 title="Failed to load diff"
@@ -192,14 +193,8 @@ export function App() {
               ) : (
                 <DiffPanel.Viewer
                   files={displayFiles}
-                  annotations={[
-                    ...(comments.length > 0 ? comments : mockComments),
-                    ...draftComments,
-                  ]}
+                  annotations={annotations}
                   aiReviewItems={displayAIReviewItems}
-                  onLineClick={(path, line, side) => {
-                    console.log(`Clicked line ${line} (${side}) in ${path}`)
-                  }}
                   onCommentSubmit={handleCommentSubmit}
                 />
               )}
@@ -208,6 +203,7 @@ export function App() {
         }
         rightPanel={
           <ErrorBoundary
+            resetKeys={[prNumber]}
             fallback={
               <ErrorFallback
                 title="Failed to load panel"

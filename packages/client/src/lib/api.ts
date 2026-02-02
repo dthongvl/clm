@@ -7,9 +7,14 @@ interface ApiError extends Error {
   details?: string;
 }
 
-async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+interface FetchApiOptions extends RequestInit {
+  signal?: AbortSignal;
+}
+
+async function fetchApi<T>(endpoint: string, options?: FetchApiOptions): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
+    signal: options?.signal,
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
@@ -59,17 +64,17 @@ interface StatusResponse {
 
 // API functions
 
-export async function fetchPRInfo(prNumber: number, repo?: string): Promise<ServerPRInfo> {
+export async function fetchPRInfo(prNumber: number, repo?: string, signal?: AbortSignal): Promise<ServerPRInfo> {
   const params = new URLSearchParams({ pr: String(prNumber) });
   if (repo) params.set('repo', repo);
-  return fetchApi<ServerPRInfo>(`/pr-info?${params}`);
+  return fetchApi<ServerPRInfo>(`/pr-info?${params}`, { signal });
 }
 
-export async function fetchPRDiff(prNumber: number, repo?: string, includeContent = true): Promise<ServerFileDiff[]> {
+export async function fetchPRDiff(prNumber: number, repo?: string, includeContent = true, signal?: AbortSignal): Promise<ServerFileDiff[]> {
   const params = new URLSearchParams({ pr: String(prNumber) });
   if (repo) params.set('repo', repo);
   if (includeContent) params.set('includeContent', 'true');
-  const response = await fetchApi<DiffResponse>(`/diff?${params}`);
+  const response = await fetchApi<DiffResponse>(`/diff?${params}`, { signal });
   return response.files;
 }
 
@@ -99,10 +104,10 @@ interface CommentsResponse {
   comments: ServerPRComment[];
 }
 
-export async function fetchPRComments(prNumber: number, repo?: string): Promise<ServerPRComment[]> {
+export async function fetchPRComments(prNumber: number, repo?: string, signal?: AbortSignal): Promise<ServerPRComment[]> {
   const params = new URLSearchParams({ pr: String(prNumber) });
   if (repo) params.set('repo', repo);
-  const response = await fetchApi<CommentsResponse>(`/comments?${params}`);
+  const response = await fetchApi<CommentsResponse>(`/comments?${params}`, { signal });
   return response.comments;
 }
 
