@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { chatWithAI, checkAIBinary } from '../services/ai.js';
-import { opencodeManager } from '../services/opencode-manager.js';
+import { opencodeClient } from '../services/opencode-client.js';
 import { safeJson } from '../utils/request.js';
 import { BoundedArrayStore } from '../utils/bounded-store.js';
 import type { ChatMessage } from '../types/index.js';
@@ -127,7 +127,7 @@ app.post('/stream', async (c) => {
 
   return streamSSE(c, async (stream) => {
     try {
-      for await (const event of opencodeManager.promptStream(fullMessage)) {
+      for await (const event of opencodeClient.promptStream(fullMessage)) {
         if (event.type === 'text' && event.content) {
           await stream.writeSSE({
             event: 'message',
@@ -181,7 +181,7 @@ app.get('/stream', async (c) => {
 
   return streamSSE(c, async (stream) => {
     try {
-      for await (const event of opencodeManager.promptStream(fullMessage)) {
+      for await (const event of opencodeClient.promptStream(fullMessage)) {
         if (event.type === 'text' && event.content) {
           await stream.writeSSE({
             event: 'message',

@@ -1,11 +1,6 @@
 import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk/client';
-import type { Subprocess } from 'bun';
 
-const OPENCODE_BINARY = process.env.OPENCODE_BINARY || 'opencode';
-const OPENCODE_PORT = parseInt(process.env.OPENCODE_PORT || '4096', 10);
-const OPENCODE_HOSTNAME = process.env.OPENCODE_HOSTNAME || '127.0.0.1';
-const HEALTH_CHECK_TIMEOUT_MS = 30_000;
-const HEALTH_CHECK_INTERVAL_MS = 500;
+const OPENCODE_URL = process.env.OPENCODE_URL || 'http://127.0.0.1:4096';
 
 function parseModelString(model: string): { providerID: string; modelID: string } {
   const [providerID, ...rest] = model.split('/');
@@ -24,115 +19,28 @@ export interface StreamEvent {
   error?: string;
 }
 
-class OpenCodeManager {
-  private process: Subprocess | null = null;
-  private client: OpencodeClient | null = null;
+class OpenCodeClient {
+  private client: OpencodeClient;
   private baseUrl: string;
-  private ready = false;
-  private startPromise: Promise<void> | null = null;
 
   constructor() {
-    this.baseUrl = `http://${OPENCODE_HOSTNAME}:${OPENCODE_PORT}`;
-  }
-
-  async start(): Promise<void> {
-    if (this.ready) return;
-    if (this.startPromise) return this.startPromise;
-
-    this.startPromise = this._start();
-    return this.startPromise;
-  }
-
-  private async _start(): Promise<void> {
-    console.log(`[opencode] Starting server on ${this.baseUrl}...`);
-
-    this.process = Bun.spawn([
-      OPENCODE_BINARY,
-      'serve',
-      '--port', String(OPENCODE_PORT),
-      '--hostname', OPENCODE_HOSTNAME,
-    ], {
-      stdin: null,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-
-    this._forwardLogs();
-
-    await this._waitForHealth();
-
+    this.baseUrl = OPENCODE_URL;
     this.client = createOpencodeClient({ baseUrl: this.baseUrl });
-    this.ready = true;
-    console.log('[opencode] Server ready');
+    console.log(`[opencode-client] Initialized with baseUrl: ${this.baseUrl}`);
   }
 
-  private async _forwardLogs(): Promise<void> {
-    if (!this.process) return;
-
-    const stdout = this.process.stdout;
-    const stderr = this.process.stderr;
-
-    if (stdout && typeof stdout !== 'number') {
-      (async () => {
-        const reader = stdout.getReader();
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          console.log(`[opencode] ${decoder.decode(value).trim()}`);
-        }
-      })();
-    }
-
-    if (stderr && typeof stderr !== 'number') {
-      (async () => {
-        const reader = stderr.getReader();
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          console.error(`[opencode] ${decoder.decode(value).trim()}`);
-        }
-      })();
-    }
-  }
-
-  private async _waitForHealth(): Promise<void> {
-    const healthUrl = `${this.baseUrl}/global/health`;
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < HEALTH_CHECK_TIMEOUT_MS) {
-      try {
-        const resp = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) });
-        if (resp.ok) {
-          const data = await resp.json() as { healthy?: boolean };
-          if (data.healthy) return;
-        }
-      } catch {
-        // Connection refused - server not ready yet
-      }
-      await Bun.sleep(HEALTH_CHECK_INTERVAL_MS);
-    }
-
-    throw new Error('OpenCode server failed to become healthy');
-  }
-
-  isReady(): boolean {
-    return this.ready;
-  }
-
-  getClient() {
-    if (!this.client) {
-      throw new Error('OpenCode client not initialized. Call start() first.');
-    }
+  getClient(): OpencodeClient {
     return this.client;
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   /**
    * Send a prompt and wait for full response (sync)
    */
   async prompt(message: string, options: PromptOptions = {}): Promise<string> {
-    await this.start();
     const client = this.getClient();
 
     // Create or get session
@@ -171,7 +79,6 @@ class OpenCodeManager {
    * Send a prompt and stream response chunks (async generator)
    */
   async *promptStream(message: string, options: PromptOptions = {}): AsyncGenerator<StreamEvent> {
-    await this.start();
     const client = this.getClient();
 
     // Create session
@@ -201,7 +108,7 @@ class OpenCodeManager {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(promptBody),
     }).catch(err => {
-      console.error('[opencode] Failed to send async prompt:', err);
+      console.error('[opencode-client] Failed to send async prompt:', err);
     });
 
     // Stream SSE events
@@ -256,26 +163,7 @@ class OpenCodeManager {
       eventsResponse.body.cancel().catch(() => {});
     }
   }
-
-  async shutdown(): Promise<void> {
-    console.log('[opencode] Shutting down...');
-
-    if (this.process) {
-      this.process.kill();
-      await this.process.exited;
-      this.process = null;
-    }
-
-    this.client = null;
-    this.ready = false;
-    this.startPromise = null;
-    console.log('[opencode] Shutdown complete');
-  }
 }
 
 // Singleton instance
-export const opencodeManager = new OpenCodeManager();
-
-// Graceful shutdown on process exit
-process.on('SIGTERM', () => opencodeManager.shutdown());
-process.on('SIGINT', () => opencodeManager.shutdown());
+export const opencodeClient = new OpenCodeClient();

@@ -181,14 +181,6 @@ interface GroupingResponse {
   groups: ServerChangeGroup[];
 }
 
-interface GroupingStatusResponse {
-  available: boolean;
-}
-
-export async function fetchGroupingStatus(): Promise<GroupingStatusResponse> {
-  return fetchApi<GroupingStatusResponse>('/grouping/status');
-}
-
 export async function generateGrouping(prNumber: number, repo?: string): Promise<ServerChangeGroup[]> {
   const response = await fetchApi<GroupingResponse>('/grouping/generate', {
     method: 'POST',
@@ -210,15 +202,6 @@ interface ServerAIReviewItem {
 interface AIReviewPRResponse {
   items: ServerAIReviewItem[];
   summary: string;
-}
-
-interface AIReviewStatusResponse {
-  available: boolean;
-  binary: string;
-}
-
-export async function fetchAIReviewStatus(): Promise<AIReviewStatusResponse> {
-  return fetchApi<AIReviewStatusResponse>('/ai-review/status');
 }
 
 export async function generateAIReview(prNumber: number, repo?: string): Promise<AIReviewPRResponse> {

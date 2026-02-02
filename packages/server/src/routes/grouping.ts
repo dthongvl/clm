@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { generateGrouping, buildPRLink, checkOpencodeBinary } from '../services/grouping.js';
+import { generateGrouping, buildPRLink } from '../services/grouping.js';
 import { getCurrentRepo } from '../services/gh.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 
@@ -9,12 +9,6 @@ interface GroupingBody {
   prNumber: number;
   repo?: string;
 }
-
-// GET /api/grouping/status - Check if opencode binary is available
-app.get('/status', async (c) => {
-  const available = await checkOpencodeBinary();
-  return c.json({ available });
-});
 
 // POST /api/grouping/generate - Generate intelligent grouping for a PR
 app.post('/generate', async (c) => {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { reviewDiff, reviewLine, checkAIBinary } from '../services/ai.js';
-import { generatePRReview, buildPRLink, checkAIReviewBinary } from '../services/ai-review.js';
+import { generatePRReview, buildPRLink } from '../services/ai-review.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 
 const app = new Hono();
@@ -90,11 +90,6 @@ app.post('/line', async (c) => {
 // Body: { prNumber: number, repo?: string }
 // Generates a comprehensive AI review for a PR using the opencode CLI
 app.post('/pr', async (c) => {
-  const hasAI = await checkAIReviewBinary();
-  if (!hasAI) {
-    return c.json({ error: 'AI binary not available. Please install and configure opencode CLI.' }, 503);
-  }
-
   const result = await safeJson<PRReviewBody>(c);
   if (!result.ok) return result.response;
   
@@ -113,17 +108,6 @@ app.post('/pr', async (c) => {
     console.error('AI PR review failed:', error);
     return c.json({ error: 'AI PR review failed', details: (error as Error).message }, 500);
   }
-});
-
-// GET /api/ai-review/status
-app.get('/status', async (c) => {
-  const hasAI = await checkAIReviewBinary();
-  const aiBinary = process.env.OPENCODE_BINARY || process.env.AI_BINARY || 'opencode';
-  
-  return c.json({
-    available: hasAI,
-    binary: aiBinary,
-  });
 });
 
 export default app;
