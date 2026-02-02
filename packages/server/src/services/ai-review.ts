@@ -1,38 +1,20 @@
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
-
-// Default AI binary - can be overridden via environment variable
-const AI_BINARY = process.env.OPENCODE_BINARY || process.env.AI_BINARY || 'opencode';
+import { opencodeManager } from './opencode-manager.js';
 
 // Model to use for review - can be overridden via environment variable
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
-// Cached binary check result (cache for 30 seconds)
-let binaryCheckCache: { available: boolean; expiresAt: number } | null = null;
-const BINARY_CHECK_TTL_MS = 30_000;
-
 export async function checkAIReviewBinary(): Promise<boolean> {
-  // Return cached result if still valid
-  if (binaryCheckCache && Date.now() < binaryCheckCache.expiresAt) {
-    return binaryCheckCache.available;
-  }
-
   try {
-    const proc = Bun.spawn([AI_BINARY, '--version'], {
-      stdin: null,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    await proc.exited;
-    binaryCheckCache = { available: true, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
-    return true;
+    await opencodeManager.start();
+    return opencodeManager.isReady();
   } catch {
-    binaryCheckCache = { available: false, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
     return false;
   }
 }
 
 /**
- * Generate AI code review for a PR using opencode CLI
+ * Generate AI code review for a PR using opencode server
  * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
  * @returns AIReviewPRResult containing the parsed review items
  */
@@ -40,46 +22,12 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
   const prompt = buildReviewPrompt(prLink);
   
   try {
-    // Execute opencode CLI with the 'run' command for non-interactive mode
-    const stdout = await runOpencode([
-      'run',
-      '-m', AI_MODEL,
-      prompt
-    ]);
-    
-    return parseReviewOutput(stdout);
+    const response = await opencodeManager.prompt(prompt, { model: AI_MODEL });
+    return parseReviewOutput(response);
   } catch (error) {
     console.error('AI review generation failed:', error);
     throw new Error(`Failed to generate AI review: ${(error as Error).message}`);
   }
-}
-
-/**
- * Run opencode CLI command using Bun.spawn for better handling of arguments
- */
-async function runOpencode(args: string[]): Promise<string> {
-  const proc = Bun.spawn([AI_BINARY, ...args], {
-    stdin: null,      // ignore stdin to prevent blocking
-    stdout: 'pipe',
-    stderr: 'pipe',
-    timeout: 300000,  // 5 minutes
-  });
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (stderr) {
-    console.warn('opencode stderr:', stderr);
-  }
-
-  if (exitCode !== 0) {
-    throw new Error(`opencode exited with code ${exitCode}: ${stderr || stdout}`);
-  }
-
-  return stdout;
 }
 
 function buildReviewPrompt(prLink: string): string {

@@ -1,38 +1,20 @@
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
-
-// Default AI binary - can be overridden via environment variable
-const AI_BINARY = process.env.OPENCODE_BINARY || process.env.AI_BINARY || 'opencode';
+import { opencodeManager } from './opencode-manager.js';
 
 // Model to use for grouping - can be overridden via environment variable
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
-// Cached binary check result (cache for 30 seconds)
-let binaryCheckCache: { available: boolean; expiresAt: number } | null = null;
-const BINARY_CHECK_TTL_MS = 30_000;
-
 export async function checkOpencodeBinary(): Promise<boolean> {
-  // Return cached result if still valid
-  if (binaryCheckCache && Date.now() < binaryCheckCache.expiresAt) {
-    return binaryCheckCache.available;
-  }
-
   try {
-    const proc = Bun.spawn([AI_BINARY, '--version'], {
-      stdin: null,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    await proc.exited;
-    binaryCheckCache = { available: true, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
-    return true;
+    await opencodeManager.start();
+    return opencodeManager.isReady();
   } catch {
-    binaryCheckCache = { available: false, expiresAt: Date.now() + BINARY_CHECK_TTL_MS };
     return false;
   }
 }
 
 /**
- * Generate intelligent grouping for a PR using opencode CLI
+ * Generate intelligent grouping for a PR using opencode server
  * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
  * @returns GroupingResult containing the parsed groups
  */
@@ -40,48 +22,12 @@ export async function generateGrouping(prLink: string): Promise<GroupingResult> 
   const prompt = buildGroupingPrompt(prLink);
   
   try {
-    // Execute opencode CLI with the 'run' command for non-interactive mode
-    // Use -m flag to specify the model
-    // Pass the prompt directly as the message argument
-    const stdout = await runOpencode([
-      'run',
-      '-m', AI_MODEL,
-      prompt
-    ]);
-    
-    return parseGroupingOutput(stdout);
+    const response = await opencodeManager.prompt(prompt, { model: AI_MODEL });
+    return parseGroupingOutput(response);
   } catch (error) {
     console.error('Grouping generation failed:', error);
     throw new Error(`Failed to generate grouping: ${(error as Error).message}`);
   }
-}
-
-/**
- * Run opencode CLI command using Bun.spawn for better handling of arguments
- */
-async function runOpencode(args: string[]): Promise<string> {
-  const proc = Bun.spawn([AI_BINARY, ...args], {
-    stdin: null,      // ignore stdin to prevent blocking
-    stdout: 'pipe',
-    stderr: 'pipe',
-    timeout: 300000,  // 5 minutes
-  });
-
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-
-  if (stderr) {
-    console.warn('opencode stderr:', stderr);
-  }
-
-  if (exitCode !== 0) {
-    throw new Error(`opencode exited with code ${exitCode}: ${stderr || stdout}`);
-  }
-
-  return stdout;
 }
 
 function buildGroupingPrompt(prLink: string): string {
