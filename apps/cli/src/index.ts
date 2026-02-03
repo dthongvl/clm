@@ -31,23 +31,72 @@ async function getCurrentRepo(): Promise<string | null> {
   }
 }
 
-async function startServer(prNumber: string, opencodeUrl: string): Promise<Subprocess> {
+async function fetchBranches(base: string, head: string): Promise<void> {
+  console.log(`Fetching branches: ${base}, ${head}...`);
+
+  const result = await Bun.$`git fetch origin ${base} ${head}`.quiet();
+
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to fetch branches: ${result.stderr.toString()}`);
+  }
+}
+
+interface PRInfoResult {
+  baseBranch: string;
+  headBranch: string;
+}
+
+async function getPRInfo(prNumber: string, repo: string): Promise<PRInfoResult> {
+  const result = await Bun.$`gh pr view ${prNumber} --repo ${repo} --json baseRefName,headRefName`.quiet();
+
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to get PR info: ${result.stderr.toString()}`);
+  }
+
+  const data = JSON.parse(result.text());
+  return {
+    baseBranch: data.baseRefName,
+    headBranch: data.headRefName,
+  };
+}
+
+async function checkGitRepo(): Promise<boolean> {
+  try {
+    const result = await Bun.$`git rev-parse --git-dir`.quiet();
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+interface ServerEnv {
+  prNumber: string;
+  opencodeUrl: string;
+  repo: string;
+  baseRef: string;
+  headRef: string;
+}
+
+async function startServer(env: ServerEnv): Promise<Subprocess> {
   const serverPath = resolve(import.meta.dir, '../../../packages/server/src/index.ts');
-  
-  const server = Bun.spawn(['bun', 'run', serverPath, prNumber], {
+
+  const server = Bun.spawn(['bun', 'run', serverPath], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
-    env: { 
-      ...process.env, 
-      PR_NUMBER: prNumber,
-      OPENCODE_URL: opencodeUrl,
+    env: {
+      ...process.env,
+      PR_NUMBER: env.prNumber,
+      OPENCODE_URL: env.opencodeUrl,
+      REPO: env.repo,
+      BASE_REF: `origin/${env.baseRef}`,
+      HEAD_REF: `origin/${env.headRef}`,
     },
   });
 
   // Wait for server to be ready
   await waitForServerHealth();
-  
+
   return server;
 }
 
@@ -118,6 +167,16 @@ async function main() {
 
       console.log('✓ GitHub CLI found');
 
+      // Check we're in a git repo
+      const isGitRepo = await checkGitRepo();
+      if (!isGitRepo) {
+        console.error('Error: Not a git repository');
+        console.error('Please run from within a git repository');
+        process.exit(1);
+      }
+
+      console.log('✓ Git repository found');
+
       // Get repository
       const repo = options.repo || await getCurrentRepo();
       if (!repo) {
@@ -127,6 +186,25 @@ async function main() {
       }
 
       console.log(`✓ Repository: ${repo}`);
+
+      // Get PR branch info
+      let prInfo: PRInfoResult;
+      try {
+        prInfo = await getPRInfo(prNumber, repo);
+        console.log(`✓ PR branches: ${prInfo.baseBranch} <- ${prInfo.headBranch}`);
+      } catch (error) {
+        console.error('Error fetching PR info:', (error as Error).message);
+        process.exit(1);
+      }
+
+      // Fetch branches locally
+      try {
+        await fetchBranches(prInfo.baseBranch, prInfo.headBranch);
+        console.log('✓ Branches fetched');
+      } catch (error) {
+        console.error('Error fetching branches:', (error as Error).message);
+        process.exit(1);
+      }
 
       // Start opencode first
       try {
@@ -140,7 +218,13 @@ async function main() {
 
       // Start the server
       try {
-        serverProcess = await startServer(prNumber, opencodeLauncher.baseUrl);
+        serverProcess = await startServer({
+          prNumber,
+          opencodeUrl: opencodeLauncher.baseUrl,
+          repo,
+          baseRef: prInfo.baseBranch,
+          headRef: prInfo.headBranch,
+        });
         console.log('✓ Server started on http://localhost:3000');
       } catch (error) {
         console.error('Error starting server:', error);

@@ -1,4 +1,4 @@
-import type { PRInfo, FileDiff } from '../types/index.js';
+import type { PRInfo } from '../types/index.js';
 
 /**
  * Run gh CLI command safely using Bun.spawn (no shell injection)
@@ -51,85 +51,6 @@ export async function getPRInfo(prNumber: number, repo?: string): Promise<PRInfo
     headBranch: data.headRefName,
     repo: repo || '',
   };
-}
-
-export async function getPRDiff(prNumber: number, repo?: string): Promise<FileDiff[]> {
-  const args = ['pr', 'diff', String(prNumber)];
-  if (repo) {
-    args.push('--repo', repo);
-  }
-  
-  const stdout = await runGh(args);
-  
-  // Parse the diff output to extract file changes
-  const files: FileDiff[] = [];
-  const diffSections = stdout.split('diff --git');
-  
-  for (const section of diffSections.slice(1)) {
-    const lines = section.trim().split('\n');
-    const fileLine = lines[0];
-    const match = fileLine.match(/a\/(.+) b\/(.+)/);
-    
-    if (match) {
-      const filename = match[2];
-      let status: FileDiff['status'] = 'modified';
-      
-      if (section.includes('new file mode')) {
-        status = 'added';
-      } else if (section.includes('deleted file mode')) {
-        status = 'removed';
-      } else if (section.includes('rename from')) {
-        status = 'renamed';
-      }
-      
-      const patch = 'diff --git' + section;
-      const additions = (section.match(/^\+[^+]/gm) || []).length;
-      const deletions = (section.match(/^-[^-]/gm) || []).length;
-      
-      files.push({
-        filename,
-        status,
-        additions,
-        deletions,
-        patch,
-      });
-    }
-  }
-  
-  return files;
-}
-
-export async function getFileContent(
-  filename: string,
-  branch: string,
-  repo?: string
-): Promise<string> {
-  if (!repo) {
-    console.error(`getFileContent called without repo for ${filename}`);
-    return '';
-  }
-  
-  try {
-    // URL encode each path segment of the filename to handle special characters
-    const encodedFilename = filename.split('/').map(encodeURIComponent).join('/');
-    
-    // Use gh api with proper repo path - the repo param should be "owner/repo" format
-    const apiPath = `repos/${repo}/contents/${encodedFilename}?ref=${branch}`;
-    
-    const stdout = await runGh(['api', apiPath]);
-    const data = JSON.parse(stdout);
-    
-    if (data.content) {
-      // GitHub API returns base64 encoded content with newlines, need to remove them
-      const cleanedContent = data.content.replace(/\n/g, '');
-      return Buffer.from(cleanedContent, 'base64').toString('utf-8');
-    }
-    return '';
-  } catch (error) {
-    // Log the error for debugging but return empty string to not break the flow
-    console.error(`Failed to fetch content for ${filename} at ${branch} in ${repo}:`, (error as Error).message);
-    return '';
-  }
 }
 
 export async function postComment(

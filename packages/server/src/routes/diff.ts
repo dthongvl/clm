@@ -1,56 +1,26 @@
 import { Hono } from 'hono';
-import { getPRDiff, getFileContent, getCurrentRepo, getPRInfo } from '../services/gh.js';
+import { getDiff, getFileContent } from '../services/git.js';
+import { getCurrentRepo } from '../services/gh.js';
 import { parsePositiveInt } from '../utils/request.js';
 import type { FileDiff } from '../types/index.js';
 
 const app = new Hono();
 
-// Concurrency limit for file content fetching to avoid rate limits
-const MAX_CONCURRENT_FETCHES = 5;
+function getRefs(): { baseRef: string; headRef: string } | null {
+  const baseRef = process.env.BASE_REF;
+  const headRef = process.env.HEAD_REF;
 
-/**
- * Process items with limited concurrency
- */
-async function processWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  processor: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = [];
-  const executing: Promise<void>[] = [];
-
-  for (const item of items) {
-    const promise = processor(item).then((result) => {
-      results.push(result);
-    });
-    
-    executing.push(promise);
-
-    if (executing.length >= concurrency) {
-      await Promise.race(executing);
-      // Remove completed promises
-      for (let i = executing.length - 1; i >= 0; i--) {
-        const p = executing[i];
-        // Check if promise is settled by racing with an immediate resolve
-        const settled = await Promise.race([
-          p.then(() => true).catch(() => true),
-          Promise.resolve(false),
-        ]);
-        if (settled) {
-          executing.splice(i, 1);
-        }
-      }
-    }
+  if (!baseRef || !headRef) {
+    return null;
   }
 
-  await Promise.all(executing);
-  return results;
+  return { baseRef, headRef };
 }
 
 // GET /api/diff?pr={number}&repo={owner/repo}&includeContent={true|false}
 app.get('/', async (c) => {
   const prNumberStr = c.req.query('pr');
-  const repo = c.req.query('repo') || await getCurrentRepo();
+  const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
   const includeContent = c.req.query('includeContent') === 'true';
 
   const prNumber = parsePositiveInt(prNumberStr);
@@ -62,35 +32,31 @@ app.get('/', async (c) => {
     return c.json({ error: 'Repository not found. Please specify repo parameter or run from a git repository.' }, 400);
   }
 
+  const refs = getRefs();
+  if (!refs) {
+    return c.json({ error: 'BASE_REF and HEAD_REF environment variables are required' }, 500);
+  }
+
   try {
-    const files = await getPRDiff(prNumber, repo);
+    // Use local git for diff
+    const files = await getDiff(refs.baseRef, refs.headRef);
 
-    // Optionally fetch full file content for base and head branches
+    // Fetch full file content using local git (no rate limits, fully parallel)
     if (includeContent) {
-      const prInfo = await getPRInfo(prNumber, repo);
-      console.log(`Fetching content for PR #${prNumber}, base: ${prInfo.baseBranch}, head: ${prInfo.headBranch}, repo: ${repo}`);
-      
-      // Build list of content fetch tasks
-      const fetchTasks: { file: FileDiff; branch: string; type: 'base' | 'head' }[] = [];
-      
-      for (const file of files) {
-        if (file.status !== 'removed') {
-          fetchTasks.push({ file, branch: prInfo.headBranch, type: 'head' });
-        }
-        if (file.status !== 'added') {
-          fetchTasks.push({ file, branch: prInfo.baseBranch, type: 'base' });
-        }
-      }
+      console.log(`Fetching content for PR #${prNumber}, base: ${refs.baseRef}, head: ${refs.headRef}`);
 
-      // Fetch with concurrency limit to avoid rate limiting
-      await processWithConcurrency(fetchTasks, MAX_CONCURRENT_FETCHES, async (task) => {
-        const content = await getFileContent(task.file.filename, task.branch, repo);
-        if (task.type === 'head') {
-          task.file.headContent = content;
-        } else {
-          task.file.baseContent = content;
-        }
-      });
+      await Promise.all(files.map(async (file) => {
+        // For renamed files, use oldFilename for base content
+        const baseFilename = file.oldFilename || file.filename;
+
+        const [baseContent, headContent] = await Promise.all([
+          file.status !== 'added' ? getFileContent(refs.baseRef, baseFilename) : Promise.resolve(null),
+          file.status !== 'removed' ? getFileContent(refs.headRef, file.filename) : Promise.resolve(null),
+        ]);
+
+        file.baseContent = baseContent ?? undefined;
+        file.headContent = headContent ?? undefined;
+      }));
     }
 
     return c.json({ files });
@@ -100,37 +66,29 @@ app.get('/', async (c) => {
   }
 });
 
-// GET /api/diff/file?pr={number}&repo={owner/repo}&filename={path}
+// GET /api/diff/file?filename={path}
 app.get('/file', async (c) => {
-  const prNumberStr = c.req.query('pr');
-  const repo = c.req.query('repo') || await getCurrentRepo();
   const filename = c.req.query('filename');
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'PR number must be a positive integer' }, 400);
-  }
 
   if (!filename) {
     return c.json({ error: 'filename is required' }, 400);
   }
 
-  if (!repo) {
-    return c.json({ error: 'Repository not found' }, 400);
+  const refs = getRefs();
+  if (!refs) {
+    return c.json({ error: 'BASE_REF and HEAD_REF environment variables are required' }, 500);
   }
 
   try {
-    const prInfo = await getPRInfo(prNumber, repo);
-    
     const [baseContent, headContent] = await Promise.all([
-      getFileContent(filename, prInfo.baseBranch, repo),
-      getFileContent(filename, prInfo.headBranch, repo),
+      getFileContent(refs.baseRef, filename),
+      getFileContent(refs.headRef, filename),
     ]);
 
     return c.json({
       filename,
-      base: { branch: prInfo.baseBranch, content: baseContent },
-      head: { branch: prInfo.headBranch, content: headContent },
+      base: { ref: refs.baseRef, content: baseContent },
+      head: { ref: refs.headRef, content: headContent },
     });
   } catch (error) {
     console.error('Failed to fetch file:', error);

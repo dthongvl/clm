@@ -10,6 +10,7 @@ export interface PRInfo {
 
 export interface FileDiff {
   filename: string;
+  oldFilename?: string;  // For renamed files, the original filename
   status: 'added' | 'removed' | 'modified' | 'renamed';
   additions: number;
   deletions: number;
@@ -76,6 +77,8 @@ export interface DraftComment {
   createdAt: string;
 }
 
+export type RiskLevel = 'high' | 'medium' | 'low';
+
 export interface ChangeGroup {
   id: string;
   title: string;
@@ -83,6 +86,8 @@ export interface ChangeGroup {
   files: string[];
   totalAdditions: number;
   totalDeletions: number;
+  riskLevel: RiskLevel;
+  riskReason?: string;
 }
 
 export interface GroupingResult {
@@ -110,4 +115,25 @@ export interface RelatedFile {
 
 export interface RelatedFilesResult {
   files: RelatedFile[];
+}
+
+export interface PatternLocation {
+  filePath: string;
+  lineNumber: number;
+  status: 'updated' | 'missing' | 'suspicious';
+  snippet?: string;
+}
+
+export interface PatternVerification {
+  id: string;
+  pattern: string;
+  description: string;
+  status: 'verified' | 'incomplete' | 'warning';
+  details: string;
+  locations: PatternLocation[];
+}
+
+export interface PatternVerificationResult {
+  verifications: PatternVerification[];
+  summary: string;
 }
