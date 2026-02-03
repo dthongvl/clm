@@ -29,12 +29,23 @@ export interface InlineCommentThreadProps {
 /**
  * Avatar component for comment authors
  */
-function AuthorAvatar({ isAI }: { isAI: boolean }) {
+function AuthorAvatar({ isAI, avatarUrl, name }: { isAI: boolean; avatarUrl?: string; name: string }) {
+  if (avatarUrl) {
+    return (
+      <img
+        data-slot="author-avatar"
+        src={avatarUrl}
+        alt={`${name}'s avatar`}
+        className="size-6 shrink-0 rounded-full object-cover"
+      />
+    )
+  }
+
   return (
     <div
       data-slot="author-avatar"
       className={cn(
-        "flex size-6 shrink-0 items-center justify-center",
+        "flex size-6 shrink-0 items-center justify-center rounded-full",
         isAI
           ? "bg-primary/10 text-primary"
           : "bg-muted text-muted-foreground"
@@ -79,7 +90,7 @@ function CommentItem({
       aria-label={`${isReply ? "Reply" : "Comment"} by ${comment.author.name}`}
     >
       <div className="flex gap-2.5">
-        <AuthorAvatar isAI={isAI} />
+        <AuthorAvatar isAI={isAI} avatarUrl={comment.author.avatarUrl} name={comment.author.name} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={cn("text-xs font-semibold", isAI && "text-primary")}>

@@ -5,7 +5,7 @@ export interface ReviewComment {
   filePath: string;
   lineNumber: number;
   content: string;
-  author: { type: 'human' | 'ai'; name: string };
+  author: { type: 'human' | 'ai'; name: string; avatarUrl?: string };
   severity?: Severity;
   createdAt: Date;
   replies: ReviewComment[];

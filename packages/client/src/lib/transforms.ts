@@ -78,6 +78,7 @@ export function transformComment(serverComment: ServerPRComment): ReviewComment 
     author: {
       type: 'human',
       name: serverComment.user.login,
+      avatarUrl: serverComment.user.avatar_url,
     },
     createdAt: new Date(serverComment.created_at),
     replies: [],
