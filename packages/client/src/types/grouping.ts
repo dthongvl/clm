@@ -1,3 +1,5 @@
+export type RiskLevel = 'high' | 'medium' | 'low';
+
 export interface ChangeGroup {
   id: string;
   title: string;
@@ -5,4 +7,6 @@ export interface ChangeGroup {
   files: string[];
   totalAdditions: number;
   totalDeletions: number;
+  riskLevel: RiskLevel;
+  riskReason?: string;
 }

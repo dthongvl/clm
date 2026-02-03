@@ -69,6 +69,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/components/review-panel.tsx", "src/lib/ai-client.ts"],
     totalAdditions: 231,
     totalDeletions: 0,
+    riskLevel: "medium",
+    riskReason: "New feature with AI integration",
   },
   {
     id: "2",
@@ -78,6 +80,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/hooks/use-review.ts", "src/types/review.ts"],
     totalAdditions: 38,
     totalDeletions: 11,
+    riskLevel: "low",
+    riskReason: "Type improvements and refactoring",
   },
   {
     id: "3",
@@ -86,6 +90,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/legacy/old-review.ts", "src/utils/helpers.ts"],
     totalAdditions: 2,
     totalDeletions: 157,
+    riskLevel: "low",
+    riskReason: "Legacy code removal",
   },
   {
     id: "4",
@@ -94,6 +100,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/auth/jwt-handler.ts", "src/auth/session.ts"],
     totalAdditions: 189,
     totalDeletions: 12,
+    riskLevel: "high",
+    riskReason: "Core authentication and security changes",
   },
   {
     id: "5",
@@ -102,6 +110,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/db/migrations/001-users.sql", "src/db/migrations/002-reviews.sql"],
     totalAdditions: 87,
     totalDeletions: 0,
+    riskLevel: "high",
+    riskReason: "Database schema changes",
   },
   {
     id: "6",
@@ -110,6 +120,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/api/reviews.ts", "src/api/users.ts", "src/api/middleware.ts"],
     totalAdditions: 312,
     totalDeletions: 45,
+    riskLevel: "medium",
+    riskReason: "API endpoint changes",
   },
   {
     id: "7",
@@ -118,6 +130,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/components/ui/button.tsx", "src/components/ui/modal.tsx"],
     totalAdditions: 156,
     totalDeletions: 8,
+    riskLevel: "low",
+    riskReason: "UI component additions",
   },
   {
     id: "8",
@@ -126,6 +140,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["src/tests/setup.ts", "src/tests/utils.ts"],
     totalAdditions: 98,
     totalDeletions: 0,
+    riskLevel: "low",
+    riskReason: "Test infrastructure only",
   },
   {
     id: "9",
@@ -134,6 +150,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["config/webpack.config.js", "config/env.ts"],
     totalAdditions: 45,
     totalDeletions: 23,
+    riskLevel: "medium",
+    riskReason: "Build configuration changes",
   },
   {
     id: "10",
@@ -142,6 +160,8 @@ export const mockChangeGroups: ChangeGroup[] = [
     files: ["docs/api.md", "docs/getting-started.md", "docs/contributing.md"],
     totalAdditions: 234,
     totalDeletions: 12,
+    riskLevel: "low",
+    riskReason: "Documentation only",
   },
 ]
 

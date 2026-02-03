@@ -175,6 +175,8 @@ interface ServerChangeGroup {
   files: string[];
   totalAdditions: number;
   totalDeletions: number;
+  riskLevel: 'high' | 'medium' | 'low';
+  riskReason?: string;
 }
 
 interface GroupingResponse {

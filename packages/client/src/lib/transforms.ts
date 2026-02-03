@@ -147,6 +147,8 @@ export function transformChangeGroup(group: ServerChangeGroup): ChangeGroup {
     files: group.files,
     totalAdditions: group.totalAdditions,
     totalDeletions: group.totalDeletions,
+    riskLevel: group.riskLevel,
+    riskReason: group.riskReason,
   };
 }
 

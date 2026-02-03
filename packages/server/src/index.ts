@@ -10,6 +10,7 @@ import prInfoRoutes from './routes/pr-info.js';
 import chatRoutes from './routes/chat.js';
 import groupingRoutes from './routes/grouping.js';
 import relatedFilesRoutes from './routes/related-files.js';
+import patternVerificationRoutes from './routes/pattern-verification.js';
 
 const app = new Hono();
 
@@ -43,6 +44,7 @@ app.route('/api/pr-info', prInfoRoutes);
 app.route('/api/chat', chatRoutes);
 app.route('/api/grouping', groupingRoutes);
 app.route('/api/related-files', relatedFilesRoutes);
+app.route('/api/pattern-verification', patternVerificationRoutes);
 
 // Health check
 app.get('/api/health', (c) => {

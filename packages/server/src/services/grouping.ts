@@ -34,12 +34,19 @@ gh pr view ${prNumber} --repo ${repo} --json title,body,files
 
 Step 2: Read the PR description to understand the intent and context of the changes. Then analyze the diff and group logically connected changes. Order groups so reviewers can understand the PR from top to bottom.
 
-Step 3: Return ONLY a YAML code block in this exact format (no other text):
+Step 3: For each group, assess the risk level:
+- HIGH: Core business logic, payment/billing, authentication, security, database migrations, data processing pipelines
+- MEDIUM: API endpoints, shared utilities, configuration, non-critical features
+- LOW: Tests, documentation, comments, formatting, dev tooling, experimental features
+
+Step 4: Return ONLY a YAML code block in this exact format (no other text):
 
 \`\`\`yaml
 groups:
   - id: group-1
     title: Short descriptive title
+    riskLevel: high  # must be: high, medium, or low
+    riskReason: Brief reason why this risk level was assigned
     explanation: |
       Quick explanation of this group:
       - Why these files are grouped together
@@ -54,7 +61,7 @@ groups:
 
 Rules:
 - Files can appear in multiple groups if they serve multiple purposes
-- Order groups logically (e.g., core changes first, then dependent changes, tests last)
+- Order groups by risk level (high-risk first, then medium, then low)
 - Provide detailed explanations that help reviewers understand the changes without reading all the code
 - Use actual additions/deletions from the gh output for each file
 - Return ONLY the YAML code block, nothing else`;
@@ -70,6 +77,8 @@ interface YamlGroup {
   id?: string;
   title?: string;
   explanation?: string;
+  riskLevel?: string;
+  riskReason?: string;
   files?: (YamlFileEntry | string)[];
 }
 
@@ -122,6 +131,11 @@ function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
         }
       }
     }
+
+    const riskLevelRaw = (group.riskLevel || 'medium').toLowerCase();
+    const riskLevel = ['high', 'medium', 'low'].includes(riskLevelRaw)
+      ? (riskLevelRaw as 'high' | 'medium' | 'low')
+      : 'medium';
     
     return {
       id: group.id || `group-${index + 1}`,
@@ -130,6 +144,8 @@ function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
       files,
       totalAdditions,
       totalDeletions,
+      riskLevel,
+      riskReason: group.riskReason || undefined,
     };
   });
 }

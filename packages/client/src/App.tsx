@@ -15,6 +15,8 @@ import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams, useRelatedFiles } from "@/hooks"
+import { usePatternVerification } from "@/hooks/use-pattern-verification"
+import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import {
@@ -93,6 +95,16 @@ export function App() {
     prNumber,
     repo,
     autoGenerate: false,
+  })
+
+  const {
+    result: verificationResult,
+    isLoading: isVerifying,
+    error: verificationError,
+    verify: verifyPatterns,
+  } = usePatternVerification({
+    repo: repo || '',
+    prNumber: prNumber || 0,
   })
 
   const annotations = useMemo(
@@ -255,6 +267,20 @@ export function App() {
                     scrollToAnnotation(item.filePath, item.lineNumber)
                   }}
                 />
+                {prNumber && (
+                  <div className="mt-6 pt-4 border-t border-border">
+                    <h3 className="text-sm font-medium mb-3">Pattern Verification</h3>
+                    <PatternVerificationPanel
+                      result={verificationResult}
+                      isLoading={isVerifying}
+                      error={verificationError}
+                      onVerify={verifyPatterns}
+                      onLocationClick={(filePath, lineNumber) => {
+                        scrollToAnnotation(filePath, lineNumber)
+                      }}
+                    />
+                  </div>
+                )}
               </SidePanelAIReviewContent>
               <SidePanelRelatedFilesContent>
                 <RelatedFiles
