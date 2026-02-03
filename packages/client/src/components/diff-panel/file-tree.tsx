@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react"
 import { cva } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type { DiffFile } from "@/types/diff"
 
 const fileItemVariants = cva(
@@ -98,46 +99,48 @@ function FileTree({
   )
 
   return (
-    <nav aria-label="Changed files" className={cn("overflow-auto", className)}>
-      <ul
-        ref={listRef}
-        role="tree"
-        onKeyDown={handleKeyDown}
-        className="flex flex-col"
-      >
-        {files.map((file) => (
-          <li
-            key={file.path}
-            role="treeitem"
-            tabIndex={selectedPath === file.path ? 0 : -1}
-            aria-selected={selectedPath === file.path}
-            data-path={file.path}
-            onClick={() => onSelectFile(file.path)}
-            className={cn(
-              fileItemVariants({ selected: selectedPath === file.path })
-            )}
-          >
-            <span
-              className={cn(statusIconVariants({ status: file.status }))}
-              aria-label={file.status}
+    <nav aria-label="Changed files" className={cn("overflow-hidden", className)}>
+      <ScrollArea className="h-full">
+        <ul
+          ref={listRef}
+          role="tree"
+          onKeyDown={handleKeyDown}
+          className="flex flex-col"
+        >
+          {files.map((file) => (
+            <li
+              key={file.path}
+              role="treeitem"
+              tabIndex={selectedPath === file.path ? 0 : -1}
+              aria-selected={selectedPath === file.path}
+              data-path={file.path}
+              onClick={() => onSelectFile(file.path)}
+              className={cn(
+                fileItemVariants({ selected: selectedPath === file.path })
+              )}
             >
-              {statusIcons[file.status]}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-foreground">
-              {file.path}
-            </span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {file.additions > 0 && (
-                <span className="text-green-500">+{file.additions}</span>
-              )}
-              {file.additions > 0 && file.deletions > 0 && " "}
-              {file.deletions > 0 && (
-                <span className="text-red-500">−{file.deletions}</span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
+              <span
+                className={cn(statusIconVariants({ status: file.status }))}
+                aria-label={file.status}
+              >
+                {statusIcons[file.status]}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-foreground">
+                {file.path}
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {file.additions > 0 && (
+                  <span className="text-green-500">+{file.additions}</span>
+                )}
+                {file.additions > 0 && file.deletions > 0 && " "}
+                {file.deletions > 0 && (
+                  <span className="text-red-500">−{file.deletions}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </ScrollArea>
     </nav>
   )
 }

@@ -1,6 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 
 type TabValue = "grouping" | "ai-review" | "related-files"
@@ -55,40 +56,55 @@ function SidePanel({
 
 function SidePanelGroupingContent({
   className,
+  children,
   ...props
 }: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
   return (
     <TabsContent
       {...props}
       value="grouping"
-      className={cn("flex-1 overflow-auto p-4", className)}
-    />
+      className={cn("flex-1 overflow-hidden", className)}
+    >
+      <ScrollArea className="h-full">
+        <div className="p-4">{children}</div>
+      </ScrollArea>
+    </TabsContent>
   )
 }
 
 function SidePanelAIReviewContent({
   className,
+  children,
   ...props
 }: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
   return (
     <TabsContent
       {...props}
       value="ai-review"
-      className={cn("flex-1 overflow-auto p-4", className)}
-    />
+      className={cn("flex-1 overflow-hidden", className)}
+    >
+      <ScrollArea className="h-full">
+        <div className="p-4">{children}</div>
+      </ScrollArea>
+    </TabsContent>
   )
 }
 
 function SidePanelRelatedFilesContent({
   className,
+  children,
   ...props
 }: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
   return (
     <TabsContent
       {...props}
       value="related-files"
-      className={cn("flex-1 overflow-auto p-4", className)}
-    />
+      className={cn("flex-1 overflow-hidden", className)}
+    >
+      <ScrollArea className="h-full">
+        <div className="p-4">{children}</div>
+      </ScrollArea>
+    </TabsContent>
   )
 }
 

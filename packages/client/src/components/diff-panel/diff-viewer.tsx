@@ -7,6 +7,7 @@ import {
 } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ReviewComment, AIReviewItem } from "@/types/review"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
 import { CommentThread } from "@/components/comment-thread"
@@ -454,10 +455,11 @@ function DiffViewer({
     <div
       data-slot="diff-viewer"
       data-state="loaded"
-      className={cn("min-h-0 flex-1 overflow-auto bg-background", className)}
+      className={cn("min-h-0 flex-1 overflow-hidden bg-background", className)}
       {...props}
     >
-      <div className="flex flex-col gap-4 p-4 pb-24" role="list" aria-label="File diffs">
+      <ScrollArea className="h-full">
+        <div className="flex flex-col gap-4 p-4 pb-24" role="list" aria-label="File diffs">
         {files.map((file) => {
           const oldFile = toFileContents(
             file.oldPath ?? file.path,
@@ -605,6 +607,7 @@ function DiffViewer({
           <span>🎉 You've reached the end — happy reviewing!</span>
         </div>
       </div>
+      </ScrollArea>
     </div>
   )
 }
