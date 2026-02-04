@@ -40,6 +40,7 @@ function transformDraftComment(draft: ServerDraftComment): ReviewComment {
     id: draft.id,
     filePath: draft.filePath,
     lineNumber: draft.lineNumber,
+    side: draft.side,
     content: draft.content,
     author: { type: 'human', name: draft.authorName },
     createdAt: new Date(draft.createdAt),

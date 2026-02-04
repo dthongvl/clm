@@ -145,7 +145,7 @@ function toLineAnnotations(
   const commentAnnotations: DiffLineAnnotation<AnnotationMetadata>[] = comments
     .filter((c) => c.filePath === filePath)
     .map((c) => ({
-      side: "additions" as const,
+      side: c.side,
       lineNumber: c.lineNumber,
       metadata: { type: "comment" as const, comment: c },
     }))
@@ -565,10 +565,12 @@ function DiffViewer({
 
                     if (meta.type === "ai-review") {
                       // Convert AI review item to ReviewComment format for display
+                      // AI reviews are always on the additions (new code) side
                       const aiComment: ReviewComment = {
                         id: meta.item.id,
                         filePath: meta.item.filePath,
                         lineNumber: meta.item.lineNumber,
+                        side: "additions",
                         content: meta.item.suggestion
                           ? `${meta.item.message}\n\n**Suggestion:** ${meta.item.suggestion}`
                           : meta.item.message,

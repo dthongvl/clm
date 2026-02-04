@@ -2,7 +2,7 @@
 
 import type { PRInfo, PRState } from '@/types/pr';
 import type { DiffFileData } from '@/components/diff-panel';
-import type { ReviewComment, AIReviewItem } from '@/types/review';
+import type { ReviewComment, AIReviewItem, CommentSide } from '@/types/review';
 import type { ChangeGroup } from '@/types/grouping';
 import type { ServerPRInfo, ServerFileDiff, ServerPRComment, ServerAIReviewItem, ServerChangeGroup } from './api';
 
@@ -67,6 +67,15 @@ export function transformFileDiffs(serverFiles: ServerFileDiff[]): DiffFileData[
 }
 
 /**
+ * Map GitHub's LEFT/RIGHT side to client's deletions/additions
+ * - LEFT = old code (deletions side in split view)
+ * - RIGHT = new code (additions side in split view)
+ */
+function mapCommentSide(side?: 'LEFT' | 'RIGHT'): CommentSide {
+  return side === 'LEFT' ? 'deletions' : 'additions';
+}
+
+/**
  * Transform a single server PR comment to client ReviewComment format
  */
 export function transformComment(serverComment: ServerPRComment): ReviewComment {
@@ -74,6 +83,7 @@ export function transformComment(serverComment: ServerPRComment): ReviewComment 
     id: String(serverComment.id),
     filePath: serverComment.path || '',
     lineNumber: serverComment.line || serverComment.original_line || 0,
+    side: mapCommentSide(serverComment.side),
     content: serverComment.body,
     author: {
       type: 'human',
