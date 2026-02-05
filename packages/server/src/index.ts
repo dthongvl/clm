@@ -11,6 +11,7 @@ import chatRoutes from './routes/chat.js';
 import groupingRoutes from './routes/grouping.js';
 import relatedFilesRoutes from './routes/related-files.js';
 import patternVerificationRoutes from './routes/pattern-verification.js';
+import refreshRoutes from './routes/refresh.js';
 
 const app = new Hono();
 
@@ -45,6 +46,7 @@ app.route('/api/chat', chatRoutes);
 app.route('/api/grouping', groupingRoutes);
 app.route('/api/related-files', relatedFilesRoutes);
 app.route('/api/pattern-verification', patternVerificationRoutes);
+app.route('/api/refresh', refreshRoutes);
 
 // Health check
 app.get('/api/health', (c) => {

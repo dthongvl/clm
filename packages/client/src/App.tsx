@@ -19,6 +19,7 @@ import { usePatternVerification } from "@/hooks/use-pattern-verification"
 import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
+import { refreshPR } from "@/lib/api"
 import {
   mockPR,
   mockChangeGroups,
@@ -51,12 +52,27 @@ export function App() {
     setStorageItem(StorageKeys.CHAT_OPEN, open)
   }, [])
 
-  const handleRefresh = useCallback(() => {
-    refetchPR()
-    refetchDiff()
-    refetchComments()
-    refetchDraftComments()
-  }, [refetchPR, refetchDiff, refetchComments, refetchDraftComments])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  
+  const handleRefresh = useCallback(async () => {
+    if (!prNumber) return
+    
+    setIsRefreshing(true)
+    try {
+      // First, fetch the latest branches from origin and update refs
+      await refreshPR(prNumber, repo || undefined)
+      
+      // Then refetch all data with updated refs
+      refetchPR()
+      refetchDiff()
+      refetchComments()
+      refetchDraftComments()
+    } catch (error) {
+      console.error('Failed to refresh:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [prNumber, repo, refetchPR, refetchDiff, refetchComments, refetchDraftComments])
 
   // Handle comment submission
   const handleCommentSubmit = useCallback(
@@ -167,9 +183,9 @@ export function App() {
               variant="outline" 
               size="sm" 
               onClick={handleRefresh}
-              disabled={isPRLoading || isDiffLoading || isCommentsLoading}
+              disabled={isRefreshing || isPRLoading || isDiffLoading || isCommentsLoading}
             >
-              {isPRLoading || isDiffLoading || isCommentsLoading ? "Loading..." : "Refresh"}
+              {isRefreshing ? "Fetching branches..." : isPRLoading || isDiffLoading || isCommentsLoading ? "Loading..." : "Refresh"}
             </Button>
           <Button variant="outline" size="sm">
             Settings

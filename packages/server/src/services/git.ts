@@ -119,3 +119,10 @@ export async function verifyRef(ref: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Fetch branches from origin
+ */
+export async function fetchBranches(baseBranch: string, headBranch: string): Promise<void> {
+  await runGit(['fetch', 'origin', baseBranch, headBranch]);
+}

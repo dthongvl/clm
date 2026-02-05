@@ -31,7 +31,7 @@ app.get('/', async (c) => {
 app.get('/status', async (c) => {
   const hasGh = await checkGhCli();
   const currentRepo = await getCurrentRepo();
-  
+
   return c.json({
     ghAvailable: hasGh,
     currentRepo,

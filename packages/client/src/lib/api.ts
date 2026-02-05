@@ -82,6 +82,22 @@ export async function fetchStatus(): Promise<StatusResponse> {
   return fetchApi<StatusResponse>('/pr-info/status');
 }
 
+// Refresh API - fetches branches and updates refs
+interface RefreshResponse {
+  success: boolean;
+  prInfo: ServerPRInfo;
+  refs: {
+    baseRef: string;
+    headRef: string;
+  };
+}
+
+export async function refreshPR(prNumber: number, repo?: string, signal?: AbortSignal): Promise<RefreshResponse> {
+  const params = new URLSearchParams({ pr: String(prNumber) });
+  if (repo) params.set('repo', repo);
+  return fetchApi<RefreshResponse>(`/refresh?${params}`, { method: 'POST', signal });
+}
+
 // Server response type for PR comments
 interface ServerPRComment {
   id: number;
@@ -232,4 +248,4 @@ export async function findRelatedFiles(prNumber: number, repo?: string): Promise
   return response.files;
 }
 
-export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile };
+export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile, RefreshResponse };
