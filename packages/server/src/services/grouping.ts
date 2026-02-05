@@ -29,17 +29,21 @@ function buildGroupingPrompt(prLink: string): string {
 
   return `Analyze GitHub PR #${prNumber} in ${repo} and group files for code review.
 
-Step 1: Use the \`gh\` CLI tool to fetch the PR information:
-gh pr view ${prNumber} --repo ${repo} --json title,body,files
+Step 1: Get PR information and branch names:
+gh pr view ${prNumber} --repo ${repo} --json title,body,baseRefName,headRefName,files
 
-Step 2: Read the PR description to understand the intent and context of the changes. Then analyze the diff and group logically connected changes. Order groups so reviewers can understand the PR from top to bottom.
+Step 2: Fetch the latest branches and get the diff locally (faster than gh pr diff):
+git fetch origin <baseRefName> <headRefName>
+git diff origin/<baseRefName>...origin/<headRefName>
 
-Step 3: For each group, assess the risk level:
+Step 3: Read the PR description to understand the intent and context of the changes. Then analyze the diff and group logically connected changes. Order groups so reviewers can understand the PR from top to bottom.
+
+Step 4: For each group, assess the risk level:
 - HIGH: Core business logic, payment/billing, authentication, security, database migrations, data processing pipelines
 - MEDIUM: API endpoints, shared utilities, configuration, non-critical features
 - LOW: Tests, documentation, comments, formatting, dev tooling, experimental features
 
-Step 4: Return ONLY a YAML code block in this exact format (no other text):
+Step 5: Return ONLY a YAML code block in this exact format (no other text):
 
 \`\`\`yaml
 groups:

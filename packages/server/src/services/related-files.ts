@@ -28,15 +28,19 @@ function buildRelatedFilesPrompt(prLink: string): string {
 
   return `Analyze GitHub PR #${prNumber} in ${repo} and find related files that are NOT part of this PR but might be relevant for reviewers.
 
-Step 1: Use the \`gh\` CLI tool to fetch the PR information:
-gh pr view ${prNumber} --repo ${repo} --json title,body,files
+Step 1: Get PR information and branch names:
+gh pr view ${prNumber} --repo ${repo} --json title,body,baseRefName,headRefName,files
 
-Step 2: Read the PR description and analyze the changed files to understand:
+Step 2: Fetch the latest branches and get the diff locally (faster than gh pr diff):
+git fetch origin <baseRefName> <headRefName>
+git diff origin/<baseRefName>...origin/<headRefName>
+
+Step 3: Read the PR description and analyze the changed files to understand:
 - What features or functionality is being modified
 - What APIs, interfaces, or contracts are being changed
 - What dependencies exist between the changed files and other parts of the codebase
 
-Step 3: Search the codebase to find files that:
+Step 4: Search the codebase to find files that:
 - Import from or are imported by the changed files
 - Use the same APIs, functions, or components being modified
 - Could be affected by the changes (downstream dependencies)
@@ -44,9 +48,9 @@ Step 3: Search the codebase to find files that:
 - Contain related tests or documentation
 - Define types/interfaces used by the changed files
 
-Step 4: For each related file found, explain the code flow and why it's relevant.
+Step 5: For each related file found, explain the code flow and why it's relevant.
 
-Step 5: Return ONLY a YAML code block in this exact format (no other text):
+Step 6: Return ONLY a YAML code block in this exact format (no other text):
 
 \`\`\`yaml
 files:

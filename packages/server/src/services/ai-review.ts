@@ -29,15 +29,19 @@ function buildReviewPrompt(prLink: string): string {
 
   return `You are a code reviewer. Analyze GitHub PR #${prNumber} in ${repo} and provide detailed code review feedback.
 
-Step 1: Use the \`gh\` CLI tool to fetch the PR diff:
-gh pr diff ${prNumber} --repo ${repo}
+Step 1: Get PR information and branch names:
+gh pr view ${prNumber} --repo ${repo} --json title,body,baseRefName,headRefName
 
-Step 2: Read and analyze the diff carefully. Look for:
+Step 2: Fetch the latest branches and get the diff locally (faster than gh pr diff):
+git fetch origin <baseRefName> <headRefName>
+git diff origin/<baseRefName>...origin/<headRefName>
+
+Step 3: Read and analyze the diff carefully. Look for:
 - Critical issues: bugs, security vulnerabilities, performance problems, data loss risks
 - Warnings: code smells, potential improvements, best practice violations, error handling issues
 - Info: suggestions, style improvements, documentation needs, minor optimizations
 
-Step 3: Return ONLY a YAML code block in this exact format (no other text):
+Step 4: Return ONLY a YAML code block in this exact format (no other text):
 
 \`\`\`yaml
 summary: Brief overall summary of the PR and key findings
