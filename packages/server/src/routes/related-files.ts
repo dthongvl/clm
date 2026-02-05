@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { findRelatedFiles } from '../services/related-files.js';
 import { getCurrentRepo } from '../services/gh.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -33,13 +34,13 @@ app.post('/analyze', async (c) => {
 
     const prLink = buildPRLink(targetRepo, prNumber);
 
-    console.log(`Finding related files for PR: ${prLink}`);
+    logger.ai(`Finding related files for PR #${prNumber}`);
 
     const result = await findRelatedFiles(prLink);
 
     return c.json(result);
   } catch (error) {
-    console.error('Related files analysis failed:', error);
+    logger.error('Related files analysis failed', error);
     return c.json(
       { 
         error: 'Failed to find related files', 

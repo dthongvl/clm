@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { logger } from '../lib/logger.js';
 
 // Model to use for grouping - can be overridden via environment variable
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
@@ -17,7 +18,7 @@ export async function generateGrouping(prLink: string): Promise<GroupingResult> 
     const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
     return parseGroupingOutput(response);
   } catch (error) {
-    console.error('Grouping generation failed:', error);
+    logger.error('Grouping generation failed', error);
     throw new Error(`Failed to generate grouping: ${(error as Error).message}`);
   }
 }
@@ -97,7 +98,8 @@ function parseGroupingOutput(output: string): GroupingResult {
       || output.match(/^(groups:\n[\s\S]*)/m);
     
     if (!yamlMatch) {
-      console.error('No YAML grouping found in output:', output.slice(0, 500));
+      logger.warn('No YAML grouping found in AI output');
+      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
       return { groups: [] };
     }
     
@@ -105,15 +107,15 @@ function parseGroupingOutput(output: string): GroupingResult {
     const parsed = parseYaml(yamlContent) as YamlGroupingResult;
     
     if (!parsed?.groups || !Array.isArray(parsed.groups)) {
-      console.error('Invalid YAML structure:', parsed);
+      logger.warn('Invalid YAML structure in grouping response');
       return { groups: [] };
     }
     
     const groups = parseYamlGroups(parsed.groups);
     return { groups };
   } catch (error) {
-    console.error('Failed to parse grouping output:', error);
-    console.error('Raw output:', output.slice(0, 1000));
+    logger.error('Failed to parse grouping output', error);
+    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
     return { groups: [] };
   }
 }

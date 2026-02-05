@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import type { PatternVerification, PatternVerificationResult, PatternLocation } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { logger } from '../lib/logger.js';
 
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
@@ -11,7 +12,7 @@ export async function verifyPatterns(prLink: string): Promise<PatternVerificatio
     const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
     return parseVerificationOutput(response);
   } catch (error) {
-    console.error('Pattern verification failed:', error);
+    logger.error('Pattern verification failed', error);
     throw new Error(`Failed to verify patterns: ${(error as Error).message}`);
   }
 }
@@ -94,7 +95,8 @@ function parseVerificationOutput(output: string): PatternVerificationResult {
       || output.match(/^(verifications:\n[\s\S]*)/m);
     
     if (!yamlMatch) {
-      console.error('No YAML found in verification output:', output.slice(0, 500));
+      logger.warn('No YAML found in verification output');
+      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
       return { verifications: [], summary: '' };
     }
     
@@ -106,8 +108,8 @@ function parseVerificationOutput(output: string): PatternVerificationResult {
     
     return { verifications, summary };
   } catch (error) {
-    console.error('Failed to parse verification output:', error);
-    console.error('Raw output:', output.slice(0, 1000));
+    logger.error('Failed to parse verification output', error);
+    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
     return { verifications: [], summary: '' };
   }
 }

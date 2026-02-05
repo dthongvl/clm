@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getPRInfo, checkGhCli, getCurrentRepo } from '../services/gh.js';
 import { parsePositiveInt } from '../utils/request.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -19,10 +20,11 @@ app.get('/', async (c) => {
   }
 
   try {
+    logger.github(`Fetching PR #${prNumber} info`);
     const prInfo = await getPRInfo(prNumber, repo);
     return c.json(prInfo);
   } catch (error) {
-    console.error('Failed to fetch PR info:', error);
+    logger.error('Failed to fetch PR info', error);
     return c.json({ error: 'Failed to fetch PR info', details: (error as Error).message }, 500);
   }
 });

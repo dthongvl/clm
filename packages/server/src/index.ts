@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
 import { serveStatic } from 'hono/bun';
+import { logger, createLoggerMiddleware } from './lib/logger.js';
 import diffRoutes from './routes/diff.js';
 import commentRoutes from './routes/comments.js';
 import draftCommentRoutes from './routes/draft-comments.js';
@@ -15,8 +15,8 @@ import refreshRoutes from './routes/refresh.js';
 
 const app = new Hono();
 
-// Middleware
-app.use('*', logger());
+// Middleware - custom beautiful logger
+app.use('*', createLoggerMiddleware());
 
 // CORS configuration - restrict to known origins
 const allowedOrigins = process.env.CORS_ORIGINS
@@ -77,7 +77,7 @@ app.get('*', async (c) => {
 
 // Error handling
 app.onError((err, c) => {
-  console.error('Server error:', err);
+  logger.error('Server error', err);
   return c.json({ error: 'Internal server error', message: err.message }, 500);
 });
 
@@ -89,7 +89,7 @@ app.notFound((c) => {
 // Start server
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-console.log(`Server starting on port ${port}...`);
+logger.serverStart(port);
 
 export default {
   port,

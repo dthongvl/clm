@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { postComment, getCurrentRepo, getPRComments } from '../services/gh.js';
 import { safeJson, parsePositiveInt, isPositiveInt } from '../utils/request.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -33,7 +34,7 @@ app.get('/', async (c) => {
     const comments = await getPRComments(prNumber, repo);
     return c.json({ comments });
   } catch (error) {
-    console.error('Failed to fetch comments:', error);
+    logger.error('Failed to fetch comments', error);
     return c.json({ error: 'Failed to fetch comments', details: (error as Error).message }, 500);
   }
 });
@@ -73,10 +74,11 @@ app.post('/', async (c) => {
   }
 
   try {
+    logger.github(`Posting comment to PR #${prNumber}`);
     await postComment(prNumber, commentBody, commitId, path, line, repo);
     return c.json({ success: true, message: 'Comment posted successfully' });
   } catch (error) {
-    console.error('Failed to post comment:', error);
+    logger.error('Failed to post comment', error);
     return c.json({ error: 'Failed to post comment', details: (error as Error).message }, 500);
   }
 });

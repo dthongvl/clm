@@ -3,6 +3,7 @@ import open from 'open';
 import type { Subprocess } from 'bun';
 import { resolve } from 'node:path';
 import { OpencodeLauncher } from './opencode-launcher.js';
+import { logger } from './logger.js';
 
 const program = new Command();
 
@@ -32,7 +33,7 @@ async function getCurrentRepo(): Promise<string | null> {
 }
 
 async function fetchBranches(base: string, head: string): Promise<void> {
-  console.log(`Fetching branches: ${base}, ${head}...`);
+  logger.step(`Fetching branches: ${base}, ${head}`);
 
   const result = await Bun.$`git fetch origin ${base} ${head}`.quiet();
 
@@ -122,11 +123,12 @@ async function shutdown(): Promise<void> {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  console.log('\n[cli] Shutting down...');
+  logger.newline();
+  logger.shutdown('Shutting down...');
 
   // Kill server first
   if (serverProcess) {
-    console.log('[cli] Stopping server...');
+    logger.shutdown('Stopping server...');
     serverProcess.kill();
     await Promise.race([
       serverProcess.exited,
@@ -139,7 +141,7 @@ async function shutdown(): Promise<void> {
     await opencodeLauncher.shutdown();
   }
 
-  console.log('[cli] Shutdown complete');
+  logger.shutdown('Shutdown complete');
   process.exit(0);
 }
 
@@ -155,54 +157,51 @@ async function main() {
     .argument('<pr-number>', 'GitHub PR number to review')
     .option('-r, --repo <owner/repo>', 'GitHub repository (defaults to current repo)')
     .action(async (prNumber: string, options: { repo?: string }) => {
-      console.log(`Starting code review for PR #${prNumber}...`);
+      logger.header(`Code Review for PR #${prNumber}`);
 
       // Check for gh CLI
       const hasGh = await checkGhCLI();
       if (!hasGh) {
-        console.error('Error: GitHub CLI (gh) is not installed or not in PATH');
-        console.error('Please install it from: https://cli.github.com/');
+        logger.error('GitHub CLI (gh) is not installed or not in PATH', 'Please install it from: https://cli.github.com/');
         process.exit(1);
       }
 
-      console.log('✓ GitHub CLI found');
+      logger.success('GitHub CLI found');
 
       // Check we're in a git repo
       const isGitRepo = await checkGitRepo();
       if (!isGitRepo) {
-        console.error('Error: Not a git repository');
-        console.error('Please run from within a git repository');
+        logger.error('Not a git repository', 'Please run from within a git repository');
         process.exit(1);
       }
 
-      console.log('✓ Git repository found');
+      logger.success('Git repository found');
 
       // Get repository
       const repo = options.repo || await getCurrentRepo();
       if (!repo) {
-        console.error('Error: Could not determine repository.');
-        console.error('Please run from a git repository or specify --repo owner/repo');
+        logger.error('Could not determine repository', 'Please run from a git repository or specify --repo owner/repo');
         process.exit(1);
       }
 
-      console.log(`✓ Repository: ${repo}`);
+      logger.success(`Repository: ${repo}`);
 
       // Get PR branch info
       let prInfo: PRInfoResult;
       try {
         prInfo = await getPRInfo(prNumber, repo);
-        console.log(`✓ PR branches: ${prInfo.baseBranch} <- ${prInfo.headBranch}`);
+        logger.success(`PR branches: ${prInfo.baseBranch} \u2190 ${prInfo.headBranch}`);
       } catch (error) {
-        console.error('Error fetching PR info:', (error as Error).message);
+        logger.error('Failed to fetch PR info', (error as Error).message);
         process.exit(1);
       }
 
       // Fetch branches locally
       try {
         await fetchBranches(prInfo.baseBranch, prInfo.headBranch);
-        console.log('✓ Branches fetched');
+        logger.success('Branches fetched');
       } catch (error) {
-        console.error('Error fetching branches:', (error as Error).message);
+        logger.error('Failed to fetch branches', (error as Error).message);
         process.exit(1);
       }
 
@@ -210,9 +209,9 @@ async function main() {
       try {
         opencodeLauncher = new OpencodeLauncher();
         const opencodeInfo = await opencodeLauncher.start();
-        console.log(`✓ OpenCode server started on ${opencodeInfo.baseUrl}`);
+        logger.success(`OpenCode server started on ${opencodeInfo.baseUrl}`);
       } catch (error) {
-        console.error('Error starting OpenCode:', error);
+        logger.error('Failed to start OpenCode', (error as Error).message);
         process.exit(1);
       }
 
@@ -225,9 +224,8 @@ async function main() {
           baseRef: prInfo.baseBranch,
           headRef: prInfo.headBranch,
         });
-        console.log('✓ Server started on http://localhost:3000');
       } catch (error) {
-        console.error('Error starting server:', error);
+        logger.error('Failed to start server', (error as Error).message);
         await shutdown();
         process.exit(1);
       }
@@ -239,14 +237,14 @@ async function main() {
       // Open browser
       try {
         await open(url);
-        console.log(`✓ Browser opened: ${url}`);
+        logger.success(`Browser opened: ${url}`);
       } catch {
-        console.log('Note: Could not open browser automatically');
-        console.log(`Please open ${url} manually`);
+        logger.warn('Could not open browser automatically');
+        logger.dim(`Please open ${url} manually`);
       }
 
-      console.log('\nCode review UI is ready!');
-      console.log('Press Ctrl+C to stop');
+      logger.ready('Code review UI is ready!');
+      logger.dim('Press Ctrl+C to stop');
     });
 
   await program.parseAsync(process.argv);

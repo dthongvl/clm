@@ -3,6 +3,7 @@ import { getDiff, getFileContent } from '../services/git.js';
 import { getCurrentRepo } from '../services/gh.js';
 import { parsePositiveInt } from '../utils/request.js';
 import type { FileDiff } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -43,7 +44,7 @@ app.get('/', async (c) => {
 
     // Fetch full file content using local git (no rate limits, fully parallel)
     if (includeContent) {
-      console.log(`Fetching content for PR #${prNumber}, base: ${refs.baseRef}, head: ${refs.headRef}`);
+      logger.operationStart(`Fetching content for PR #${prNumber}`);
 
       await Promise.all(files.map(async (file) => {
         // For renamed files, use oldFilename for base content
@@ -61,7 +62,7 @@ app.get('/', async (c) => {
 
     return c.json({ files });
   } catch (error) {
-    console.error('Failed to fetch diff:', error);
+    logger.error('Failed to fetch diff', error);
     return c.json({ error: 'Failed to fetch PR diff', details: (error as Error).message }, 500);
   }
 });
@@ -91,7 +92,7 @@ app.get('/file', async (c) => {
       head: { ref: refs.headRef, content: headContent },
     });
   } catch (error) {
-    console.error('Failed to fetch file:', error);
+    logger.error('Failed to fetch file', error);
     return c.json({ error: 'Failed to fetch file content', details: (error as Error).message }, 500);
   }
 });

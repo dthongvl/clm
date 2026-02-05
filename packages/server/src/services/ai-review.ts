@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { logger } from '../lib/logger.js';
 
 // Model to use for review - can be overridden via environment variable
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
@@ -17,7 +18,7 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
     const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
     return parseReviewOutput(response);
   } catch (error) {
-    console.error('AI review generation failed:', error);
+    logger.error('AI review generation failed', error);
     throw new Error(`Failed to generate AI review: ${(error as Error).message}`);
   }
 }
@@ -86,7 +87,8 @@ function parseReviewOutput(output: string): AIReviewPRResult {
       || output.match(/^(items:\n[\s\S]*)/m);
     
     if (!yamlMatch) {
-      console.error('No YAML review found in output:', output.slice(0, 500));
+      logger.warn('No YAML review found in AI output');
+      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
       return { items: [], summary: '' };
     }
     
@@ -98,8 +100,8 @@ function parseReviewOutput(output: string): AIReviewPRResult {
     
     return { items, summary };
   } catch (error) {
-    console.error('Failed to parse review output:', error);
-    console.error('Raw output:', output.slice(0, 1000));
+    logger.error('Failed to parse review output', error);
+    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
     return { items: [], summary: '' };
   }
 }

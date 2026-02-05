@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { generateGrouping, buildPRLink } from '../services/grouping.js';
 import { getCurrentRepo } from '../services/gh.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -35,14 +36,14 @@ app.post('/generate', async (c) => {
     // Build the PR link
     const prLink = buildPRLink(targetRepo, prNumber);
 
-    console.log(`Generating grouping for PR: ${prLink}`);
+    logger.ai(`Generating grouping for PR #${prNumber}`);
 
     // Generate grouping using opencode CLI
     const groupingResult = await generateGrouping(prLink);
 
     return c.json(groupingResult);
   } catch (error) {
-    console.error('Grouping generation failed:', error);
+    logger.error('Grouping generation failed', error);
     return c.json(
       { 
         error: 'Failed to generate grouping', 

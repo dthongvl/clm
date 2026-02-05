@@ -1,4 +1,5 @@
 import type { AIReviewResult, AIReviewSuggestion } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 // Default AI binary - can be overridden via environment variable
 const AI_BINARY = process.env.CLAUDE_BINARY || process.env.AI_BINARY || 'claude';
@@ -62,7 +63,7 @@ export async function reviewDiff(
     const stdout = await runAIWithStdin(prompt, { timeoutMs: 120_000 });
     return parseAIReviewOutput(stdout);
   } catch (error) {
-    console.error('AI review failed:', error);
+    logger.error('AI review failed', error);
     return {
       suggestions: [],
       summary: 'AI review failed to complete.',
@@ -80,7 +81,7 @@ export async function chatWithAI(
     const stdout = await runAIWithStdin(prompt, { timeoutMs: 60_000 });
     return stdout.trim();
   } catch (error) {
-    console.error('AI chat failed:', error);
+    logger.error('AI chat failed', error);
     return 'Sorry, I encountered an error processing your request.';
   }
 }
@@ -104,7 +105,7 @@ Provide a brief review comment about this line. Be concise and actionable.`;
     const stdout = await runAIWithStdin(prompt, { timeoutMs: 30_000 });
     return stdout.trim();
   } catch (error) {
-    console.error('Line review failed:', error);
+    logger.error('Line review failed', error);
     return 'Unable to review this line at the moment.';
   }
 }
@@ -220,7 +221,7 @@ function parseAIReviewOutput(output: string): AIReviewResult {
       summary: output.slice(0, 200),
     };
   } catch (error) {
-    console.error('Failed to parse AI output:', error);
+    logger.error('Failed to parse AI output', error);
     return {
       suggestions: [],
       summary: 'Failed to parse AI review results.',

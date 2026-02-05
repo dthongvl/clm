@@ -1,4 +1,5 @@
 import type { PRInfo } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Run gh CLI command safely using Bun.spawn (no shell injection)
@@ -121,7 +122,7 @@ export async function getPRComments(prNumber: number, repo: string): Promise<PRC
     // Review comments have path/line, issue comments don't
     return [...reviewComments, ...issueComments];
   } catch (error) {
-    console.error('Failed to fetch PR comments:', (error as Error).message);
+    logger.error('Failed to fetch PR comments', error);
     return [];
   }
 }

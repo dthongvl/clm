@@ -5,6 +5,7 @@ import { opencodeClient } from '../services/opencode-client.js';
 import { safeJson } from '../utils/request.js';
 import { BoundedArrayStore } from '../utils/bounded-store.js';
 import type { ChatMessage } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -70,7 +71,7 @@ app.post('/', async (c) => {
       messageId: aiMessage.id,
     });
   } catch (error) {
-    console.error('Chat failed:', error);
+    logger.error('Chat failed', error);
     return c.json({ error: 'Chat failed', details: (error as Error).message }, 500);
   }
 });
@@ -145,7 +146,7 @@ app.post('/stream', async (c) => {
         }
       }
     } catch (error) {
-      console.error('Stream error:', error);
+      logger.error('Stream error', error);
       await stream.writeSSE({
         event: 'error',
         data: JSON.stringify({ error: (error as Error).message }),
@@ -199,7 +200,7 @@ app.get('/stream', async (c) => {
         }
       }
     } catch (error) {
-      console.error('Stream error:', error);
+      logger.error('Stream error', error);
       await stream.writeSSE({
         event: 'error',
         data: JSON.stringify({ error: (error as Error).message }),

@@ -1,6 +1,7 @@
 import type { Subprocess } from 'bun';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { logger } from './logger.js';
 
 const OPENCODE_BINARY = process.env.OPENCODE_BINARY || 'opencode';
 const OPENCODE_PORT = parseInt(process.env.OPENCODE_PORT || '4096', 10);
@@ -26,7 +27,7 @@ export class OpencodeLauncher {
   }
 
   async start(): Promise<OpencodeInfo> {
-    console.log(`[opencode] Starting server on ${this.baseUrl}...`);
+    logger.step(`Starting OpenCode server on ${this.baseUrl}`);
 
     this.process = Bun.spawn([
       OPENCODE_BINARY,
@@ -55,7 +56,7 @@ export class OpencodeLauncher {
     // Write PID file
     await this.writePidFile();
 
-    console.log('[opencode] Server ready');
+    logger.debug('OpenCode server ready');
     return this.info;
   }
 
@@ -71,7 +72,8 @@ export class OpencodeLauncher {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          console.log(`[opencode] ${decoder.decode(value).trim()}`);
+          const text = decoder.decode(value).trim();
+          if (text) logger.prefixed('opencode', text);
         }
       })();
     }
@@ -83,7 +85,8 @@ export class OpencodeLauncher {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          console.error(`[opencode] ${decoder.decode(value).trim()}`);
+          const text = decoder.decode(value).trim();
+          if (text) logger.prefixed('opencode', text, true);
         }
       })();
     }
@@ -112,7 +115,7 @@ export class OpencodeLauncher {
   private async writePidFile(): Promise<void> {
     if (this.info) {
       await Bun.write(PID_FILE, JSON.stringify(this.info, null, 2));
-      console.log(`[opencode] PID file written: ${PID_FILE}`);
+      logger.debug(`PID file written: ${PID_FILE}`);
     }
   }
 
@@ -130,7 +133,7 @@ export class OpencodeLauncher {
   }
 
   async shutdown(): Promise<void> {
-    console.log('[opencode] Shutting down...');
+    logger.shutdown('Stopping OpenCode...');
 
     if (this.process) {
       this.process.kill();
@@ -143,7 +146,7 @@ export class OpencodeLauncher {
     }
 
     await this.cleanup();
-    console.log('[opencode] Shutdown complete');
+    logger.shutdown('OpenCode stopped');
   }
 }
 

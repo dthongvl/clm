@@ -1,4 +1,5 @@
 import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk/client';
+import { logger } from '../lib/logger.js';
 
 const OPENCODE_URL = process.env.OPENCODE_URL || 'http://127.0.0.1:4096';
 
@@ -26,7 +27,7 @@ class OpenCodeClient {
   constructor() {
     this.baseUrl = OPENCODE_URL;
     this.client = createOpencodeClient({ baseUrl: this.baseUrl });
-    console.log(`[opencode-client] Initialized with baseUrl: ${this.baseUrl}`);
+    logger.info(`OpenCode client initialized: ${this.baseUrl}`);
   }
 
   getClient(): OpencodeClient {
@@ -108,7 +109,7 @@ class OpenCodeClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(promptBody),
     }).catch(err => {
-      console.error('[opencode-client] Failed to send async prompt:', err);
+      logger.error('Failed to send async prompt', err);
     });
 
     // Stream SSE events

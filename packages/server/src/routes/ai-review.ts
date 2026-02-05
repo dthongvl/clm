@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { reviewDiff, reviewLine, checkAIBinary } from '../services/ai.js';
 import { generatePRReview, buildPRLink } from '../services/ai-review.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
+import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
@@ -44,10 +45,11 @@ app.post('/', async (c) => {
   }
 
   try {
+    logger.ai('Running diff review');
     const reviewResult = await reviewDiff(diff, fileContext);
     return c.json(reviewResult);
   } catch (error) {
-    console.error('AI review failed:', error);
+    logger.error('AI review failed', error);
     return c.json({ error: 'AI review failed', details: (error as Error).message }, 500);
   }
 });
@@ -78,10 +80,11 @@ app.post('/line', async (c) => {
   }
 
   try {
+    logger.ai(`Reviewing line ${line} in ${filename}`);
     const comment = await reviewLine(filename, line, code, diff);
     return c.json({ comment });
   } catch (error) {
-    console.error('Line review failed:', error);
+    logger.error('Line review failed', error);
     return c.json({ error: 'Line review failed', details: (error as Error).message }, 500);
   }
 });
@@ -102,10 +105,11 @@ app.post('/pr', async (c) => {
   try {
     // Build PR link - repo is optional if running from within a git repo
     const prLink = repo ? buildPRLink(repo, prNumber) : buildPRLink('', prNumber);
+    logger.ai(`Generating PR review for #${prNumber}`);
     const reviewResult = await generatePRReview(prLink);
     return c.json(reviewResult);
   } catch (error) {
-    console.error('AI PR review failed:', error);
+    logger.error('AI PR review failed', error);
     return c.json({ error: 'AI PR review failed', details: (error as Error).message }, 500);
   }
 });

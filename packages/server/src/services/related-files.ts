@@ -1,6 +1,7 @@
 import { parse as parseYaml } from 'yaml';
 import type { RelatedFilesResult, RelatedFile } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { logger } from '../lib/logger.js';
 
 const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
@@ -16,7 +17,7 @@ export async function findRelatedFiles(prLink: string): Promise<RelatedFilesResu
     const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
     return parseRelatedFilesOutput(response);
   } catch (error) {
-    console.error('Related files analysis failed:', error);
+    logger.error('Related files analysis failed', error);
     throw new Error(`Failed to find related files: ${(error as Error).message}`);
   }
 }
@@ -86,7 +87,8 @@ function parseRelatedFilesOutput(output: string): RelatedFilesResult {
       || output.match(/^(files:\n[\s\S]*)/m);
     
     if (!yamlMatch) {
-      console.error('No YAML found in related files output:', output.slice(0, 500));
+      logger.warn('No YAML found in related files output');
+      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
       return { files: [] };
     }
     
@@ -94,7 +96,7 @@ function parseRelatedFilesOutput(output: string): RelatedFilesResult {
     const parsed = parseYaml(yamlContent) as YamlRelatedFilesResult;
     
     if (!parsed?.files || !Array.isArray(parsed.files)) {
-      console.error('Invalid YAML structure:', parsed);
+      logger.warn('Invalid YAML structure in related files response');
       return { files: [] };
     }
     
@@ -109,8 +111,8 @@ function parseRelatedFilesOutput(output: string): RelatedFilesResult {
     
     return { files };
   } catch (error) {
-    console.error('Failed to parse related files output:', error);
-    console.error('Raw output:', output.slice(0, 1000));
+    logger.error('Failed to parse related files output', error);
+    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
     return { files: [] };
   }
 }
