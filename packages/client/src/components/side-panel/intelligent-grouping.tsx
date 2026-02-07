@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { ChangeGroupCard } from "./change-group-card"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { AiGenerativeIcon, Loading03Icon, AlertCircleIcon } from "@hugeicons/core-free-icons"
+import { ActionSettingsPopover } from "./action-settings-popover"
+import type { ModelOption } from "@/types/settings"
 
 export interface IntelligentGroupingProps extends React.ComponentProps<"div"> {
   groups: ChangeGroup[]
@@ -11,6 +13,9 @@ export interface IntelligentGroupingProps extends React.ComponentProps<"div"> {
   onGenerateGroups?: () => void
   isGenerating?: boolean
   error?: Error | null
+  models?: ModelOption[]
+  currentModel?: string
+  onModelChange?: (model: string) => void
 }
 
 function IntelligentGrouping({
@@ -20,6 +25,9 @@ function IntelligentGrouping({
   onGenerateGroups,
   isGenerating = false,
   error,
+  models,
+  currentModel,
+  onModelChange,
   ...props
 }: IntelligentGroupingProps) {
   return (
@@ -30,21 +38,31 @@ function IntelligentGrouping({
       {...props}
     >
       {onGenerateGroups && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onGenerateGroups}
-          disabled={isGenerating}
-          className="w-full"
-          aria-label={isGenerating ? "Generating groups..." : "Generate AI groupings"}
-        >
-          <HugeiconsIcon
-            icon={isGenerating ? Loading03Icon : AiGenerativeIcon}
-            className={cn(isGenerating && "animate-spin")}
-            data-icon="inline-start"
-          />
-          {isGenerating ? "Generating..." : groups.length > 0 ? "Regenerate Groupings" : "Generate AI Groupings"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onGenerateGroups}
+            disabled={isGenerating}
+            className="flex-1"
+            aria-label={isGenerating ? "Generating groups..." : "Generate AI groupings"}
+          >
+            <HugeiconsIcon
+              icon={isGenerating ? Loading03Icon : AiGenerativeIcon}
+              className={cn(isGenerating && "animate-spin")}
+              data-icon="inline-start"
+            />
+            {isGenerating ? "Generating..." : groups.length > 0 ? "Regenerate Groupings" : "Generate AI Groupings"}
+          </Button>
+          {models && onModelChange && (
+            <ActionSettingsPopover
+              actionKey="grouping"
+              models={models}
+              currentModel={currentModel}
+              onModelChange={onModelChange}
+            />
+          )}
+        </div>
       )}
 
       {error ? (

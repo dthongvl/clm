@@ -1,4 +1,5 @@
 // API client utilities for communicating with the server
+import type { Settings, ModelOption } from '@/types/settings'
 
 const API_BASE = '/api';
 
@@ -246,6 +247,28 @@ export async function findRelatedFiles(prNumber: number, repo?: string): Promise
     body: JSON.stringify({ prNumber, repo }),
   });
   return response.files;
+}
+
+// Settings API
+export async function fetchSettings(): Promise<Settings> {
+  return fetchApi<Settings>('/settings');
+}
+
+export async function updateSettings(settings: Partial<Settings>): Promise<Settings> {
+  return fetchApi<Settings>('/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+}
+
+// Models API
+interface ModelsResponse {
+  models: ModelOption[];
+}
+
+export async function fetchModels(): Promise<ModelOption[]> {
+  const response = await fetchApi<ModelsResponse>('/models');
+  return response.models;
 }
 
 export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile, RefreshResponse };

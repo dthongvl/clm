@@ -3,6 +3,8 @@ import type { RelatedFile } from "@/types"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { AiGenerativeIcon, Loading03Icon, AlertCircleIcon, File01Icon } from "@hugeicons/core-free-icons"
+import { ActionSettingsPopover } from "./action-settings-popover"
+import type { ModelOption } from "@/types/settings"
 
 export interface RelatedFilesProps extends React.ComponentProps<"div"> {
   files: RelatedFile[]
@@ -10,6 +12,9 @@ export interface RelatedFilesProps extends React.ComponentProps<"div"> {
   onFindFiles?: () => void
   isLoading?: boolean
   error?: Error | null
+  models?: ModelOption[]
+  currentModel?: string
+  onModelChange?: (model: string) => void
 }
 
 function RelatedFiles({
@@ -19,6 +24,9 @@ function RelatedFiles({
   onFindFiles,
   isLoading = false,
   error,
+  models,
+  currentModel,
+  onModelChange,
   ...props
 }: RelatedFilesProps) {
   return (
@@ -29,21 +37,31 @@ function RelatedFiles({
       {...props}
     >
       {onFindFiles && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onFindFiles}
-          disabled={isLoading}
-          className="w-full"
-          aria-label={isLoading ? "Finding related files..." : "Find related files"}
-        >
-          <HugeiconsIcon
-            icon={isLoading ? Loading03Icon : AiGenerativeIcon}
-            className={cn(isLoading && "animate-spin")}
-            data-icon="inline-start"
-          />
-          {isLoading ? "Finding..." : files.length > 0 ? "Refresh Related Files" : "Find Related Files"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onFindFiles}
+            disabled={isLoading}
+            className="flex-1"
+            aria-label={isLoading ? "Finding related files..." : "Find related files"}
+          >
+            <HugeiconsIcon
+              icon={isLoading ? Loading03Icon : AiGenerativeIcon}
+              className={cn(isLoading && "animate-spin")}
+              data-icon="inline-start"
+            />
+            {isLoading ? "Finding..." : files.length > 0 ? "Refresh Related Files" : "Find Related Files"}
+          </Button>
+          {models && onModelChange && (
+            <ActionSettingsPopover
+              actionKey="related-files"
+              models={models}
+              currentModel={currentModel}
+              onModelChange={onModelChange}
+            />
+          )}
+        </div>
       )}
 
       {error ? (

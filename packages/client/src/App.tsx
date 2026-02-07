@@ -14,9 +14,10 @@ import {
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams, useRelatedFiles } from "@/hooks"
+import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams, useRelatedFiles, useModels, useSettings } from "@/hooks"
 import { usePatternVerification } from "@/hooks/use-pattern-verification"
 import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
+import { ActionSettingsPopover } from "@/components/side-panel/action-settings-popover"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import { refreshPR } from "@/lib/api"
@@ -122,6 +123,9 @@ export function App() {
     repo: repo || '',
     prNumber: prNumber || 0,
   })
+
+  const { models } = useModels()
+  const { settings, updateActionModel } = useSettings()
 
   const annotations = useMemo(
     () => [...(isDemo ? mockComments : comments), ...draftComments],
@@ -261,20 +265,29 @@ export function App() {
                   onGenerateGroups={prNumber ? generateGroups : undefined}
                   isGenerating={isGeneratingGroups}
                   error={groupingError}
+                  models={models}
+                  currentModel={settings?.grouping?.model}
+                  onModelChange={(model) => updateActionModel("grouping", model)}
                 />
               </SidePanelGroupingContent>
               <SidePanelAIReviewContent>
                 {prNumber && (
-                  <div className="mb-4">
+                  <div className="mb-4 flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={triggerReview}
                       disabled={isReviewLoading}
-                      className="w-full"
+                      className="flex-1"
                     >
                       {isReviewLoading ? "Generating AI Review..." : "Generate AI Review"}
                     </Button>
+                    <ActionSettingsPopover
+                      actionKey="ai-review"
+                      models={models}
+                      currentModel={settings?.["ai-review"]?.model}
+                      onModelChange={(model) => updateActionModel("ai-review", model)}
+                    />
                   </div>
                 )}
                 <AIReviewSummary
@@ -294,6 +307,9 @@ export function App() {
                       onLocationClick={(filePath, lineNumber) => {
                         scrollToAnnotation(filePath, lineNumber)
                       }}
+                      models={models}
+                      currentModel={settings?.["pattern-verification"]?.model}
+                      onModelChange={(model) => updateActionModel("pattern-verification", model)}
                     />
                   </div>
                 )}
@@ -305,6 +321,9 @@ export function App() {
                   onFindFiles={prNumber ? findRelatedFiles : undefined}
                   isLoading={isLoadingRelatedFiles}
                   error={relatedFilesError}
+                  models={models}
+                  currentModel={settings?.["related-files"]?.model}
+                  onModelChange={(model) => updateActionModel("related-files", model)}
                 />
               </SidePanelRelatedFilesContent>
             </SidePanel>

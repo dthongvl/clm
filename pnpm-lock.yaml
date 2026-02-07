@@ -26,9 +26,6 @@ importers:
       commander:
         specifier: ^12.0.0
         version: 12.1.0
-      execa:
-        specifier: ^9.0.0
-        version: 9.6.1
       open:
         specifier: ^10.0.0
         version: 10.2.0
@@ -151,6 +148,9 @@ importers:
       hono:
         specifier: ^4.11.7
         version: 4.11.7
+      smol-toml:
+        specifier: ^1.6.0
+        version: 1.6.0
       yaml:
         specifier: ^2.8.2
         version: 2.8.2
@@ -3028,6 +3028,10 @@ packages:
 
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
+
+  smol-toml@1.6.0:
+    resolution: {integrity: sha512-4zemZi0HvTnYwLfrpk/CF9LOd9Lt87kAt50GnqhMpyF9U3poDAP2+iukq2bZsO/ufegbYehBkqINbsWxj4l4cw==}
+    engines: {node: '>= 18'}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -6689,6 +6693,8 @@ snapshots:
   signal-exit@4.1.0: {}
 
   sisteransi@1.0.5: {}
+
+  smol-toml@1.6.0: {}
 
   source-map-js@1.2.1: {}
 

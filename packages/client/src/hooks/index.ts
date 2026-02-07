@@ -9,3 +9,5 @@ export { useComments } from './use-comments';
 export { useDraftComments } from './use-draft-comments';
 export { usePRParams } from './use-pr-params';
 export { useRelatedFiles } from './use-related-files';
+export { useModels } from './use-models';
+export { useSettings } from './use-settings';

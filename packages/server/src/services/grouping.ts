@@ -1,10 +1,8 @@
 import { parse as parseYaml } from 'yaml';
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
-
-// Model to use for grouping - can be overridden via environment variable
-const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
 /**
  * Generate intelligent grouping for a PR using opencode server
@@ -15,7 +13,8 @@ export async function generateGrouping(prLink: string): Promise<GroupingResult> 
   const prompt = buildGroupingPrompt(prLink);
   
   try {
-    const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
+    const model = await getModelForAction('grouping');
+    const response = await opencodeClient.prompt(prompt, { model });
     return parseGroupingOutput(response);
   } catch (error) {
     logger.error('Grouping generation failed', error);

@@ -10,6 +10,8 @@ import {
   ArrowRight01Icon
 } from "@hugeicons/core-free-icons"
 import type { PatternVerification, PatternVerificationResult } from "@/types/verification"
+import { ActionSettingsPopover } from "./action-settings-popover"
+import type { ModelOption } from "@/types/settings"
 
 interface PatternVerificationPanelProps extends React.ComponentProps<"div"> {
   result: PatternVerificationResult | null;
@@ -17,6 +19,9 @@ interface PatternVerificationPanelProps extends React.ComponentProps<"div"> {
   error: Error | null;
   onVerify: () => void;
   onLocationClick?: (filePath: string, lineNumber: number) => void;
+  models?: ModelOption[];
+  currentModel?: string;
+  onModelChange?: (model: string) => void;
 }
 
 function PatternVerificationPanel({
@@ -26,6 +31,9 @@ function PatternVerificationPanel({
   error,
   onVerify,
   onLocationClick,
+  models,
+  currentModel,
+  onModelChange,
   ...props
 }: PatternVerificationPanelProps) {
   const incompleteCount = result?.verifications.filter(v => v.status === 'incomplete').length || 0;
@@ -36,20 +44,30 @@ function PatternVerificationPanel({
       className={cn("flex flex-col gap-3", className)}
       {...props}
     >
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onVerify}
-        disabled={isLoading}
-        className="w-full"
-      >
-        <HugeiconsIcon
-          icon={isLoading ? Loading03Icon : CheckmarkSquare01Icon}
-          className={cn(isLoading && "animate-spin")}
-          data-icon="inline-start"
-        />
-        {isLoading ? "Verifying..." : result ? "Re-verify Patterns" : "Verify Patterns"}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onVerify}
+          disabled={isLoading}
+          className="flex-1"
+        >
+          <HugeiconsIcon
+            icon={isLoading ? Loading03Icon : CheckmarkSquare01Icon}
+            className={cn(isLoading && "animate-spin")}
+            data-icon="inline-start"
+          />
+          {isLoading ? "Verifying..." : result ? "Re-verify Patterns" : "Verify Patterns"}
+        </Button>
+        {models && onModelChange && (
+          <ActionSettingsPopover
+            actionKey="pattern-verification"
+            models={models}
+            currentModel={currentModel}
+            onModelChange={onModelChange}
+          />
+        )}
+      </div>
 
       {error && (
         <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">

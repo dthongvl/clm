@@ -1,9 +1,8 @@
 import { parse as parseYaml } from 'yaml';
 import type { RelatedFilesResult, RelatedFile } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
-
-const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
 /**
  * Find files related to the PR changes that might be relevant for code review
@@ -14,7 +13,8 @@ export async function findRelatedFiles(prLink: string): Promise<RelatedFilesResu
   const prompt = buildRelatedFilesPrompt(prLink);
   
   try {
-    const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
+    const model = await getModelForAction('related-files');
+    const response = await opencodeClient.prompt(prompt, { model });
     return parseRelatedFilesOutput(response);
   } catch (error) {
     logger.error('Related files analysis failed', error);

@@ -12,6 +12,8 @@ import groupingRoutes from './routes/grouping.js';
 import relatedFilesRoutes from './routes/related-files.js';
 import patternVerificationRoutes from './routes/pattern-verification.js';
 import refreshRoutes from './routes/refresh.js';
+import settingsRoutes from './routes/settings.js';
+import modelsRoutes from './routes/models.js';
 
 const app = new Hono();
 
@@ -47,6 +49,8 @@ app.route('/api/grouping', groupingRoutes);
 app.route('/api/related-files', relatedFilesRoutes);
 app.route('/api/pattern-verification', patternVerificationRoutes);
 app.route('/api/refresh', refreshRoutes);
+app.route('/api/settings', settingsRoutes);
+app.route('/api/models', modelsRoutes);
 
 // Health check
 app.get('/api/health', (c) => {

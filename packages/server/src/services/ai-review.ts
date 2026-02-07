@@ -1,10 +1,8 @@
 import { parse as parseYaml } from 'yaml';
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
-
-// Model to use for review - can be overridden via environment variable
-const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
 /**
  * Generate AI code review for a PR using opencode server
@@ -15,7 +13,8 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
   const prompt = buildReviewPrompt(prLink);
   
   try {
-    const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
+    const model = await getModelForAction('ai-review');
+    const response = await opencodeClient.prompt(prompt, { model });
     return parseReviewOutput(response);
   } catch (error) {
     logger.error('AI review generation failed', error);

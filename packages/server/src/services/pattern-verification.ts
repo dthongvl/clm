@@ -1,15 +1,15 @@
 import { parse as parseYaml } from 'yaml';
 import type { PatternVerification, PatternVerificationResult, PatternLocation } from '../types/index.js';
 import { opencodeClient } from './opencode-client.js';
+import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
-
-const AI_MODEL = process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
 export async function verifyPatterns(prLink: string): Promise<PatternVerificationResult> {
   const prompt = buildVerificationPrompt(prLink);
   
   try {
-    const response = await opencodeClient.prompt(prompt, { model: AI_MODEL });
+    const model = await getModelForAction('pattern-verification');
+    const response = await opencodeClient.prompt(prompt, { model });
     return parseVerificationOutput(response);
   } catch (error) {
     logger.error('Pattern verification failed', error);
