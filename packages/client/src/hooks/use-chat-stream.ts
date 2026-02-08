@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { ChatMessage } from '@/types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
-
 interface ChatContext {
   diff?: string;
   filename?: string;
@@ -60,7 +58,7 @@ export function useChatStream(): UseChatStreamReturn {
     abortControllerRef.current = new AbortController();
 
     try {
-      const response = await fetch(`${API_BASE}/api/chat/stream`, {
+      const response = await fetch('/api/ai/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content, context }),
@@ -137,116 +135,6 @@ export function useChatStream(): UseChatStreamReturn {
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  }, [abortStream]);
-
-  const clearMessages = useCallback(() => {
-    abortStream();
-    setMessages([]);
-    setError(null);
-  }, [abortStream]);
-
-  return {
-    messages,
-    sendMessage,
-    isStreaming,
-    error,
-    clearMessages,
-    abortStream,
-  };
-}
-
-/**
- * Alternative hook using EventSource API (GET requests only, simpler API)
- */
-export function useChatStreamEventSource(): UseChatStreamReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-
-  const abortStream = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    setIsStreaming(false);
-  }, []);
-
-  const sendMessage = useCallback(async (content: string, context?: ChatContext) => {
-    abortStream();
-
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content,
-      createdAt: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setIsStreaming(true);
-    setError(null);
-
-    const assistantId = crypto.randomUUID();
-    const assistantMessage: ChatMessage = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      createdAt: new Date(),
-    };
-    setMessages((prev) => [...prev, assistantMessage]);
-
-    // Build URL with query params
-    const url = new URL(`${API_BASE}/api/chat/stream`, window.location.origin);
-    url.searchParams.set('message', content);
-    if (context?.filename) url.searchParams.set('filename', context.filename);
-    if (context?.line) url.searchParams.set('line', String(context.line));
-
-    const es = new EventSource(url.toString());
-    eventSourceRef.current = es;
-
-    es.addEventListener('message', (e) => {
-      try {
-        const { text } = JSON.parse(e.data);
-        if (text) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantId
-                ? { ...msg, content: msg.content + text }
-                : msg
-            )
-          );
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    });
-
-    es.addEventListener('done', () => {
-      es.close();
-      eventSourceRef.current = null;
-      setIsStreaming(false);
-    });
-
-    es.addEventListener('error', (e) => {
-      try {
-        const data = (e as MessageEvent).data;
-        if (data) {
-          const { error: errMsg } = JSON.parse(data);
-          setError(new Error(errMsg));
-        }
-      } catch {
-        setError(new Error('Stream connection error'));
-      }
-      es.close();
-      eventSourceRef.current = null;
-      setIsStreaming(false);
-    });
-
-    es.onerror = () => {
-      if (es.readyState === EventSource.CLOSED) {
-        setIsStreaming(false);
-      }
-    };
   }, [abortStream]);
 
   const clearMessages = useCallback(() => {

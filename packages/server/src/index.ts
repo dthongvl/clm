@@ -38,17 +38,21 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// API routes
-app.route('/api/diff', diffRoutes);
-app.route('/api/comments', commentRoutes);
+// API routes — AI actions
+app.route('/api/ai/review', aiReviewRoutes);
+app.route('/api/ai/grouping', groupingRoutes);
+app.route('/api/ai/related-files', relatedFilesRoutes);
+app.route('/api/ai/pattern-verification', patternVerificationRoutes);
+app.route('/api/ai/chat', chatRoutes);
+
+// API routes — Git/GitHub operations
+app.route('/api/git/diff', diffRoutes);
+app.route('/api/git/comments', commentRoutes);
+app.route('/api/git/pr-info', prInfoRoutes);
+app.route('/api/git/refresh', refreshRoutes);
+
+// API routes — App-level
 app.route('/api/draft-comments', draftCommentRoutes);
-app.route('/api/ai-review', aiReviewRoutes);
-app.route('/api/pr-info', prInfoRoutes);
-app.route('/api/chat', chatRoutes);
-app.route('/api/grouping', groupingRoutes);
-app.route('/api/related-files', relatedFilesRoutes);
-app.route('/api/pattern-verification', patternVerificationRoutes);
-app.route('/api/refresh', refreshRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/models', modelsRoutes);
 
@@ -82,7 +86,7 @@ app.get('*', async (c) => {
 // Error handling
 app.onError((err, c) => {
   logger.error('Server error', err);
-  return c.json({ error: 'Internal server error', message: err.message }, 500);
+  return c.json({ error: 'Internal server error', details: err.message }, 500);
 });
 
 // 404 handler

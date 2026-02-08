@@ -24,7 +24,7 @@ interface PRReviewBody {
   repo?: string;
 }
 
-// POST /api/ai-review
+// POST /api/ai/review
 // Body: { diff: string, fileContext?: Array<{filename, content}> }
 app.post('/', async (c) => {
   const hasAI = await checkAIBinary();
@@ -55,7 +55,7 @@ app.post('/', async (c) => {
   }
 });
 
-// POST /api/ai-review/line
+// POST /api/ai/review/line
 // Body: { filename: string, line: number, code: string, diff?: string }
 app.post('/line', async (c) => {
   const hasAI = await checkAIBinary();
@@ -90,7 +90,7 @@ app.post('/line', async (c) => {
   }
 });
 
-// POST /api/ai-review/pr
+// POST /api/ai/review/pr
 // Body: { prNumber: number, repo?: string }
 // Generates a comprehensive AI review for a PR using the opencode CLI
 app.post('/pr', async (c) => {

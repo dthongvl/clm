@@ -45,27 +45,4 @@ app.post('/', async (c) => {
   }
 });
 
-app.get('/', async (c) => {
-  const repo = c.req.query('repo');
-  const prNumberStr = c.req.query('prNumber');
-
-  if (!repo || !prNumberStr) {
-    return c.json({ error: 'repo and prNumber are required' }, 400);
-  }
-
-  const prNumber = parseInt(prNumberStr, 10);
-  if (!isPositiveInt(prNumber)) {
-    return c.json({ error: 'prNumber must be a positive integer' }, 400);
-  }
-
-  try {
-    logger.ai(`Verifying patterns for PR #${prNumber}`);
-    const verificationResult = await handleVerification(prNumber, repo);
-    return c.json(verificationResult);
-  } catch (error) {
-    logger.error('Pattern verification failed', error);
-    return c.json({ error: 'Failed to verify patterns', details: (error as Error).message }, 500);
-  }
-});
-
 export default app;

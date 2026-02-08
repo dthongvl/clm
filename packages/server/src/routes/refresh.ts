@@ -2,18 +2,25 @@ import { Hono } from 'hono';
 import { getPRInfo, getCurrentRepo } from '../services/gh.js';
 import { fetchBranches } from '../services/git.js';
 import { setPRContext } from '../services/pr-context.js';
-import { parsePositiveInt } from '../utils/request.js';
+import { safeJson, isPositiveInt } from '../utils/request.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
-app.post('/', async (c) => {
-  const prNumberStr = c.req.query('pr');
-  const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
+interface RefreshBody {
+  prNumber: number;
+  repo?: string;
+}
 
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'PR number must be a positive integer' }, 400);
+app.post('/', async (c) => {
+  const result = await safeJson<RefreshBody>(c);
+  if (!result.ok) return result.response;
+
+  const { prNumber, repo: bodyRepo } = result.data;
+  const repo = bodyRepo || process.env.REPO || await getCurrentRepo();
+
+  if (!isPositiveInt(prNumber)) {
+    return c.json({ error: 'prNumber must be a positive integer' }, 400);
   }
 
   if (!repo) {
@@ -33,7 +40,6 @@ app.post('/', async (c) => {
     logger.success(`PR #${prNumber} refreshed`);
 
     return c.json({
-      success: true,
       prInfo,
       refs: { baseRef, headRef },
     });

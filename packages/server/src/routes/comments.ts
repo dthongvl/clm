@@ -14,16 +14,16 @@ interface PostCommentBody {
   repo?: string;
 }
 
-// GET /api/comments?pr={number}&repo={owner/repo}
+// GET /api/git/comments?prNumber={number}&repo={owner/repo}
 // Fetch all comments (review comments + issue comments) for a PR
 app.get('/', async (c) => {
-  const prNumberStr = c.req.query('pr');
+  const prNumberStr = c.req.query('prNumber');
   const queryRepo = c.req.query('repo');
   const repo = queryRepo || await getCurrentRepo();
 
   const prNumber = parsePositiveInt(prNumberStr);
   if (!prNumber) {
-    return c.json({ error: 'pr query parameter must be a positive integer' }, 400);
+    return c.json({ error: 'prNumber query parameter must be a positive integer' }, 400);
   }
 
   if (!repo) {
@@ -39,7 +39,7 @@ app.get('/', async (c) => {
   }
 });
 
-// POST /api/comments
+// POST /api/git/comments
 // Body: { prNumber: number, body: string, commitId?: string, path?: string, line?: number, repo?: string }
 app.post('/', async (c) => {
   const result = await safeJson<PostCommentBody>(c);
@@ -76,7 +76,7 @@ app.post('/', async (c) => {
   try {
     logger.github(`Posting comment to PR #${prNumber}`);
     await postComment(prNumber, commentBody, commitId, path, line, repo);
-    return c.json({ success: true, message: 'Comment posted successfully' });
+    return c.json({});
   } catch (error) {
     logger.error('Failed to post comment', error);
     return c.json({ error: 'Failed to post comment', details: (error as Error).message }, 500);

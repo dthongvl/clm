@@ -1,5 +1,5 @@
 export { useChat } from './use-chat';
-export { useChatStream, useChatStreamEventSource } from './use-chat-stream';
+export { useChatStream } from './use-chat-stream';
 export { useAIReview } from './use-ai-review';
 export { useAIComment } from './use-ai-comment';
 export { usePersistedState } from './use-persisted-state';

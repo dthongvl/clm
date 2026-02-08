@@ -21,7 +21,7 @@ interface ChatRequestBody {
   context?: { diff?: string; filename?: string; line?: number };
 }
 
-// POST /api/chat
+// POST /api/ai/chat
 // Body: { message: string, sessionId?: string, context?: { diff?: string, filename?: string, line?: number } }
 app.post('/', async (c) => {
   const hasAI = await checkAIBinary();
@@ -75,7 +75,7 @@ app.post('/', async (c) => {
   }
 });
 
-// GET /api/chat/history?sessionId={id}
+// GET /api/ai/chat/history?sessionId={id}
 app.get('/history', (c) => {
   const sessionId = c.req.query('sessionId') || 'default';
   const messages = chatHistories.get(sessionId);
@@ -83,12 +83,12 @@ app.get('/history', (c) => {
   return c.json({ sessionId, messages });
 });
 
-// DELETE /api/chat/history?sessionId={id}
+// DELETE /api/ai/chat/history?sessionId={id}
 app.delete('/history', (c) => {
   const sessionId = c.req.query('sessionId') || 'default';
   chatHistories.delete(sessionId);
   
-  return c.json({ success: true, message: 'Chat history cleared' });
+  return c.json({});
 });
 
 interface StreamRequestBody {
@@ -96,7 +96,7 @@ interface StreamRequestBody {
   context?: { diff?: string; filename?: string; line?: number };
 }
 
-// POST /api/chat/stream
+// POST /api/ai/chat/stream
 // Body: { message: string, context?: { diff?: string, filename?: string, line?: number } }
 // Returns: Server-Sent Events stream
 app.post('/stream', async (c) => {
@@ -128,7 +128,7 @@ app.post('/stream', async (c) => {
   return streamOpencodeResponse(c, fullMessage);
 });
 
-// GET /api/chat/stream (alternative for EventSource which only supports GET)
+// GET /api/ai/chat/stream (alternative for EventSource which only supports GET)
 // Query: message (required), filename (optional), line (optional)
 app.get('/stream', async (c) => {
   const message = c.req.query('message');

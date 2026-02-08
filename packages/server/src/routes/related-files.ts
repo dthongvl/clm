@@ -52,10 +52,4 @@ app.post('/', async (c) => {
   return handleRelatedFiles(c, result.data.prNumber, result.data.repo);
 });
 
-app.post('/analyze', async (c) => {
-  const result = await safeJson<RelatedFilesBody>(c);
-  if (!result.ok) return result.response;
-  return handleRelatedFiles(c, result.data.prNumber, result.data.repo);
-});
-
 export default app;

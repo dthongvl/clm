@@ -5,9 +5,9 @@ import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
-// GET /api/pr-info?pr={number}&repo={owner/repo}
+// GET /api/git/pr-info?prNumber={number}&repo={owner/repo}
 app.get('/', async (c) => {
-  const prNumberStr = c.req.query('pr');
+  const prNumberStr = c.req.query('prNumber');
   const repo = c.req.query('repo') || await getCurrentRepo();
 
   const prNumber = parsePositiveInt(prNumberStr);
@@ -29,7 +29,7 @@ app.get('/', async (c) => {
   }
 });
 
-// GET /api/pr-info/status
+// GET /api/git/pr-info/status
 app.get('/status', async (c) => {
   const hasGh = await checkGhCli();
   const currentRepo = await getCurrentRepo();

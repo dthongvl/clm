@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { PatternVerificationResult } from '@/types/verification';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { verifyPatterns } from '@/lib/api';
 
 interface UsePatternVerificationOptions {
   repo: string;
@@ -28,18 +27,7 @@ export function usePatternVerification({
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/pattern-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prNumber, repo }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to verify patterns');
-      }
-
-      const data: PatternVerificationResult = await response.json();
+      const data = await verifyPatterns(prNumber, repo);
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Unknown error'));

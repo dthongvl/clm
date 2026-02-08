@@ -52,10 +52,4 @@ app.post('/', async (c) => {
   return handleGrouping(c, result.data.prNumber, result.data.repo);
 });
 
-app.post('/generate', async (c) => {
-  const result = await safeJson<GroupingBody>(c);
-  if (!result.ok) return result.response;
-  return handleGrouping(c, result.data.prNumber, result.data.repo);
-});
-
 export default app;

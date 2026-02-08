@@ -17,7 +17,7 @@ function getEnvRefs(): { baseRef: string; headRef: string } | null {
 }
 
 app.get('/', async (c) => {
-  const prNumberStr = c.req.query('pr');
+  const prNumberStr = c.req.query('prNumber');
   const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
   const includeContent = c.req.query('includeContent') === 'true';
 
@@ -63,7 +63,7 @@ app.get('/', async (c) => {
 
 app.get('/file', async (c) => {
   const filename = c.req.query('filename');
-  const prNumberStr = c.req.query('pr');
+  const prNumberStr = c.req.query('prNumber');
   const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
 
   if (!filename) {
