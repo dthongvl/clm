@@ -7,7 +7,7 @@ export { usePR, useStatus } from './use-pr';
 export { useDiff } from './use-diff';
 export { useComments } from './use-comments';
 export { useDraftComments } from './use-draft-comments';
-export { usePRParams } from './use-pr-params';
+export { usePRContext, PRContextProvider } from './use-pr-context'
 export { useRelatedFiles } from './use-related-files';
 export { useModels } from './use-models';
 export { useSettings } from './use-settings';

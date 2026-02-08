@@ -1,33 +1,16 @@
 import { Hono } from 'hono';
 import { findRelatedFiles } from '../services/related-files.js';
-import { getCurrentRepo } from '../services/gh.js';
-import { safeJson, isPositiveInt } from '../utils/request.js';
 import { buildPRLink } from '../utils/github.js';
+import { getAppContext } from '../lib/app-context.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
-interface RelatedFilesBody {
-  prNumber: number;
-  repo?: string;
-}
-
-async function handleRelatedFiles(c: import('hono').Context, prNumber: number, repo: string | undefined) {
-  if (!isPositiveInt(prNumber)) {
-    return c.json({ error: 'prNumber must be a positive integer' }, 400);
-  }
+app.post('/', async (c) => {
+  const { prNumber, repo } = getAppContext();
 
   try {
-    let targetRepo = repo;
-    if (!targetRepo) {
-      targetRepo = await getCurrentRepo() ?? undefined;
-    }
-
-    if (!targetRepo) {
-      return c.json({ error: 'Repository is required. Provide repo in request or run from a git repository.' }, 400);
-    }
-
-    const prLink = buildPRLink(targetRepo, prNumber);
+    const prLink = buildPRLink(repo, prNumber);
 
     logger.ai(`Finding related files for PR #${prNumber}`);
 
@@ -44,12 +27,6 @@ async function handleRelatedFiles(c: import('hono').Context, prNumber: number, r
       500
     );
   }
-}
-
-app.post('/', async (c) => {
-  const result = await safeJson<RelatedFilesBody>(c);
-  if (!result.ok) return result.response;
-  return handleRelatedFiles(c, result.data.prNumber, result.data.repo);
 });
 
 export default app;

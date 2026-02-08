@@ -3,11 +3,6 @@ import type { ReviewComment } from '@/types/review';
 import { fetchPRComments } from '@/lib/api';
 import { transformComments } from '@/lib/transforms';
 
-interface UseCommentsOptions {
-  prNumber?: number;
-  repo?: string;
-}
-
 interface UseCommentsReturn {
   comments: ReviewComment[];
   isLoading: boolean;
@@ -15,17 +10,13 @@ interface UseCommentsReturn {
   refetch: () => Promise<void>;
 }
 
-export function useComments({ prNumber, repo }: UseCommentsOptions = {}): UseCommentsReturn {
+export function useComments(): UseCommentsReturn {
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!prNumber) {
-      return;
-    }
-
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
@@ -33,7 +24,7 @@ export function useComments({ prNumber, repo }: UseCommentsOptions = {}): UseCom
     setError(null);
 
     try {
-      const serverComments = await fetchPRComments(prNumber, repo, abortControllerRef.current.signal);
+      const serverComments = await fetchPRComments(abortControllerRef.current.signal);
       const clientComments = transformComments(serverComments);
       setComments(clientComments);
     } catch (err) {
@@ -43,16 +34,14 @@ export function useComments({ prNumber, repo }: UseCommentsOptions = {}): UseCom
     } finally {
       setIsLoading(false);
     }
-  }, [prNumber, repo]);
+  }, []);
 
   useEffect(() => {
-    if (prNumber) {
-      fetchData();
-    }
+    fetchData();
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [prNumber, fetchData]);
+  }, [fetchData]);
 
   return {
     comments,

@@ -3,11 +3,14 @@ import { createRoot } from 'react-dom/client'
 import './style.css'
 import App from './App.tsx'
 import { ThemeProvider } from './components/theme-provider'
+import { PRContextProvider } from './hooks'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider defaultTheme="system" storageKey="codereview-ui-theme">
-      <App />
+      <PRContextProvider>
+        <App />
+      </PRContextProvider>
     </ThemeProvider>
   </StrictMode>,
 )

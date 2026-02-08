@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
 import { getDiff, getFileContent } from '../services/git.js';
-import { getCurrentRepo } from '../services/gh.js';
 import { getPRContext } from '../services/pr-context.js';
 import { mapWithConcurrency } from '../utils/concurrency.js';
-import { parsePositiveInt } from '../utils/request.js';
+import { getAppContext } from '../lib/app-context.js';
 import type { FileDiff } from '../types/index.js';
 import { logger } from '../lib/logger.js';
 
@@ -17,18 +16,8 @@ function getEnvRefs(): { baseRef: string; headRef: string } | null {
 }
 
 app.get('/', async (c) => {
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
+  const { prNumber, repo } = getAppContext();
   const includeContent = c.req.query('includeContent') === 'true';
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'PR number must be a positive integer' }, 400);
-  }
-
-  if (!repo) {
-    return c.json({ error: 'Repository not found. Please specify repo parameter or run from a git repository.' }, 400);
-  }
 
   const refs = getPRContext(repo, prNumber) ?? getEnvRefs();
   if (!refs) {
@@ -63,20 +52,10 @@ app.get('/', async (c) => {
 
 app.get('/file', async (c) => {
   const filename = c.req.query('filename');
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
+  const { prNumber, repo } = getAppContext();
 
   if (!filename) {
     return c.json({ error: 'filename is required' }, 400);
-  }
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'PR number must be a positive integer' }, 400);
-  }
-
-  if (!repo) {
-    return c.json({ error: 'Repository not found. Please specify repo parameter or run from a git repository.' }, 400);
   }
 
   const refs = getPRContext(repo, prNumber) ?? getEnvRefs();

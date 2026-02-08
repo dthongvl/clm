@@ -14,19 +14,13 @@ import {
 import { ChatPopup } from "@/components/chat"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRParams, useRelatedFiles, useModels, useSettings } from "@/hooks"
+import { useChat, useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings } from "@/hooks"
 import { usePatternVerification } from "@/hooks/use-pattern-verification"
 import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
 import { ActionSettingsPopover } from "@/components/side-panel/action-settings-popover"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 import { refreshPR } from "@/lib/api"
-import {
-  mockPR,
-  mockChangeGroups,
-  mockAIReviewItems,
-  mockComments,
-} from "@/lib/mock-data"
 
 export function App() {
   const diffContainerRef = useRef<HTMLDivElement>(null)
@@ -34,19 +28,12 @@ export function App() {
     getStorageItem(StorageKeys.CHAT_OPEN, false)
   )
 
-  // Get PR params from URL
-  const { prNumber, repo } = usePRParams()
-  const isDemo = !prNumber
+  const { prNumber } = usePRContext()
 
-  // Fetch real PR data
-  const { pr, isLoading: isPRLoading, error: prError, refetch: refetchPR } = usePR({ prNumber, repo })
-  const { files, isLoading: isDiffLoading, error: diffError, refetch: refetchDiff } = useDiff({ prNumber, repo })
-  const { comments, isLoading: isCommentsLoading, refetch: refetchComments } = useComments({ prNumber, repo })
-  const { draftComments, addDraftComment, refetch: refetchDraftComments } = useDraftComments({ prNumber })
-
-  // Use real PR data or fall back to mock in demo mode
-  const displayPR = isDemo ? mockPR : (pr ?? null)
-  const displayFiles = isDemo ? [] : files
+  const { pr, isLoading: isPRLoading, error: prError, refetch: refetchPR } = usePR()
+  const { files, isLoading: isDiffLoading, error: diffError, refetch: refetchDiff } = useDiff()
+  const { comments, isLoading: isCommentsLoading, refetch: refetchComments } = useComments()
+  const { draftComments, addDraftComment, refetch: refetchDraftComments } = useDraftComments()
 
   const handleChatOpenChange = useCallback((open: boolean) => {
     setChatOpen(open)
@@ -56,14 +43,9 @@ export function App() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   
   const handleRefresh = useCallback(async () => {
-    if (!prNumber) return
-    
     setIsRefreshing(true)
     try {
-      // First, fetch the latest branches from origin and update refs
-      await refreshPR(prNumber, repo || undefined)
-      
-      // Then refetch all data with updated refs
+      await refreshPR()
       refetchPR()
       refetchDiff()
       refetchComments()
@@ -73,9 +55,8 @@ export function App() {
     } finally {
       setIsRefreshing(false)
     }
-  }, [prNumber, repo, refetchPR, refetchDiff, refetchComments, refetchDraftComments])
+  }, [refetchPR, refetchDiff, refetchComments, refetchDraftComments])
 
-  // Handle comment submission
   const handleCommentSubmit = useCallback(
     async (
       filePath: string,
@@ -98,9 +79,7 @@ export function App() {
     triggerReview,
     isLoading: isReviewLoading,
   } = useAIReview({
-    prNumber,
-    repo,
-    autoGenerate: false, // Only generate when button is clicked
+    autoGenerate: false,
   })
 
   const {
@@ -109,8 +88,6 @@ export function App() {
     isLoading: isLoadingRelatedFiles,
     error: relatedFilesError,
   } = useRelatedFiles({
-    prNumber,
-    repo,
     autoGenerate: false,
   })
 
@@ -119,27 +96,14 @@ export function App() {
     isLoading: isVerifying,
     error: verificationError,
     verify: verifyPatterns,
-  } = usePatternVerification({
-    repo: repo || '',
-    prNumber: prNumber || 0,
-  })
+  } = usePatternVerification()
 
   const { models } = useModels()
   const { settings, updateActionModel } = useSettings()
 
   const annotations = useMemo(
-    () => [...(isDemo ? mockComments : comments), ...draftComments],
-    [isDemo, comments, draftComments]
-  )
-
-  const displayGroups = useMemo(
-    () => groups.length > 0 ? groups : (isDemo ? mockChangeGroups : []),
-    [groups, isDemo]
-  )
-
-  const displayAIReviewItems = useMemo(
-    () => aiReviewItems.length > 0 ? aiReviewItems : (isDemo ? mockAIReviewItems : []),
-    [aiReviewItems, isDemo]
+    () => [...comments, ...draftComments],
+    [comments, draftComments]
   )
 
   const scrollToFile = useCallback((filePath: string) => {
@@ -166,8 +130,6 @@ export function App() {
     }
   }, [scrollToFile])
 
-
-
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <TopBar.Root>
@@ -179,8 +141,8 @@ export function App() {
           <div className="flex items-center gap-2 text-destructive">
             <span>Failed to load PR: {prError.message}</span>
           </div>
-        ) : displayPR ? (
-          <TopBar.PRInfo pr={displayPR} />
+        ) : pr ? (
+          <TopBar.PRInfo pr={pr} />
         ) : null}
         <TopBar.Actions>
             <Button 
@@ -216,30 +178,20 @@ export function App() {
                 <div className="flex h-full items-center justify-center text-muted-foreground">
                   <span className="animate-pulse">Loading diff...</span>
                 </div>
-              ) : diffError && displayFiles.length === 0 ? (
+              ) : diffError && files.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
                   <p className="text-destructive">Failed to load diff</p>
                   <p className="text-sm text-muted-foreground">{diffError.message}</p>
-                  {!prNumber && (
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      Add <code className="rounded bg-muted px-1">?pr=NUMBER</code> to the URL to load a PR
-                    </p>
-                  )}
                 </div>
-              ) : displayFiles.length === 0 ? (
+              ) : files.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-muted-foreground">
                   <p>No files to display</p>
-                  {!prNumber && (
-                    <p className="text-sm">
-                      Add <code className="rounded bg-muted px-1">?pr=NUMBER</code> to the URL to load a PR
-                    </p>
-                  )}
                 </div>
               ) : (
                 <DiffPanel.Viewer
-                  files={displayFiles}
+                  files={files}
                   annotations={annotations}
-                  aiReviewItems={displayAIReviewItems}
+                  aiReviewItems={aiReviewItems}
                   onCommentSubmit={handleCommentSubmit}
                 />
               )}
@@ -260,9 +212,9 @@ export function App() {
             <SidePanel className="h-full">
               <SidePanelGroupingContent>
                 <IntelligentGrouping
-                  groups={displayGroups}
+                  groups={groups}
                   onFileClick={scrollToFile}
-                  onGenerateGroups={prNumber ? generateGroups : undefined}
+                  onGenerateGroups={generateGroups}
                   isGenerating={isGeneratingGroups}
                   error={groupingError}
                   models={models}
@@ -271,54 +223,50 @@ export function App() {
                 />
               </SidePanelGroupingContent>
               <SidePanelAIReviewContent>
-                {prNumber && (
-                  <div className="mb-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={triggerReview}
-                      disabled={isReviewLoading}
-                      className="flex-1"
-                    >
-                      {isReviewLoading ? "Generating AI Review..." : "Generate AI Review"}
-                    </Button>
-                    <ActionSettingsPopover
-                      actionKey="ai-review"
-                      models={models}
-                      currentModel={settings?.["ai-review"]?.model}
-                      onModelChange={(model) => updateActionModel("ai-review", model)}
-                    />
-                  </div>
-                )}
+                <div className="mb-4 flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={triggerReview}
+                    disabled={isReviewLoading}
+                    className="flex-1"
+                  >
+                    {isReviewLoading ? "Generating AI Review..." : "Generate AI Review"}
+                  </Button>
+                  <ActionSettingsPopover
+                    actionKey="ai-review"
+                    models={models}
+                    currentModel={settings?.["ai-review"]?.model}
+                    onModelChange={(model) => updateActionModel("ai-review", model)}
+                  />
+                </div>
                 <AIReviewSummary
-                  items={displayAIReviewItems}
+                  items={aiReviewItems}
                   onItemClick={(item) => {
                     scrollToAnnotation(item.filePath, item.lineNumber)
                   }}
                 />
-                {prNumber && (
-                  <div className="mt-6 pt-4 border-t border-border">
-                    <h3 className="text-sm font-medium mb-3">Pattern Verification</h3>
-                    <PatternVerificationPanel
-                      result={verificationResult}
-                      isLoading={isVerifying}
-                      error={verificationError}
-                      onVerify={verifyPatterns}
-                      onLocationClick={(filePath, lineNumber) => {
-                        scrollToAnnotation(filePath, lineNumber)
-                      }}
-                      models={models}
-                      currentModel={settings?.["pattern-verification"]?.model}
-                      onModelChange={(model) => updateActionModel("pattern-verification", model)}
-                    />
-                  </div>
-                )}
+                <div className="mt-6 pt-4 border-t border-border">
+                  <h3 className="text-sm font-medium mb-3">Pattern Verification</h3>
+                  <PatternVerificationPanel
+                    result={verificationResult}
+                    isLoading={isVerifying}
+                    error={verificationError}
+                    onVerify={verifyPatterns}
+                    onLocationClick={(filePath, lineNumber) => {
+                      scrollToAnnotation(filePath, lineNumber)
+                    }}
+                    models={models}
+                    currentModel={settings?.["pattern-verification"]?.model}
+                    onModelChange={(model) => updateActionModel("pattern-verification", model)}
+                  />
+                </div>
               </SidePanelAIReviewContent>
               <SidePanelRelatedFilesContent>
                 <RelatedFiles
                   files={relatedFiles}
                   onFileClick={scrollToFile}
-                  onFindFiles={prNumber ? findRelatedFiles : undefined}
+                  onFindFiles={findRelatedFiles}
                   isLoading={isLoadingRelatedFiles}
                   error={relatedFilesError}
                   models={models}

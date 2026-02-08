@@ -4,8 +4,6 @@ import { fetchPRDiff } from '@/lib/api';
 import { transformFileDiffs } from '@/lib/transforms';
 
 interface UseDiffOptions {
-  prNumber?: number;
-  repo?: string;
   includeContent?: boolean;
 }
 
@@ -16,17 +14,13 @@ interface UseDiffReturn {
   refetch: () => Promise<void>;
 }
 
-export function useDiff({ prNumber, repo, includeContent = true }: UseDiffOptions = {}): UseDiffReturn {
+export function useDiff({ includeContent = true }: UseDiffOptions = {}): UseDiffReturn {
   const [files, setFiles] = useState<DiffFileData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!prNumber) {
-      return;
-    }
-
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
@@ -34,7 +28,7 @@ export function useDiff({ prNumber, repo, includeContent = true }: UseDiffOption
     setError(null);
 
     try {
-      const serverFiles = await fetchPRDiff(prNumber, repo, includeContent, abortControllerRef.current.signal);
+      const serverFiles = await fetchPRDiff(includeContent, abortControllerRef.current.signal);
       const clientFiles = transformFileDiffs(serverFiles);
       setFiles(clientFiles);
     } catch (err) {
@@ -44,16 +38,14 @@ export function useDiff({ prNumber, repo, includeContent = true }: UseDiffOption
     } finally {
       setIsLoading(false);
     }
-  }, [prNumber, repo, includeContent]);
+  }, [includeContent]);
 
   useEffect(() => {
-    if (prNumber) {
-      fetchData();
-    }
+    fetchData();
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [prNumber, fetchData]);
+  }, [fetchData]);
 
   return {
     files,

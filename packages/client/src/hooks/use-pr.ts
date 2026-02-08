@@ -3,11 +3,6 @@ import type { PRInfo } from '@/types/pr';
 import { fetchPRInfo, fetchStatus } from '@/lib/api';
 import { transformPRInfo } from '@/lib/transforms';
 
-interface UsePROptions {
-  prNumber?: number;
-  repo?: string;
-}
-
 interface UsePRReturn {
   pr: PRInfo | null;
   isLoading: boolean;
@@ -15,17 +10,13 @@ interface UsePRReturn {
   refetch: () => Promise<void>;
 }
 
-export function usePR({ prNumber, repo }: UsePROptions = {}): UsePRReturn {
+export function usePR(): UsePRReturn {
   const [pr, setPR] = useState<PRInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!prNumber) {
-      return;
-    }
-
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
@@ -33,7 +24,7 @@ export function usePR({ prNumber, repo }: UsePROptions = {}): UsePRReturn {
     setError(null);
 
     try {
-      const serverPR = await fetchPRInfo(prNumber, repo, abortControllerRef.current.signal);
+      const serverPR = await fetchPRInfo(abortControllerRef.current.signal);
       const clientPR = transformPRInfo(serverPR);
       setPR(clientPR);
     } catch (err) {
@@ -43,16 +34,14 @@ export function usePR({ prNumber, repo }: UsePROptions = {}): UsePRReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [prNumber, repo]);
+  }, []);
 
   useEffect(() => {
-    if (prNumber) {
-      fetchData();
-    }
+    fetchData();
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [prNumber, fetchData]);
+  }, [fetchData]);
 
   return {
     pr,

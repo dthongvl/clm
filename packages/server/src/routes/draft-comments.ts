@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { safeJson, parsePositiveInt } from '../utils/request.js';
+import { safeJson } from '../utils/request.js';
 import { BoundedArrayStore } from '../utils/bounded-store.js';
+import { getAppContext } from '../lib/app-context.js';
 import type { DraftComment } from '../types/index.js';
 
 const app = new Hono();
@@ -14,8 +15,8 @@ const draftCommentsStore = new BoundedArrayStore<string, DraftComment>({
 });
 
 // Helper to build store key
-function buildKey(prNumber: number, repo?: string): string {
-  return repo ? `${repo}:${prNumber}` : `default:${prNumber}`;
+function buildKey(prNumber: number, repo: string): string {
+  return `${repo}:${prNumber}`;
 }
 
 // Helper to generate unique ID
@@ -24,25 +25,17 @@ function generateId(): string {
 }
 
 interface DraftCommentBody {
-  prNumber: number;
   filePath: string;
   lineNumber: number;
   side: 'additions' | 'deletions';
   content: string;
   authorName?: string;
-  repo?: string;
 }
 
-// GET /api/draft-comments?prNumber={number}&repo={owner/repo}
+// GET /api/draft-comments
 // Fetch all draft comments for a PR
 app.get('/', (c) => {
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo');
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'prNumber query parameter must be a positive integer' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   const key = buildKey(prNumber, repo);
   const comments = draftCommentsStore.get(key);
@@ -51,16 +44,14 @@ app.get('/', (c) => {
 
 // POST /api/draft-comments
 // Add a new draft comment
-// Body: { prNumber: number, filePath: string, lineNumber: number, side: 'additions' | 'deletions', content: string, authorName?: string, repo?: string }
+// Body: { filePath: string, lineNumber: number, side: 'additions' | 'deletions', content: string, authorName?: string }
 app.post('/', async (c) => {
+  const { prNumber, repo } = getAppContext();
+
   const result = await safeJson<DraftCommentBody>(c);
   if (!result.ok) return result.response;
   
-  const { prNumber, filePath, lineNumber, side, content, authorName = 'You', repo } = result.data;
-
-  if (!prNumber || typeof prNumber !== 'number' || prNumber < 1) {
-    return c.json({ error: 'prNumber must be a positive integer' }, 400);
-  }
+  const { filePath, lineNumber, side, content, authorName = 'You' } = result.data;
 
   if (!filePath || typeof filePath !== 'string') {
     return c.json({ error: 'filePath is required and must be a string' }, 400);
@@ -103,17 +94,11 @@ app.post('/', async (c) => {
   return c.json({ comment: newComment });
 });
 
-// DELETE /api/draft-comments/:id?prNumber={number}&repo={owner/repo}
+// DELETE /api/draft-comments/:id
 // Delete a specific draft comment
 app.delete('/:id', (c) => {
   const id = c.req.param('id');
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo');
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'prNumber query parameter must be a positive integer' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   const key = buildKey(prNumber, repo);
   const beforeCount = draftCommentsStore.get(key).length;
@@ -126,33 +111,21 @@ app.delete('/:id', (c) => {
   return c.json({});
 });
 
-// DELETE /api/draft-comments?prNumber={number}&repo={owner/repo}
+// DELETE /api/draft-comments
 // Clear all draft comments for a PR (useful when submitting to GitHub)
 app.delete('/', (c) => {
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo');
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'prNumber query parameter must be a positive integer' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   const key = buildKey(prNumber, repo);
   draftCommentsStore.delete(key);
   return c.json({});
 });
 
-// POST /api/draft-comments/submit?prNumber={number}&repo={owner/repo}
+// POST /api/draft-comments/submit
 // Submit all draft comments to GitHub (placeholder - just clears for now)
 // In a full implementation, this would call the GitHub API to post each comment
 app.post('/submit', async (c) => {
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo');
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'prNumber query parameter must be a positive integer' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   const key = buildKey(prNumber, repo);
   const comments = draftCommentsStore.get(key);

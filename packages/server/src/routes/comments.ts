@@ -1,34 +1,22 @@
 import { Hono } from 'hono';
-import { postComment, getCurrentRepo, getPRComments } from '../services/gh.js';
-import { safeJson, parsePositiveInt, isPositiveInt } from '../utils/request.js';
+import { postComment, getPRComments } from '../services/gh.js';
+import { safeJson, isPositiveInt } from '../utils/request.js';
+import { getAppContext } from '../lib/app-context.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
 interface PostCommentBody {
-  prNumber: number;
   body: string;
   commitId?: string;
   path?: string;
   line?: number;
-  repo?: string;
 }
 
-// GET /api/git/comments?prNumber={number}&repo={owner/repo}
+// GET /api/git/comments
 // Fetch all comments (review comments + issue comments) for a PR
 app.get('/', async (c) => {
-  const prNumberStr = c.req.query('prNumber');
-  const queryRepo = c.req.query('repo');
-  const repo = queryRepo || await getCurrentRepo();
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'prNumber query parameter must be a positive integer' }, 400);
-  }
-
-  if (!repo) {
-    return c.json({ error: 'Repository not found' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   try {
     const comments = await getPRComments(prNumber, repo);
@@ -40,17 +28,14 @@ app.get('/', async (c) => {
 });
 
 // POST /api/git/comments
-// Body: { prNumber: number, body: string, commitId?: string, path?: string, line?: number, repo?: string }
+// Body: { body: string, commitId?: string, path?: string, line?: number }
 app.post('/', async (c) => {
+  const { prNumber, repo } = getAppContext();
+
   const result = await safeJson<PostCommentBody>(c);
   if (!result.ok) return result.response;
   
-  const { prNumber, body: commentBody, commitId, path, line, repo: bodyRepo } = result.data;
-  const repo = bodyRepo || await getCurrentRepo();
-
-  if (!isPositiveInt(prNumber)) {
-    return c.json({ error: 'prNumber must be a positive integer' }, 400);
-  }
+  const { body: commentBody, commitId, path, line } = result.data;
 
   if (!commentBody || typeof commentBody !== 'string') {
     return c.json({ error: 'body is required and must be a string' }, 400);
@@ -58,10 +43,6 @@ app.post('/', async (c) => {
 
   if (commentBody.length > 65536) {
     return c.json({ error: 'body exceeds maximum length of 65536 characters' }, 400);
-  }
-
-  if (!repo) {
-    return c.json({ error: 'Repository not found' }, 400);
   }
 
   // If path and line are provided, commitId is required

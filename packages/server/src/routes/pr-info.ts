@@ -1,23 +1,13 @@
 import { Hono } from 'hono';
 import { getPRInfo, checkGhCli, getCurrentRepo } from '../services/gh.js';
-import { parsePositiveInt } from '../utils/request.js';
+import { getAppContext } from '../lib/app-context.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
-// GET /api/git/pr-info?prNumber={number}&repo={owner/repo}
+// GET /api/git/pr-info
 app.get('/', async (c) => {
-  const prNumberStr = c.req.query('prNumber');
-  const repo = c.req.query('repo') || await getCurrentRepo();
-
-  const prNumber = parsePositiveInt(prNumberStr);
-  if (!prNumber) {
-    return c.json({ error: 'PR number must be a positive integer' }, 400);
-  }
-
-  if (!repo) {
-    return c.json({ error: 'Repository not found. Please specify repo parameter or run from a git repository.' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   try {
     logger.github(`Fetching PR #${prNumber} info`);

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/bun';
 import { logger, createLoggerMiddleware } from './lib/logger.js';
+import { initAppContext, getAppContext } from './lib/app-context.js';
 import diffRoutes from './routes/diff.js';
 import commentRoutes from './routes/comments.js';
 import draftCommentRoutes from './routes/draft-comments.js';
@@ -14,6 +15,8 @@ import patternVerificationRoutes from './routes/pattern-verification.js';
 import refreshRoutes from './routes/refresh.js';
 import settingsRoutes from './routes/settings.js';
 import modelsRoutes from './routes/models.js';
+
+initAppContext();
 
 const app = new Hono();
 
@@ -55,6 +58,12 @@ app.route('/api/git/refresh', refreshRoutes);
 app.route('/api/draft-comments', draftCommentRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/models', modelsRoutes);
+
+// Context endpoint - returns the PR being reviewed
+app.get('/api/context', (c) => {
+  const ctx = getAppContext();
+  return c.json(ctx);
+});
 
 // Health check
 app.get('/api/health', (c) => {

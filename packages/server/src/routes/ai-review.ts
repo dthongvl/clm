@@ -3,6 +3,7 @@ import { reviewDiff, reviewLine, checkAIBinary } from '../services/ai.js';
 import { generatePRReview } from '../services/ai-review.js';
 import { buildPRLink } from '../utils/github.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
+import { getAppContext } from '../lib/app-context.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
@@ -17,11 +18,6 @@ interface LineReviewBody {
   line: number;
   code: string;
   diff?: string;
-}
-
-interface PRReviewBody {
-  prNumber: number;
-  repo?: string;
 }
 
 // POST /api/ai/review
@@ -91,21 +87,12 @@ app.post('/line', async (c) => {
 });
 
 // POST /api/ai/review/pr
-// Body: { prNumber: number, repo?: string }
 // Generates a comprehensive AI review for a PR using the opencode CLI
 app.post('/pr', async (c) => {
-  const result = await safeJson<PRReviewBody>(c);
-  if (!result.ok) return result.response;
-  
-  const { prNumber, repo } = result.data;
-
-  if (!isPositiveInt(prNumber)) {
-    return c.json({ error: 'prNumber must be a positive integer' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   try {
-    // Build PR link - repo is optional if running from within a git repo
-    const prLink = repo ? buildPRLink(repo, prNumber) : buildPRLink('', prNumber);
+    const prLink = buildPRLink(repo, prNumber);
     logger.ai(`Generating PR review for #${prNumber}`);
     const reviewResult = await generatePRReview(prLink);
     return c.json(reviewResult);

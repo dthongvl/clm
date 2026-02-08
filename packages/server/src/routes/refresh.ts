@@ -1,31 +1,14 @@
 import { Hono } from 'hono';
-import { getPRInfo, getCurrentRepo } from '../services/gh.js';
+import { getPRInfo } from '../services/gh.js';
 import { fetchBranches } from '../services/git.js';
 import { setPRContext } from '../services/pr-context.js';
-import { safeJson, isPositiveInt } from '../utils/request.js';
+import { getAppContext } from '../lib/app-context.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
-interface RefreshBody {
-  prNumber: number;
-  repo?: string;
-}
-
 app.post('/', async (c) => {
-  const result = await safeJson<RefreshBody>(c);
-  if (!result.ok) return result.response;
-
-  const { prNumber, repo: bodyRepo } = result.data;
-  const repo = bodyRepo || process.env.REPO || await getCurrentRepo();
-
-  if (!isPositiveInt(prNumber)) {
-    return c.json({ error: 'prNumber must be a positive integer' }, 400);
-  }
-
-  if (!repo) {
-    return c.json({ error: 'Repository not found. Please specify repo parameter or run from a git repository.' }, 400);
-  }
+  const { prNumber, repo } = getAppContext();
 
   try {
     logger.operationStart(`Refreshing PR #${prNumber}`);

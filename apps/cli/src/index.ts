@@ -230,9 +230,7 @@ async function main() {
         process.exit(1);
       }
 
-      // Build URL with PR number and repo
-      const params = new URLSearchParams({ pr: prNumber, repo });
-      const url = `http://localhost:3000?${params.toString()}`;
+      const url = 'http://localhost:3000';
 
       // Open browser
       try {

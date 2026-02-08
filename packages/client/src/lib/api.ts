@@ -65,17 +65,15 @@ interface StatusResponse {
 
 // API functions
 
-export async function fetchPRInfo(prNumber: number, repo?: string, signal?: AbortSignal): Promise<ServerPRInfo> {
-  const params = new URLSearchParams({ prNumber: String(prNumber) });
-  if (repo) params.set('repo', repo);
-  return fetchApi<ServerPRInfo>(`/git/pr-info?${params}`, { signal });
+export async function fetchPRInfo(signal?: AbortSignal): Promise<ServerPRInfo> {
+  return fetchApi<ServerPRInfo>('/git/pr-info', { signal });
 }
 
-export async function fetchPRDiff(prNumber: number, repo?: string, includeContent = true, signal?: AbortSignal): Promise<ServerFileDiff[]> {
-  const params = new URLSearchParams({ prNumber: String(prNumber) });
-  if (repo) params.set('repo', repo);
+export async function fetchPRDiff(includeContent = true, signal?: AbortSignal): Promise<ServerFileDiff[]> {
+  const params = new URLSearchParams();
   if (includeContent) params.set('includeContent', 'true');
-  const response = await fetchApi<DiffResponse>(`/git/diff?${params}`, { signal });
+  const query = params.toString();
+  const response = await fetchApi<DiffResponse>(`/git/diff${query ? `?${query}` : ''}`, { signal });
   return response.files;
 }
 
@@ -92,10 +90,9 @@ interface RefreshResponse {
   };
 }
 
-export async function refreshPR(prNumber: number, repo?: string, signal?: AbortSignal): Promise<RefreshResponse> {
+export async function refreshPR(signal?: AbortSignal): Promise<RefreshResponse> {
   return fetchApi<RefreshResponse>('/git/refresh', {
     method: 'POST',
-    body: JSON.stringify({ prNumber, repo }),
     signal,
   });
 }
@@ -122,10 +119,8 @@ interface CommentsResponse {
   comments: ServerPRComment[];
 }
 
-export async function fetchPRComments(prNumber: number, repo?: string, signal?: AbortSignal): Promise<ServerPRComment[]> {
-  const params = new URLSearchParams({ prNumber: String(prNumber) });
-  if (repo) params.set('repo', repo);
-  const response = await fetchApi<CommentsResponse>(`/git/comments?${params}`, { signal });
+export async function fetchPRComments(signal?: AbortSignal): Promise<ServerPRComment[]> {
+  const response = await fetchApi<CommentsResponse>('/git/comments', { signal });
   return response.comments;
 }
 
@@ -149,14 +144,12 @@ interface CreateDraftCommentResponse {
   comment: ServerDraftComment;
 }
 
-export async function fetchDraftComments(prNumber: number): Promise<ServerDraftComment[]> {
-  const params = new URLSearchParams({ prNumber: String(prNumber) });
-  const response = await fetchApi<DraftCommentsResponse>(`/draft-comments?${params}`);
+export async function fetchDraftComments(): Promise<ServerDraftComment[]> {
+  const response = await fetchApi<DraftCommentsResponse>('/draft-comments');
   return response.comments;
 }
 
 export async function createDraftComment(
-  prNumber: number,
   filePath: string,
   lineNumber: number,
   side: 'additions' | 'deletions',
@@ -165,21 +158,19 @@ export async function createDraftComment(
 ): Promise<ServerDraftComment> {
   const response = await fetchApi<CreateDraftCommentResponse>('/draft-comments', {
     method: 'POST',
-    body: JSON.stringify({ prNumber, filePath, lineNumber, side, content, authorName }),
+    body: JSON.stringify({ filePath, lineNumber, side, content, authorName }),
   });
   return response.comment;
 }
 
-export async function deleteDraftComment(prNumber: number, commentId: string): Promise<void> {
-  const params = new URLSearchParams({ prNumber: String(prNumber) });
-  await fetchApi(`/draft-comments/${commentId}?${params}`, {
+export async function deleteDraftComment(commentId: string): Promise<void> {
+  await fetchApi(`/draft-comments/${commentId}`, {
     method: 'DELETE',
   });
 }
 
-export async function clearDraftComments(prNumber: number): Promise<void> {
-  const params = new URLSearchParams({ prNumber: String(prNumber) });
-  await fetchApi(`/draft-comments?${params}`, {
+export async function clearDraftComments(): Promise<void> {
+  await fetchApi('/draft-comments', {
     method: 'DELETE',
   });
 }
@@ -200,10 +191,10 @@ interface GroupingResponse {
   groups: ServerChangeGroup[];
 }
 
-export async function generateGrouping(prNumber: number, repo?: string): Promise<ServerChangeGroup[]> {
+export async function generateGrouping(): Promise<ServerChangeGroup[]> {
   const response = await fetchApi<GroupingResponse>('/ai/grouping', {
     method: 'POST',
-    body: JSON.stringify({ prNumber, repo }),
+    body: JSON.stringify({}),
   });
   return response.groups;
 }
@@ -223,10 +214,10 @@ interface AIReviewPRResponse {
   summary: string;
 }
 
-export async function generateAIReview(prNumber: number, repo?: string): Promise<AIReviewPRResponse> {
+export async function generateAIReview(): Promise<AIReviewPRResponse> {
   const response = await fetchApi<AIReviewPRResponse>('/ai/review/pr', {
     method: 'POST',
-    body: JSON.stringify({ prNumber, repo }),
+    body: JSON.stringify({}),
   });
   return response;
 }
@@ -241,10 +232,10 @@ interface RelatedFilesResponse {
   files: ServerRelatedFile[];
 }
 
-export async function findRelatedFiles(prNumber: number, repo?: string): Promise<ServerRelatedFile[]> {
+export async function findRelatedFiles(): Promise<ServerRelatedFile[]> {
   const response = await fetchApi<RelatedFilesResponse>('/ai/related-files', {
     method: 'POST',
-    body: JSON.stringify({ prNumber, repo }),
+    body: JSON.stringify({}),
   });
   return response.files;
 }
@@ -252,10 +243,10 @@ export async function findRelatedFiles(prNumber: number, repo?: string): Promise
 // Pattern Verification API
 import type { PatternVerificationResult } from '@/types/verification'
 
-export async function verifyPatterns(prNumber: number, repo: string): Promise<PatternVerificationResult> {
+export async function verifyPatterns(): Promise<PatternVerificationResult> {
   return fetchApi<PatternVerificationResult>('/ai/pattern-verification', {
     method: 'POST',
-    body: JSON.stringify({ prNumber, repo }),
+    body: JSON.stringify({}),
   });
 }
 
