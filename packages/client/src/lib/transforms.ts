@@ -1,7 +1,7 @@
 // Data transformation utilities to convert server responses to client types
 
 import type { PRInfo, PRState } from '@/types/pr';
-import type { DiffFileData } from '@/components/diff-panel';
+import type { DiffFileData } from '@/types/diff';
 import type { ReviewComment, AIReviewItem, CommentSide } from '@/types/review';
 import type { ChangeGroup } from '@/types/grouping';
 import type { ServerPRInfo, ServerFileDiff, ServerPRComment, ServerAIReviewItem, ServerChangeGroup } from './api';

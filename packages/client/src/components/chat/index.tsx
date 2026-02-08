@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 "use client"
 
 import * as React from "react"
@@ -185,7 +186,6 @@ export interface ChatPopupWelcomeProps extends React.ComponentProps<"div"> {
 
 function Welcome({
   className,
-  title = "Lily",
   message = "Hey! I'm Lily. I've reviewed this PR and I'm ready to help. Ask me anything about the changes, potential issues, or how the code works.",
   ...props
 }: ChatPopupWelcomeProps) {

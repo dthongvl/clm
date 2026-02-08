@@ -1,4 +1,5 @@
-import { useRef, useCallback, useState, useMemo } from "react"
+import { useRef, useCallback, useState, useMemo, useEffect } from "react"
+import { toast } from "sonner"
 import { TopBar } from "@/components/top-bar"
 import { MainLayout } from "@/components/main-layout"
 import { DiffPanel } from "@/components/diff-panel"
@@ -46,10 +47,12 @@ export function App() {
     setIsRefreshing(true)
     try {
       await refreshPR()
-      refetchPR()
-      refetchDiff()
-      refetchComments()
-      refetchDraftComments()
+      await Promise.all([
+        refetchPR(),
+        refetchDiff(),
+        refetchComments(),
+        refetchDraftComments(),
+      ])
     } catch (error) {
       console.error('Failed to refresh:', error)
     } finally {
@@ -98,8 +101,24 @@ export function App() {
     verify: verifyPatterns,
   } = usePatternVerification()
 
-  const { models } = useModels()
-  const { settings, updateActionModel } = useSettings()
+  const { models, error: modelsError } = useModels()
+  const { settings, updateActionModel, error: settingsError } = useSettings()
+
+  useEffect(() => {
+    if (settingsError) {
+      toast.error("Failed to load settings", {
+        description: settingsError.message,
+      })
+    }
+  }, [settingsError])
+
+  useEffect(() => {
+    if (modelsError) {
+      toast.error("Failed to load models", {
+        description: modelsError.message,
+      })
+    }
+  }, [modelsError])
 
   const annotations = useMemo(
     () => [...comments, ...draftComments],

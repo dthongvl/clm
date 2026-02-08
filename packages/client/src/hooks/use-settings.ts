@@ -5,12 +5,14 @@ import type { Settings, ActionKey } from '@/types/settings'
 interface UseSettingsReturn {
   settings: Settings | null
   isLoading: boolean
+  error: Error | null
   updateActionModel: (action: ActionKey, model: string) => Promise<void>
 }
 
 export function useSettings(): UseSettingsReturn {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -21,6 +23,7 @@ export function useSettings(): UseSettingsReturn {
       })
       .catch((err) => {
         console.error('Failed to fetch settings:', err)
+        if (!cancelled) setError(err instanceof Error ? err : new Error('Failed to fetch settings'))
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -47,5 +50,5 @@ export function useSettings(): UseSettingsReturn {
     }
   }, [])
 
-  return { settings, isLoading, updateActionModel }
+  return { settings, isLoading, error, updateActionModel }
 }

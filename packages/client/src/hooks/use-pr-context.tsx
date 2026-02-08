@@ -1,13 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-
-interface PRContextValue {
-  prNumber: number
-  repo: string
-  isLoading: boolean
-  error: Error | null
-}
-
-const PRContext = createContext<PRContextValue | null>(null)
+import { useEffect, useState, type ReactNode } from "react"
+import { PRContext } from "./pr-context"
 
 export function PRContextProvider({ children }: { children: ReactNode }) {
   const [prNumber, setPrNumber] = useState<number>(0)
@@ -34,12 +26,4 @@ export function PRContextProvider({ children }: { children: ReactNode }) {
       {children}
     </PRContext.Provider>
   )
-}
-
-export function usePRContext(): PRContextValue {
-  const ctx = useContext(PRContext)
-  if (!ctx) {
-    throw new Error("usePRContext must be used within PRContextProvider")
-  }
-  return ctx
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import type { DiffFileData } from '@/components/diff-panel';
+import type { DiffFileData } from '@/types/diff';
 import { fetchPRDiff } from '@/lib/api';
 import { transformFileDiffs } from '@/lib/transforms';
 
