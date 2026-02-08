@@ -1,5 +1,5 @@
-import { parse as parseYaml } from 'yaml';
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
+import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -79,30 +79,22 @@ interface YamlReviewResult {
 }
 
 function parseReviewOutput(output: string): AIReviewPRResult {
-  try {
-    // Extract YAML from code block or raw YAML
-    const yamlMatch = output.match(/```ya?ml\n([\s\S]*?)```/)
-      || output.match(/^(summary:\n[\s\S]*)/m)
-      || output.match(/^(items:\n[\s\S]*)/m);
-    
-    if (!yamlMatch) {
-      logger.warn('No YAML review found in AI output');
-      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
-      return { items: [], summary: '' };
-    }
-    
-    const yamlContent = yamlMatch[1];
-    const parsed = parseYaml(yamlContent) as YamlReviewResult;
-    
-    const summary = parsed?.summary || '';
-    const items = parseYamlReviewItems(parsed?.items || []);
-    
-    return { items, summary };
-  } catch (error) {
-    logger.error('Failed to parse review output', error);
-    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
+  const yamlContent = extractYamlBlock(output, ['summary', 'items']);
+  if (!yamlContent) {
+    logger.warn('No YAML review found in AI output');
+    logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { items: [], summary: '' };
   }
+  const parsed = parseYamlSafe<YamlReviewResult>(yamlContent);
+  if (!parsed) {
+    logger.error('Failed to parse review YAML', new Error('YAML parse failed'));
+    return { items: [], summary: '' };
+  }
+
+  const summary = parsed.summary || '';
+  const items = parseYamlReviewItems(parsed.items || []);
+
+  return { items, summary };
 }
 
 function parseYamlReviewItems(yamlItems: YamlReviewItem[]): AIReviewItem[] {
@@ -140,12 +132,3 @@ function parseYamlReviewItems(yamlItems: YamlReviewItem[]): AIReviewItem[] {
   return items;
 }
 
-/**
- * Build a PR link from repo and PR number
- */
-export function buildPRLink(repo: string, prNumber: number): string {
-  if (repo.startsWith('http')) {
-    return `${repo}/pull/${prNumber}`;
-  }
-  return `https://github.com/${repo}/pull/${prNumber}`;
-}

@@ -29,7 +29,7 @@ export interface Comment {
   replies?: Comment[];
 }
 
-export interface PRCommentResponse {
+export interface PRComment {
   id: number;
   body: string;
   user: {

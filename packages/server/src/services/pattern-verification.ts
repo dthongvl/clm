@@ -1,5 +1,5 @@
-import { parse as parseYaml } from 'yaml';
 import type { PatternVerification, PatternVerificationResult, PatternLocation } from '../types/index.js';
+import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -89,29 +89,22 @@ interface YamlVerificationResult {
 }
 
 function parseVerificationOutput(output: string): PatternVerificationResult {
-  try {
-    const yamlMatch = output.match(/```ya?ml\n([\s\S]*?)```/)
-      || output.match(/^(summary:\n[\s\S]*)/m)
-      || output.match(/^(verifications:\n[\s\S]*)/m);
-    
-    if (!yamlMatch) {
-      logger.warn('No YAML found in verification output');
-      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
-      return { verifications: [], summary: '' };
-    }
-    
-    const yamlContent = yamlMatch[1];
-    const parsed = parseYaml(yamlContent) as YamlVerificationResult;
-    
-    const summary = parsed?.summary || '';
-    const verifications = parseYamlVerifications(parsed?.verifications || []);
-    
-    return { verifications, summary };
-  } catch (error) {
-    logger.error('Failed to parse verification output', error);
-    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
+  const yamlContent = extractYamlBlock(output, ['summary', 'verifications']);
+  if (!yamlContent) {
+    logger.warn('No YAML found in verification output');
+    logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { verifications: [], summary: '' };
   }
+  const parsed = parseYamlSafe<YamlVerificationResult>(yamlContent);
+  if (!parsed) {
+    logger.error('Failed to parse verification YAML', new Error('YAML parse failed'));
+    return { verifications: [], summary: '' };
+  }
+
+  const summary = parsed.summary || '';
+  const verifications = parseYamlVerifications(parsed.verifications || []);
+
+  return { verifications, summary };
 }
 
 function parseYamlVerifications(yamlVerifications: YamlPatternVerification[]): PatternVerification[] {

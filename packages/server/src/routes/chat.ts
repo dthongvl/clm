@@ -1,8 +1,7 @@
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import { chatWithAI, checkAIBinary } from '../services/ai.js';
-import { opencodeClient } from '../services/opencode-client.js';
 import { safeJson } from '../utils/request.js';
+import { streamOpencodeResponse } from '../utils/sse.js';
 import { BoundedArrayStore } from '../utils/bounded-store.js';
 import type { ChatMessage } from '../types/index.js';
 import { logger } from '../lib/logger.js';
@@ -126,33 +125,7 @@ app.post('/stream', async (c) => {
     }
   }
 
-  return streamSSE(c, async (stream) => {
-    try {
-      for await (const event of opencodeClient.promptStream(fullMessage)) {
-        if (event.type === 'text' && event.content) {
-          await stream.writeSSE({
-            event: 'message',
-            data: JSON.stringify({ text: event.content }),
-          });
-        } else if (event.type === 'done') {
-          await stream.writeSSE({ event: 'done', data: '' });
-          break;
-        } else if (event.type === 'error') {
-          await stream.writeSSE({
-            event: 'error',
-            data: JSON.stringify({ error: event.error }),
-          });
-          break;
-        }
-      }
-    } catch (error) {
-      logger.error('Stream error', error);
-      await stream.writeSSE({
-        event: 'error',
-        data: JSON.stringify({ error: (error as Error).message }),
-      });
-    }
-  });
+  return streamOpencodeResponse(c, fullMessage);
 });
 
 // GET /api/chat/stream (alternative for EventSource which only supports GET)
@@ -180,33 +153,7 @@ app.get('/stream', async (c) => {
     fullMessage = `${contextParts.join('\n')}\n\nQuestion: ${decodedMessage}`;
   }
 
-  return streamSSE(c, async (stream) => {
-    try {
-      for await (const event of opencodeClient.promptStream(fullMessage)) {
-        if (event.type === 'text' && event.content) {
-          await stream.writeSSE({
-            event: 'message',
-            data: JSON.stringify({ text: event.content }),
-          });
-        } else if (event.type === 'done') {
-          await stream.writeSSE({ event: 'done', data: '' });
-          break;
-        } else if (event.type === 'error') {
-          await stream.writeSSE({
-            event: 'error',
-            data: JSON.stringify({ error: event.error }),
-          });
-          break;
-        }
-      }
-    } catch (error) {
-      logger.error('Stream error', error);
-      await stream.writeSSE({
-        event: 'error',
-        data: JSON.stringify({ error: (error as Error).message }),
-      });
-    }
-  });
+  return streamOpencodeResponse(c, fullMessage);
 });
 
 export default app;

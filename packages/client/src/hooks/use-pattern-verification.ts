@@ -28,9 +28,11 @@ export function usePatternVerification({
     setError(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/api/pattern-verification?repo=${encodeURIComponent(repo)}&prNumber=${prNumber}`
-      );
+      const response = await fetch(`${API_BASE}/api/pattern-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prNumber, repo }),
+      });
 
       if (!response.ok) {
         const data = await response.json();

@@ -1,5 +1,5 @@
-import { parse as parseYaml } from 'yaml';
 import type { RelatedFilesResult, RelatedFile } from '../types/index.js';
+import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -82,37 +82,26 @@ interface YamlRelatedFilesResult {
 }
 
 function parseRelatedFilesOutput(output: string): RelatedFilesResult {
-  try {
-    const yamlMatch = output.match(/```ya?ml\n([\s\S]*?)```/) 
-      || output.match(/^(files:\n[\s\S]*)/m);
-    
-    if (!yamlMatch) {
-      logger.warn('No YAML found in related files output');
-      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
-      return { files: [] };
-    }
-    
-    const yamlContent = yamlMatch[1];
-    const parsed = parseYaml(yamlContent) as YamlRelatedFilesResult;
-    
-    if (!parsed?.files || !Array.isArray(parsed.files)) {
-      logger.warn('Invalid YAML structure in related files response');
-      return { files: [] };
-    }
-    
-    const files: RelatedFile[] = parsed.files
-      .filter((file): file is YamlRelatedFile => 
-        !!file && typeof file.filePath === 'string' && typeof file.explanation === 'string'
-      )
-      .map(file => ({
-        filePath: file.filePath!,
-        explanation: file.explanation!.trim(),
-      }));
-    
-    return { files };
-  } catch (error) {
-    logger.error('Failed to parse related files output', error);
-    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
+  const yamlContent = extractYamlBlock(output, ['files']);
+  if (!yamlContent) {
+    logger.warn('No YAML found in related files output');
+    logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { files: [] };
   }
+  const parsed = parseYamlSafe<YamlRelatedFilesResult>(yamlContent);
+  if (!parsed?.files || !Array.isArray(parsed.files)) {
+    logger.warn('Invalid YAML structure in related files response');
+    return { files: [] };
+  }
+
+  const files: RelatedFile[] = parsed.files
+    .filter((file): file is YamlRelatedFile =>
+      !!file && typeof file.filePath === 'string' && typeof file.explanation === 'string'
+    )
+    .map(file => ({
+      filePath: file.filePath!,
+      explanation: file.explanation!.trim(),
+    }));
+
+  return { files };
 }

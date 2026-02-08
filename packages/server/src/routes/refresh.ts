@@ -1,13 +1,12 @@
 import { Hono } from 'hono';
 import { getPRInfo, getCurrentRepo } from '../services/gh.js';
 import { fetchBranches } from '../services/git.js';
+import { setPRContext } from '../services/pr-context.js';
 import { parsePositiveInt } from '../utils/request.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
 
-// POST /api/refresh?pr={number}&repo={owner/repo}
-// Refreshes PR info and fetches the latest branches from origin
 app.post('/', async (c) => {
   const prNumberStr = c.req.query('pr');
   const repo = c.req.query('repo') || process.env.REPO || await getCurrentRepo();
@@ -23,26 +22,20 @@ app.post('/', async (c) => {
 
   try {
     logger.operationStart(`Refreshing PR #${prNumber}`);
-    
-    // Get latest PR info from GitHub
-    const prInfo = await getPRInfo(prNumber, repo);
 
-    // Fetch the branches from origin
+    const prInfo = await getPRInfo(prNumber, repo);
     await fetchBranches(prInfo.baseBranch, prInfo.headBranch);
 
-    // Update environment variables for subsequent requests
-    process.env.BASE_REF = `origin/${prInfo.baseBranch}`;
-    process.env.HEAD_REF = `origin/${prInfo.headBranch}`;
+    const baseRef = `origin/${prInfo.baseBranch}`;
+    const headRef = `origin/${prInfo.headBranch}`;
+    setPRContext(repo, prNumber, baseRef, headRef);
 
     logger.success(`PR #${prNumber} refreshed`);
 
     return c.json({
       success: true,
       prInfo,
-      refs: {
-        baseRef: process.env.BASE_REF,
-        headRef: process.env.HEAD_REF,
-      },
+      refs: { baseRef, headRef },
     });
   } catch (error) {
     logger.error('Failed to refresh', error);

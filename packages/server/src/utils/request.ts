@@ -35,10 +35,3 @@ export function parsePositiveInt(value: string | undefined): number | null {
   if (Number.isNaN(parsed) || parsed < 1) return null;
   return parsed;
 }
-
-/**
- * Validate repo format (owner/repo)
- */
-export function isValidRepo(repo: string): boolean {
-  return /^[\w.-]+\/[\w.-]+$/.test(repo);
-}

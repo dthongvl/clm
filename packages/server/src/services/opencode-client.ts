@@ -137,7 +137,10 @@ class OpenCodeClient {
 
             try {
               const event = JSON.parse(data);
-              
+
+              const eventSessionId = event.properties?.sessionID || event.properties?.sessionId;
+              if (eventSessionId && eventSessionId !== sessionId) continue;
+
               // Handle different event types
               if (event.type === 'message.part.updated' || event.type === 'assistant.message.part') {
                 const text = event.properties?.part?.text || event.properties?.text;

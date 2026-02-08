@@ -24,6 +24,9 @@ export interface Settings {
   'related-files'?: ActionSettings;
 }
 
+let settingsCache: { settings: Settings; expiresAt: number } | null = null;
+const SETTINGS_CACHE_TTL_MS = 30_000;
+
 function getDefaults(): Settings {
   return {
     grouping: { model: DEFAULT_MODEL },
@@ -34,10 +37,13 @@ function getDefaults(): Settings {
 }
 
 export async function getSettings(): Promise<Settings> {
+  if (settingsCache && Date.now() < settingsCache.expiresAt) {
+    return settingsCache.settings;
+  }
+
   try {
     const content = await readFile(CONFIG_FILE, 'utf-8');
     const parsed = parse(content) as Settings;
-    // Merge with defaults so missing keys are filled
     const defaults = getDefaults();
     for (const key of ACTION_KEYS) {
       if (!parsed[key]) {
@@ -46,10 +52,12 @@ export async function getSettings(): Promise<Settings> {
         parsed[key]!.model = defaults[key]!.model;
       }
     }
+    settingsCache = { settings: parsed, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
     return parsed;
   } catch {
-    // File doesn't exist or is invalid — return defaults
-    return getDefaults();
+    const defaults = getDefaults();
+    settingsCache = { settings: defaults, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
+    return defaults;
   }
 }
 
@@ -64,6 +72,7 @@ export async function updateSettings(partial: Partial<Settings>): Promise<Settin
 
   await mkdir(CONFIG_DIR, { recursive: true });
   await writeFile(CONFIG_FILE, stringify(current as Record<string, unknown>), 'utf-8');
+  settingsCache = null;
   logger.info(`Settings saved to ${CONFIG_FILE}`);
 
   return current;

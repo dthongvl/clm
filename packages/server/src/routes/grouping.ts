@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
-import { generateGrouping, buildPRLink } from '../services/grouping.js';
+import { generateGrouping } from '../services/grouping.js';
+import { buildPRLink } from '../utils/github.js';
 import { getCurrentRepo } from '../services/gh.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 import { logger } from '../lib/logger.js';
@@ -11,19 +12,12 @@ interface GroupingBody {
   repo?: string;
 }
 
-// POST /api/grouping/generate - Generate intelligent grouping for a PR
-app.post('/generate', async (c) => {
-  const result = await safeJson<GroupingBody>(c);
-  if (!result.ok) return result.response;
-  
-  const { prNumber, repo } = result.data;
-
+async function handleGrouping(c: import('hono').Context, prNumber: number, repo: string | undefined) {
   if (!isPositiveInt(prNumber)) {
     return c.json({ error: 'prNumber must be a positive integer' }, 400);
   }
 
   try {
-    // Get repo from body or try to detect current repo
     let targetRepo = repo;
     if (!targetRepo) {
       targetRepo = await getCurrentRepo() ?? undefined;
@@ -33,12 +27,10 @@ app.post('/generate', async (c) => {
       return c.json({ error: 'Repository is required. Provide repo in request or run from a git repository.' }, 400);
     }
 
-    // Build the PR link
     const prLink = buildPRLink(targetRepo, prNumber);
 
     logger.ai(`Generating grouping for PR #${prNumber}`);
 
-    // Generate grouping using opencode CLI
     const groupingResult = await generateGrouping(prLink);
 
     return c.json(groupingResult);
@@ -52,6 +44,18 @@ app.post('/generate', async (c) => {
       500
     );
   }
+}
+
+app.post('/', async (c) => {
+  const result = await safeJson<GroupingBody>(c);
+  if (!result.ok) return result.response;
+  return handleGrouping(c, result.data.prNumber, result.data.repo);
+});
+
+app.post('/generate', async (c) => {
+  const result = await safeJson<GroupingBody>(c);
+  if (!result.ok) return result.response;
+  return handleGrouping(c, result.data.prNumber, result.data.repo);
 });
 
 export default app;

@@ -201,7 +201,7 @@ interface GroupingResponse {
 }
 
 export async function generateGrouping(prNumber: number, repo?: string): Promise<ServerChangeGroup[]> {
-  const response = await fetchApi<GroupingResponse>('/grouping/generate', {
+  const response = await fetchApi<GroupingResponse>('/grouping', {
     method: 'POST',
     body: JSON.stringify({ prNumber, repo }),
   });
@@ -242,7 +242,7 @@ interface RelatedFilesResponse {
 }
 
 export async function findRelatedFiles(prNumber: number, repo?: string): Promise<ServerRelatedFile[]> {
-  const response = await fetchApi<RelatedFilesResponse>('/related-files/analyze', {
+  const response = await fetchApi<RelatedFilesResponse>('/related-files', {
     method: 'POST',
     body: JSON.stringify({ prNumber, repo }),
   });

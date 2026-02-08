@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { reviewDiff, reviewLine, checkAIBinary } from '../services/ai.js';
-import { generatePRReview, buildPRLink } from '../services/ai-review.js';
+import { generatePRReview } from '../services/ai-review.js';
+import { buildPRLink } from '../utils/github.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 import { logger } from '../lib/logger.js';
 

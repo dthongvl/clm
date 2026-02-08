@@ -1,4 +1,4 @@
-import type { PRInfo } from '../types/index.js';
+import type { PRInfo, PRComment } from '../types/index.js';
 import { logger } from '../lib/logger.js';
 
 /**
@@ -167,22 +167,7 @@ export async function getCurrentRepo(): Promise<string | null> {
   }
 }
 
-export interface PRComment {
-  id: number;
-  body: string;
-  user: {
-    login: string;
-    avatar_url: string;
-  };
-  created_at: string;
-  updated_at: string;
-  path?: string;
-  line?: number;
-  original_line?: number;
-  side?: 'LEFT' | 'RIGHT';
-  in_reply_to_id?: number;
-  diff_hunk?: string;
-}
+export type { PRComment } from '../types/index.js';
 
 export async function getPRComments(prNumber: number, repo: string): Promise<PRComment[]> {
   try {

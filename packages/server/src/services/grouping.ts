@@ -1,5 +1,5 @@
-import { parse as parseYaml } from 'yaml';
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
+import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -91,32 +91,20 @@ interface YamlGroupingResult {
 }
 
 function parseGroupingOutput(output: string): GroupingResult {
-  try {
-    // Extract YAML from code block or raw YAML
-    const yamlMatch = output.match(/```ya?ml\n([\s\S]*?)```/) 
-      || output.match(/^(groups:\n[\s\S]*)/m);
-    
-    if (!yamlMatch) {
-      logger.warn('No YAML grouping found in AI output');
-      logger.debug(`Output preview: ${output.slice(0, 200)}...`);
-      return { groups: [] };
-    }
-    
-    const yamlContent = yamlMatch[1];
-    const parsed = parseYaml(yamlContent) as YamlGroupingResult;
-    
-    if (!parsed?.groups || !Array.isArray(parsed.groups)) {
-      logger.warn('Invalid YAML structure in grouping response');
-      return { groups: [] };
-    }
-    
-    const groups = parseYamlGroups(parsed.groups);
-    return { groups };
-  } catch (error) {
-    logger.error('Failed to parse grouping output', error);
-    logger.debug(`Raw output: ${output.slice(0, 500)}...`);
+  const yamlContent = extractYamlBlock(output, ['groups']);
+  if (!yamlContent) {
+    logger.warn('No YAML grouping found in AI output');
+    logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { groups: [] };
   }
+  const parsed = parseYamlSafe<YamlGroupingResult>(yamlContent);
+  if (!parsed?.groups || !Array.isArray(parsed.groups)) {
+    logger.warn('Invalid YAML structure in grouping response');
+    return { groups: [] };
+  }
+
+  const groups = parseYamlGroups(parsed.groups);
+  return { groups };
 }
 
 function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
@@ -155,12 +143,3 @@ function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
   });
 }
 
-/**
- * Build a PR link from repo and PR number
- */
-export function buildPRLink(repo: string, prNumber: number): string {
-  if (repo.startsWith('http')) {
-    return `${repo}/pull/${prNumber}`;
-  }
-  return `https://github.com/${repo}/pull/${prNumber}`;
-}
