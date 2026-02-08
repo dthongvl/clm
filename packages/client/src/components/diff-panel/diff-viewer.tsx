@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useSyncExternalStore } from "react"
 import {
   type DiffLineAnnotation,
   type AnnotationSide,
@@ -78,6 +78,13 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   /** AI review items to display as comment threads */
   aiReviewItems?: AIReviewItem[]
 }
+
+const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+const subscribeSystemTheme = (cb: () => void) => {
+  mediaQuery.addEventListener("change", cb)
+  return () => mediaQuery.removeEventListener("change", cb)
+}
+const getSystemThemeSnapshot = (): "dark" | "light" => mediaQuery.matches ? "dark" : "light"
 
 /** Metadata for annotations - can be a comment, draft form, or AI review item */
 export type AnnotationMetadata =
@@ -197,15 +204,9 @@ function DiffViewer({
   // Get current theme from theme provider
   const { theme } = useTheme()
 
-  // Resolve theme (handle "system" by checking media query)
-  const resolvedTheme = useMemo(() => {
-    if (theme === "system") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-    }
-    return theme
-  }, [theme])
+  // Subscribe to OS dark/light changes so diff view updates reactively
+  const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemThemeSnapshot)
+  const resolvedTheme = theme === "system" ? systemTheme : theme
 
   // Track collapsed state for each file
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set())
