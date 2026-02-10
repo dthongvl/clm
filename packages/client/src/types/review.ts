@@ -17,6 +17,9 @@ export interface ReviewComment {
   resolved?: boolean;
   /** Whether this comment is currently being streamed */
   isStreaming?: boolean;
+  isDraft?: boolean;
+  reviewId?: string;
+  editable?: boolean;
 }
 
 export interface AIReviewItem {

@@ -41,6 +41,9 @@ interface FileDiffCardProps {
     lineNumber: number
   ) => void
   onSubmitReply?: (commentId: string, content: string) => Promise<void>
+  onEditDraft?: (commentId: string, content: string) => Promise<void>
+  onDeleteDraft?: (commentId: string) => Promise<void>
+  isDraftActionLoading?: boolean
   onLineClick?: (
     filePath: string,
     line: number,
@@ -63,6 +66,9 @@ export const FileDiffCard = memo(function FileDiffCard({
   onSubmitDraft,
   onCancelDraft,
   onSubmitReply,
+  onEditDraft,
+  onDeleteDraft,
+  isDraftActionLoading,
   onLineClick,
 }: FileDiffCardProps) {
   const oldFile = useMemo(
@@ -150,6 +156,9 @@ export const FileDiffCard = memo(function FileDiffCard({
               onSubmitDraft={onSubmitDraft}
               onCancelDraft={onCancelDraft}
               onSubmitReply={onSubmitReply}
+              onEditDraft={onEditDraft}
+              onDeleteDraft={onDeleteDraft}
+              isDraftActionLoading={isDraftActionLoading}
             />
           )}
         />

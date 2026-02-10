@@ -105,40 +105,6 @@ export function SidePanelSkeleton({ className, ...props }: SidePanelSkeletonProp
   )
 }
 
-export type ChatSkeletonProps = React.ComponentProps<"div">
-
-export function ChatSkeleton({ className, ...props }: ChatSkeletonProps) {
-  return (
-    <div
-      data-slot="chat-skeleton"
-      className={cn("flex flex-col gap-4 p-4", className)}
-      aria-label="Loading chat"
-      role="status"
-      {...props}
-    >
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "flex gap-2",
-            i % 2 === 0 ? "justify-end" : "justify-start"
-          )}
-        >
-          <div
-            className={cn(
-              "max-w-[80%] space-y-2 rounded-lg p-3",
-              i % 2 === 0 ? "bg-primary/10" : "bg-muted"
-            )}
-          >
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export type EmptyStateProps = React.ComponentProps<"div"> & {
   icon?: React.ReactNode
   title: string

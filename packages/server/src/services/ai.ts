@@ -71,21 +71,6 @@ export async function reviewDiff(
   }
 }
 
-export async function chatWithAI(
-  message: string,
-  context?: { diff?: string; filename?: string; line?: number }
-): Promise<string> {
-  const prompt = buildChatPrompt(message, context);
-  
-  try {
-    const stdout = await runAIWithStdin(prompt, { timeoutMs: 60_000 });
-    return stdout.trim();
-  } catch (error) {
-    logger.error('AI chat failed', error);
-    return 'Sorry, I encountered an error processing your request.';
-  }
-}
-
 export async function reviewLine(
   filename: string,
   line: number,
@@ -149,30 +134,6 @@ Please identify:
 3. Info (suggestions, style improvements, documentation needs)
 
 Focus on actionable feedback that improves code quality.`;
-
-  return prompt;
-}
-
-function buildChatPrompt(
-  message: string,
-  context?: { diff?: string; filename?: string; line?: number }
-): string {
-  let prompt = `You are helping with code review. Answer the following question:
-
-${message}`;
-
-  if (context) {
-    prompt += '\n\nContext:';
-    if (context.filename) {
-      prompt += `\nFile: ${context.filename}`;
-    }
-    if (context.line) {
-      prompt += `\nLine: ${context.line}`;
-    }
-    if (context.diff) {
-      prompt += `\n\nDiff:\n${context.diff}`;
-    }
-  }
 
   return prompt;
 }

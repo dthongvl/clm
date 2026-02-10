@@ -1,16 +1,26 @@
-import type { PRInfo, PRComment } from '../types/index.js';
+import type { PRInfo, PRComment, DraftReviewComment, SubmitReviewEvent } from '../types/index.js';
 import { logger } from '../lib/logger.js';
+
+interface ClassifiedError {
+  code: string;
+  message: string;
+}
 
 /**
  * Run gh CLI command safely using Bun.spawn (no shell injection)
  */
-async function runGh(args: string[], opts?: { timeoutMs?: number }): Promise<string> {
+async function runGh(args: string[], opts?: { timeoutMs?: number; input?: string }): Promise<string> {
   const proc = Bun.spawn(['gh', ...args], {
-    stdin: null,
+    stdin: opts?.input ? 'pipe' : null,
     stdout: 'pipe',
     stderr: 'pipe',
     timeout: opts?.timeoutMs ?? 120_000,
   });
+
+  if (opts?.input && proc.stdin) {
+    proc.stdin.write(opts.input);
+    proc.stdin.end();
+  }
 
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -19,7 +29,8 @@ async function runGh(args: string[], opts?: { timeoutMs?: number }): Promise<str
   ]);
 
   if (exitCode !== 0) {
-    throw new Error(stderr || stdout || `gh exited with code ${exitCode}`);
+    const parts = [stderr, stdout].filter(Boolean).join('\n');
+    throw new Error(parts || `gh exited with code ${exitCode}`);
   }
 
   return stdout;
@@ -183,5 +194,431 @@ export async function getPRComments(prNumber: number, repo: string): Promise<PRC
   } catch (error) {
     logger.error('Failed to fetch PR comments', error);
     return [];
+  }
+}
+
+function classifyGhError(error: unknown): ClassifiedError {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes('422') || msg.includes('pull_request_review_thread.diff_hunk')) {
+    return { code: 'COMMENT_LOCATION_STALE', message: msg };
+  }
+  if (msg.includes('404')) {
+    return { code: 'NOT_FOUND', message: msg };
+  }
+  return { code: 'UNKNOWN', message: msg };
+}
+
+function mapSideFromGh(side: 'LEFT' | 'RIGHT'): 'additions' | 'deletions' {
+  return side === 'RIGHT' ? 'additions' : 'deletions';
+}
+
+function mapSideToGh(side: 'additions' | 'deletions'): 'RIGHT' | 'LEFT' {
+  return side === 'additions' ? 'RIGHT' : 'LEFT';
+}
+
+export async function getCurrentUserLogin(): Promise<string> {
+  const query = `query { viewer { login } }`;
+  const stdout = await runGh(['api', 'graphql', '-f', `query=${query}`]);
+  const result = JSON.parse(stdout);
+  return result.data.viewer.login;
+}
+
+export async function findPendingReview(
+  prNumber: number,
+  repo: string,
+  login: string,
+): Promise<{ id: string; nodeId: string; state: 'PENDING' } | null> {
+  const [owner, name] = repo.split('/');
+  const query = `
+    query($owner: String!, $name: String!, $prNumber: Int!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $prNumber) {
+          reviews(first: 100, states: PENDING) {
+            nodes {
+              databaseId
+              id
+              state
+              author { login }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const stdout = await runGh([
+    'api', 'graphql',
+    '-f', `query=${query}`,
+    '-f', `owner=${owner}`,
+    '-f', `name=${name}`,
+    '-F', `prNumber=${prNumber}`,
+  ]);
+
+  const result = JSON.parse(stdout);
+  const reviews = result.data.repository.pullRequest.reviews.nodes as Array<{
+    databaseId: number;
+    id: string;
+    state: string;
+    author: { login: string };
+  }>;
+
+  const pending = reviews.find((r) => r.author.login === login);
+  if (!pending) {
+    return null;
+  }
+  return { id: pending.id, nodeId: pending.id, state: 'PENDING' };
+}
+
+export async function createPendingReview(
+  prNumber: number,
+  repo: string,
+): Promise<{ id: string; nodeId: string; state: 'PENDING' }> {
+  const [owner, name] = repo.split('/');
+  const query = `
+    query($owner: String!, $name: String!, $prNumber: Int!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $prNumber) { id }
+      }
+    }
+  `;
+
+  const prStdout = await runGh([
+    'api', 'graphql',
+    '-f', `query=${query}`,
+    '-f', `owner=${owner}`,
+    '-f', `name=${name}`,
+    '-F', `prNumber=${prNumber}`,
+  ]);
+  const prResult = JSON.parse(prStdout);
+  const prNodeId = prResult.data.repository.pullRequest.id as string;
+
+  const mutation = `
+    mutation($prId: ID!) {
+      addPullRequestReview(input: { pullRequestId: $prId }) {
+        pullRequestReview {
+          databaseId
+          id
+          state
+        }
+      }
+    }
+  `;
+
+  const stdout = await runGh([
+    'api', 'graphql',
+    '-f', `query=${mutation}`,
+    '-f', `prId=${prNodeId}`,
+  ]);
+  const result = JSON.parse(stdout);
+  const review = result.data.addPullRequestReview.pullRequestReview;
+  return { id: review.id, nodeId: review.id, state: 'PENDING' };
+}
+
+export async function getPRHeadSha(prNumber: number, repo: string): Promise<string> {
+  const [owner, name] = repo.split('/');
+  const query = `
+    query($owner: String!, $name: String!, $prNumber: Int!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $prNumber) {
+          headRefOid
+        }
+      }
+    }
+  `;
+
+  const stdout = await runGh([
+    'api', 'graphql',
+    '-f', `query=${query}`,
+    '-f', `owner=${owner}`,
+    '-f', `name=${name}`,
+    '-F', `prNumber=${prNumber}`,
+  ]);
+  const result = JSON.parse(stdout);
+  return result.data.repository.pullRequest.headRefOid;
+}
+
+export async function listPendingReviewComments(
+  prNumber: number,
+  repo: string,
+  reviewNodeId: string,
+): Promise<DraftReviewComment[]> {
+  const [owner, name] = repo.split('/');
+  const query = `
+    query($owner: String!, $name: String!, $prNumber: Int!, $after: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $prNumber) {
+          reviewThreads(first: 100, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              diffSide
+              line
+              originalLine
+              path
+              comments(first: 100) {
+                nodes {
+                  databaseId
+                  id
+                  body
+                  line
+                  originalLine
+                  author { login }
+                  createdAt
+                  pullRequestReview { id }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  type ThreadNode = {
+    diffSide: 'LEFT' | 'RIGHT';
+    line: number | null;
+    originalLine: number | null;
+    path: string;
+    comments: {
+      nodes: Array<{
+        databaseId: number;
+        id: string;
+        body: string;
+        line: number | null;
+        originalLine: number | null;
+        author: { login: string };
+        createdAt: string;
+        pullRequestReview: { id: string };
+      }>;
+    };
+  };
+
+  const allThreadNodes: ThreadNode[] = [];
+  let after: string | null = null;
+
+  do {
+    const args = [
+      'api', 'graphql',
+      '-f', `query=${query}`,
+      '-f', `owner=${owner}`,
+      '-f', `name=${name}`,
+      '-F', `prNumber=${prNumber}`,
+    ];
+    if (after) {
+      args.push('-f', `after=${after}`);
+    }
+
+    const stdout = await runGh(args);
+    const result = JSON.parse(stdout);
+    const threadConnection = result.data.repository.pullRequest.reviewThreads;
+    allThreadNodes.push(...(threadConnection.nodes as ThreadNode[]));
+    after = threadConnection.pageInfo.hasNextPage ? threadConnection.pageInfo.endCursor : null;
+  } while (after);
+
+  const comments: DraftReviewComment[] = [];
+  for (const thread of allThreadNodes) {
+    for (const comment of thread.comments.nodes) {
+      if (comment.pullRequestReview.id !== reviewNodeId) continue;
+      comments.push({
+        id: comment.id,
+        nodeId: comment.id,
+        reviewId: comment.pullRequestReview.id,
+        filePath: thread.path,
+        lineNumber: comment.line ?? comment.originalLine ?? thread.line ?? thread.originalLine ?? 0,
+        side: mapSideFromGh(thread.diffSide),
+        content: comment.body,
+        authorName: comment.author.login,
+        createdAt: comment.createdAt,
+      });
+    }
+  }
+
+  return comments;
+}
+
+export async function createPendingReviewComment(
+  prNumber: number,
+  repo: string,
+  filePath: string,
+  lineNumber: number,
+  side: 'additions' | 'deletions',
+  content: string,
+  reviewNodeId: string,
+): Promise<DraftReviewComment> {
+  try {
+    const query = `
+      mutation($reviewId: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: String!) {
+        addPullRequestReviewThread(input: {
+          pullRequestReviewId: $reviewId
+          path: $path
+          line: $line
+          side: $side
+          body: $body
+        }) {
+          thread {
+            comments(first: 1) {
+              nodes {
+                databaseId
+                id
+                body
+                path
+                line: originalLine
+                author { login avatarUrl }
+                createdAt
+                pullRequestReview { id }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const stdout = await runGh([
+      'api', 'graphql',
+      '-f', `query=${query}`,
+      '-f', `reviewId=${reviewNodeId}`,
+      '-f', `path=${filePath}`,
+      '-F', `line=${lineNumber}`,
+      '-f', `side=${mapSideToGh(side)}`,
+      '-f', `body=${content}`,
+    ]);
+
+    const result = JSON.parse(stdout);
+    const node = result.data.addPullRequestReviewThread.thread.comments.nodes[0];
+    return {
+      id: node.id,
+      nodeId: node.id,
+      reviewId: node.pullRequestReview.id,
+      filePath: node.path,
+      lineNumber: node.line ?? lineNumber,
+      side,
+      content: node.body,
+      authorName: node.author.login,
+      createdAt: node.createdAt,
+    };
+  } catch (error) {
+    const classified = classifyGhError(error);
+    throw new Error(`${classified.code}: ${classified.message}`);
+  }
+}
+
+export interface UpdatedReviewComment {
+  id: string;
+  nodeId: string;
+  reviewId: string;
+  content: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export async function updatePendingReviewComment(
+  commentNodeId: string,
+  body: string,
+): Promise<UpdatedReviewComment> {
+  try {
+    const mutation = `
+      mutation($commentId: ID!, $body: String!) {
+        updatePullRequestReviewComment(input: {
+          pullRequestReviewCommentId: $commentId
+          body: $body
+        }) {
+          pullRequestReviewComment {
+            databaseId
+            id
+            body
+            author { login }
+            createdAt
+            pullRequestReview { id }
+          }
+        }
+      }
+    `;
+
+    const stdout = await runGh([
+      'api', 'graphql',
+      '-f', `query=${mutation}`,
+      '-f', `commentId=${commentNodeId}`,
+      '-f', `body=${body}`,
+    ]);
+
+    const result = JSON.parse(stdout);
+    const node = result.data.updatePullRequestReviewComment.pullRequestReviewComment;
+    return {
+      id: node.id,
+      nodeId: node.id,
+      reviewId: node.pullRequestReview.id,
+      content: node.body,
+      authorName: node.author.login,
+      createdAt: node.createdAt,
+    };
+  } catch (error) {
+    const classified = classifyGhError(error);
+    throw new Error(`${classified.code}: ${classified.message}`);
+  }
+}
+
+export async function deletePendingReviewComment(
+  commentNodeId: string,
+): Promise<void> {
+  try {
+    const mutation = `
+      mutation($commentId: ID!) {
+        deletePullRequestReviewComment(input: {
+          id: $commentId
+        }) {
+          pullRequestReviewComment { databaseId }
+        }
+      }
+    `;
+
+    await runGh([
+      'api', 'graphql',
+      '-f', `query=${mutation}`,
+      '-f', `commentId=${commentNodeId}`,
+    ]);
+  } catch (error) {
+    const classified = classifyGhError(error);
+    throw new Error(`${classified.code}: ${classified.message}`);
+  }
+}
+
+export async function submitPendingReview(
+  prNumber: number,
+  repo: string,
+  reviewNodeId: string,
+  event: SubmitReviewEvent,
+  body?: string,
+): Promise<void> {
+  try {
+    const eventMap: Record<SubmitReviewEvent, string> = {
+      COMMENT: 'COMMENT',
+      REQUEST_CHANGES: 'REQUEST_CHANGES',
+      APPROVE: 'APPROVE',
+    };
+
+    const mutation = `
+      mutation($reviewId: ID!, $event: PullRequestReviewEvent!, $body: String) {
+        submitPullRequestReview(input: {
+          pullRequestReviewId: $reviewId
+          event: $event
+          body: $body
+        }) {
+          pullRequestReview { state }
+        }
+      }
+    `;
+
+    const args = [
+      'api', 'graphql',
+      '-f', `query=${mutation}`,
+      '-f', `reviewId=${reviewNodeId}`,
+      '-f', `event=${eventMap[event]}`,
+    ];
+    if (body) {
+      args.push('-f', `body=${body}`);
+    }
+    await runGh(args);
+  } catch (error) {
+    const classified = classifyGhError(error);
+    throw new Error(`${classified.code}: ${classified.message}`);
   }
 }

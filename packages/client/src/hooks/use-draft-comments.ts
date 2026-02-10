@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  fetchDraftComments,
-  createDraftComment,
-  deleteDraftComment,
-  clearDraftComments,
-  type ServerDraftComment,
+  fetchDraftReview,
+  createDraftReviewComment,
+  updateDraftReviewComment,
+  deleteDraftReviewComment,
+  submitDraftReview as submitDraftReviewApi,
+  type ServerDraftReviewComment,
 } from '@/lib/api';
 import type { ReviewComment } from '@/types/review';
 
@@ -18,12 +19,17 @@ interface UseDraftCommentsReturn {
     side: 'additions' | 'deletions',
     content: string
   ) => Promise<void>;
+  updateDraftComment: (commentId: string, content: string) => Promise<void>;
   removeDraftComment: (commentId: string) => Promise<void>;
-  clearAllDraftComments: () => Promise<void>;
+  submitDraftReview: (
+    event: 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE',
+    body?: string
+  ) => Promise<void>;
+  draftCount: number;
   refetch: () => Promise<void>;
 }
 
-function transformDraftComment(draft: ServerDraftComment): ReviewComment {
+function transformDraftReviewComment(draft: ServerDraftReviewComment): ReviewComment {
   return {
     id: draft.id,
     filePath: draft.filePath,
@@ -33,6 +39,9 @@ function transformDraftComment(draft: ServerDraftComment): ReviewComment {
     author: { type: 'human', name: draft.authorName },
     createdAt: new Date(draft.createdAt),
     replies: [],
+    isDraft: true,
+    editable: true,
+    reviewId: draft.reviewId,
   };
 }
 
@@ -46,8 +55,8 @@ export function useDraftComments(): UseDraftCommentsReturn {
     setError(null);
 
     try {
-      const comments = await fetchDraftComments();
-      setDraftComments(comments.map(transformDraftComment));
+      const response = await fetchDraftReview();
+      setDraftComments(response.comments.map(transformDraftReviewComment));
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch draft comments'));
     } finally {
@@ -66,38 +75,53 @@ export function useDraftComments(): UseDraftCommentsReturn {
       side: 'additions' | 'deletions',
       content: string
     ) => {
-      const newComment = await createDraftComment(
+      const newComment = await createDraftReviewComment(
         filePath,
         lineNumber,
         side,
         content
       );
 
-      setDraftComments((prev) => [...prev, transformDraftComment(newComment)]);
+      setDraftComments((prev) => [...prev, transformDraftReviewComment(newComment)]);
+    },
+    []
+  );
+
+  const updateDraftComment = useCallback(
+    async (commentId: string, content: string) => {
+      const updated = await updateDraftReviewComment(commentId, content);
+      setDraftComments((prev) =>
+        prev.map((c) => (c.id === commentId ? transformDraftReviewComment(updated) : c))
+      );
     },
     []
   );
 
   const removeDraftComment = useCallback(
     async (commentId: string) => {
-      await deleteDraftComment(commentId);
+      await deleteDraftReviewComment(commentId);
       setDraftComments((prev) => prev.filter((c) => c.id !== commentId));
     },
     []
   );
 
-  const clearAllDraftComments = useCallback(async () => {
-    await clearDraftComments();
-    setDraftComments([]);
-  }, []);
+  const submitReview = useCallback(
+    async (event: 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE', body?: string) => {
+      await submitDraftReviewApi(event, body);
+      setDraftComments([]);
+    },
+    []
+  );
 
   return {
     draftComments,
     isLoading,
     error,
     addDraftComment,
+    updateDraftComment,
     removeDraftComment,
-    clearAllDraftComments,
+    submitDraftReview: submitReview,
+    draftCount: draftComments.length,
     refetch: fetchComments,
   };
 }

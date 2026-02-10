@@ -21,6 +21,9 @@ interface AnnotationRendererProps {
     lineNumber: number
   ) => void
   onSubmitReply?: (commentId: string, content: string) => Promise<void>
+  onEditDraft?: (commentId: string, content: string) => Promise<void>
+  onDeleteDraft?: (commentId: string) => Promise<void>
+  isDraftActionLoading?: boolean
 }
 
 export const AnnotationRenderer = memo(function AnnotationRenderer({
@@ -30,6 +33,9 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
   onSubmitDraft,
   onCancelDraft,
   onSubmitReply,
+  onEditDraft,
+  onDeleteDraft,
+  isDraftActionLoading,
 }: AnnotationRendererProps) {
   const meta = annotation.metadata
   if (!meta) return null
@@ -94,6 +100,9 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
       lineNumber={annotation.lineNumber}
       onReplySubmit={onSubmitReply}
       isSubmittingReply={submittingReplies.has(meta.comment.id)}
+      onEditDraft={onEditDraft}
+      onDeleteDraft={onDeleteDraft}
+      isDraftActionLoading={isDraftActionLoading}
     />
   )
 })

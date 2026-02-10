@@ -124,10 +124,15 @@ export async function fetchPRComments(signal?: AbortSignal): Promise<ServerPRCom
   return response.comments;
 }
 
-// Draft comments API
-interface ServerDraftComment {
+// Draft Review API (GitHub-backed)
+interface ServerDraftReview {
   id: string;
-  prNumber: number;
+  state: 'PENDING';
+}
+
+interface ServerDraftReviewComment {
+  id: string;
+  reviewId: string;
   filePath: string;
   lineNumber: number;
   side: 'additions' | 'deletions';
@@ -136,42 +141,64 @@ interface ServerDraftComment {
   createdAt: string;
 }
 
-interface DraftCommentsResponse {
-  comments: ServerDraftComment[];
+interface DraftReviewResponse {
+  review: ServerDraftReview | null;
+  comments: ServerDraftReviewComment[];
 }
 
-interface CreateDraftCommentResponse {
-  comment: ServerDraftComment;
+interface CreateDraftReviewCommentResponse {
+  comment: ServerDraftReviewComment;
 }
 
-export async function fetchDraftComments(): Promise<ServerDraftComment[]> {
-  const response = await fetchApi<DraftCommentsResponse>('/draft-comments');
-  return response.comments;
+interface UpdateDraftReviewCommentResponse {
+  comment: ServerDraftReviewComment;
 }
 
-export async function createDraftComment(
+interface SubmitDraftReviewResponse {
+  submitted: boolean;
+}
+
+export async function fetchDraftReview(): Promise<DraftReviewResponse> {
+  return fetchApi<DraftReviewResponse>('/reviews/draft');
+}
+
+export async function createDraftReviewComment(
   filePath: string,
   lineNumber: number,
   side: 'additions' | 'deletions',
   content: string,
-  authorName = 'You'
-): Promise<ServerDraftComment> {
-  const response = await fetchApi<CreateDraftCommentResponse>('/draft-comments', {
+): Promise<ServerDraftReviewComment> {
+  const response = await fetchApi<CreateDraftReviewCommentResponse>('/reviews/draft/comments', {
     method: 'POST',
-    body: JSON.stringify({ filePath, lineNumber, side, content, authorName }),
+    body: JSON.stringify({ filePath, lineNumber, side, content }),
   });
   return response.comment;
 }
 
-export async function deleteDraftComment(commentId: string): Promise<void> {
-  await fetchApi(`/draft-comments/${commentId}`, {
+export async function updateDraftReviewComment(
+  commentId: string,
+  content: string,
+): Promise<ServerDraftReviewComment> {
+  const response = await fetchApi<UpdateDraftReviewCommentResponse>(`/reviews/draft/comments/${commentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
+  });
+  return response.comment;
+}
+
+export async function deleteDraftReviewComment(commentId: string): Promise<void> {
+  await fetchApi(`/reviews/draft/comments/${commentId}`, {
     method: 'DELETE',
   });
 }
 
-export async function clearDraftComments(): Promise<void> {
-  await fetchApi('/draft-comments', {
-    method: 'DELETE',
+export async function submitDraftReview(
+  event: 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE',
+  body?: string,
+): Promise<SubmitDraftReviewResponse> {
+  return fetchApi<SubmitDraftReviewResponse>('/reviews/draft/submit', {
+    method: 'POST',
+    body: JSON.stringify({ event, body }),
   });
 }
 
@@ -272,4 +299,4 @@ export async function fetchModels(): Promise<ModelOption[]> {
   return response.models;
 }
 
-export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerDraftComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile, RefreshResponse };
+export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile, RefreshResponse, ServerDraftReview, ServerDraftReviewComment, DraftReviewResponse };

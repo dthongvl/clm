@@ -35,6 +35,5 @@ export function removeStorageItem(key: string): void {
 export const StorageKeys = {
   MAIN_LAYOUT_SIZES: "main-layout-sizes",
   SIDE_PANEL_TAB: "side-panel-tab",
-  CHAT_OPEN: "chat-open",
   DIFF_VIEW_MODE: "diff-view-mode",
 } as const

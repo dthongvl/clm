@@ -5,16 +5,15 @@ import { logger, createLoggerMiddleware } from './lib/logger.js';
 import { initAppContext, getAppContext } from './lib/app-context.js';
 import diffRoutes from './routes/diff.js';
 import commentRoutes from './routes/comments.js';
-import draftCommentRoutes from './routes/draft-comments.js';
 import aiReviewRoutes from './routes/ai-review.js';
 import prInfoRoutes from './routes/pr-info.js';
-import chatRoutes from './routes/chat.js';
 import groupingRoutes from './routes/grouping.js';
 import relatedFilesRoutes from './routes/related-files.js';
 import patternVerificationRoutes from './routes/pattern-verification.js';
 import refreshRoutes from './routes/refresh.js';
 import settingsRoutes from './routes/settings.js';
 import modelsRoutes from './routes/models.js';
+import reviewRoutes from './routes/reviews.js';
 
 initAppContext();
 
@@ -46,7 +45,6 @@ app.route('/api/ai/review', aiReviewRoutes);
 app.route('/api/ai/grouping', groupingRoutes);
 app.route('/api/ai/related-files', relatedFilesRoutes);
 app.route('/api/ai/pattern-verification', patternVerificationRoutes);
-app.route('/api/ai/chat', chatRoutes);
 
 // API routes — Git/GitHub operations
 app.route('/api/git/diff', diffRoutes);
@@ -55,7 +53,7 @@ app.route('/api/git/pr-info', prInfoRoutes);
 app.route('/api/git/refresh', refreshRoutes);
 
 // API routes — App-level
-app.route('/api/draft-comments', draftCommentRoutes);
+app.route('/api/reviews', reviewRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/models', modelsRoutes);
 

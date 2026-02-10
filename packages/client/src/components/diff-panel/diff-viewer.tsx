@@ -77,6 +77,12 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   ) => Promise<void>
   /** AI review items to display as comment threads */
   aiReviewItems?: AIReviewItem[]
+  /** Callback when a draft comment is edited */
+  onEditDraft?: (commentId: string, content: string) => Promise<void>
+  /** Callback when a draft comment is deleted */
+  onDeleteDraft?: (commentId: string) => Promise<void>
+  /** Whether a draft action (edit/delete) is currently loading */
+  isDraftActionLoading?: boolean
 }
 
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -199,6 +205,9 @@ function DiffViewer({
   onCommentSubmit,
   onReplySubmit,
   aiReviewItems = [],
+  onEditDraft,
+  onDeleteDraft,
+  isDraftActionLoading,
   ...props
 }: DiffViewerProps) {
   // Get current theme from theme provider
@@ -420,11 +429,14 @@ function DiffViewer({
               onSubmitDraft={submitDraftAnnotation}
               onCancelDraft={cancelDraftAnnotation}
               onSubmitReply={onReplySubmit ? submitReply : undefined}
+              onEditDraft={onEditDraft}
+              onDeleteDraft={onDeleteDraft}
+              isDraftActionLoading={isDraftActionLoading}
               onLineClick={onLineClick}
             />
           ))}
 
-        {/* Footer spacer to avoid overlap with floating chat trigger */}
+        {/* Footer spacer */}
         <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
           <span>🎉 You've reached the end — happy reviewing!</span>
         </div>

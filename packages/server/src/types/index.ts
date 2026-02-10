@@ -59,24 +59,6 @@ export interface AIReviewResult {
   summary?: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-}
-
-export interface DraftComment {
-  id: string;
-  prNumber: number;
-  filePath: string;
-  lineNumber: number;
-  side: 'additions' | 'deletions';
-  content: string;
-  authorName: string;
-  createdAt: string;
-}
-
 export type RiskLevel = 'high' | 'medium' | 'low';
 
 export interface ChangeGroup {
@@ -136,4 +118,23 @@ export interface PatternVerification {
 export interface PatternVerificationResult {
   verifications: PatternVerification[];
   summary: string;
+}
+
+export type SubmitReviewEvent = 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE';
+
+export interface DraftReview {
+  id: string;
+  state: 'PENDING';
+}
+
+export interface DraftReviewComment {
+  id: string;
+  nodeId: string;
+  reviewId: string;
+  filePath: string;
+  lineNumber: number;
+  side: 'additions' | 'deletions';
+  content: string;
+  authorName: string;
+  createdAt: string;
 }
