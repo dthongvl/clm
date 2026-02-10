@@ -36,4 +36,5 @@ export const StorageKeys = {
   MAIN_LAYOUT_SIZES: "main-layout-sizes",
   SIDE_PANEL_TAB: "side-panel-tab",
   DIFF_VIEW_MODE: "diff-view-mode",
+  PR_FILE_TREE_VISIBLE: "pr-file-tree-visible",
 } as const
