@@ -40,6 +40,10 @@ export interface InlineCommentThreadProps {
   onDeleteDraft?: (commentId: string) => Promise<void>
   /** Whether a draft action (edit/delete) is currently loading */
   isDraftActionLoading?: boolean
+  /** Callback when an AI comment is converted to a draft */
+  onConvertToDraft?: () => Promise<void>
+  /** Whether the AI comment is currently being converted to a draft */
+  isConvertingToDraft?: boolean
 }
 
 /**
@@ -182,6 +186,8 @@ function InlineCommentThread({
   onEditDraft,
   onDeleteDraft,
   isDraftActionLoading,
+  onConvertToDraft,
+  isConvertingToDraft,
 }: InlineCommentThreadProps) {
   const [isReplyFormOpen, setIsReplyFormOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -189,6 +195,8 @@ function InlineCommentThread({
   const [isDeletePopoverOpen, setIsDeletePopoverOpen] = useState(false)
   const hasReplies = comment.replies && comment.replies.length > 0
   const isDraftEditable = comment.isDraft && comment.editable
+  const isAIComment = comment.author.type === "ai"
+  const canConvertToDraft = isAIComment && onConvertToDraft
 
   const handleReplySubmit = async (content: string) => {
     if (!onReplySubmit) return
@@ -307,29 +315,52 @@ function InlineCommentThread({
         )}
         {!isDraftEditable && !isEditing && (
           <>
-            {!isReplyFormOpen ? (
+            {canConvertToDraft && (
               <Button
                 variant="ghost"
                 size="xs"
                 className="-ml-2 text-muted-foreground hover:text-foreground"
-                onClick={() => setIsReplyFormOpen(true)}
-                aria-label="Reply to this thread"
+                onClick={onConvertToDraft}
+                disabled={isConvertingToDraft}
+                aria-label="Add this AI suggestion to your draft review"
               >
-                Reply
+                {isConvertingToDraft ? (
+                  <>
+                    <HugeiconsIcon icon={Loading03Icon} className="mr-1 size-3 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add to draft"
+                )}
               </Button>
-            ) : (
-              <div className="w-full">
-                <CommentForm
-                  variant="default"
-                  size="sm"
-                  autoFocus
-                  showKeyboardHints
-                  placeholder="Write a reply..."
-                  onSubmit={handleReplySubmit}
-                  onCancel={() => setIsReplyFormOpen(false)}
-                  isLoading={isSubmittingReply}
-                />
-              </div>
+            )}
+            {onReplySubmit && !canConvertToDraft && (
+              <>
+                {!isReplyFormOpen ? (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="-ml-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsReplyFormOpen(true)}
+                    aria-label="Reply to this thread"
+                  >
+                    Reply
+                  </Button>
+                ) : (
+                  <div className="w-full">
+                    <CommentForm
+                      variant="default"
+                      size="sm"
+                      autoFocus
+                      showKeyboardHints
+                      placeholder="Write a reply..."
+                      onSubmit={handleReplySubmit}
+                      onCancel={() => setIsReplyFormOpen(false)}
+                      isLoading={isSubmittingReply}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

@@ -83,6 +83,10 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   onDeleteDraft?: (commentId: string) => Promise<void>
   /** Whether a draft action (edit/delete) is currently loading */
   isDraftActionLoading?: boolean
+  /** Callback to convert an AI review item to a draft comment */
+  onConvertAIToDraft?: (itemId: string) => Promise<void>
+  /** Set of AI item IDs currently being converted */
+  convertingAIItemIds?: Set<string>
 }
 
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -208,6 +212,8 @@ function DiffViewer({
   onEditDraft,
   onDeleteDraft,
   isDraftActionLoading,
+  onConvertAIToDraft,
+  convertingAIItemIds,
   ...props
 }: DiffViewerProps) {
   // Get current theme from theme provider
@@ -433,6 +439,8 @@ function DiffViewer({
               onDeleteDraft={onDeleteDraft}
               isDraftActionLoading={isDraftActionLoading}
               onLineClick={onLineClick}
+              onConvertAIToDraft={onConvertAIToDraft}
+              convertingAIItemIds={convertingAIItemIds}
             />
           ))}
 

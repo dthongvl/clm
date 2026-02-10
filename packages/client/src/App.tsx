@@ -41,6 +41,10 @@ export function App() {
 
   const [isDraftActionLoading, setIsDraftActionLoading] = useState(false)
 
+  // AI comment to draft conversion state
+  const [convertingAIItemIds, setConvertingAIItemIds] = useState<Set<string>>(new Set())
+  const [convertedAIItemIds, setConvertedAIItemIds] = useState<Set<string>>(new Set())
+
   const [isRefreshing, setIsRefreshing] = useState(false)
   
   const handleRefresh = useCallback(async () => {
@@ -90,6 +94,36 @@ export function App() {
     }
   }, [removeDraftComment])
 
+  const handleConvertAIToDraft = useCallback(async (itemId: string) => {
+    // Find the AI review item
+    const item = aiReviewItems.find((i) => i.id === itemId)
+    if (!item) return
+
+    // Format content consistently with how it's displayed
+    const content = item.suggestion
+      ? `${item.message}\n\n**Suggestion:** ${item.suggestion}`
+      : item.message
+
+    setConvertingAIItemIds((prev) => new Set(prev).add(itemId))
+
+    try {
+      await addDraftComment(item.filePath, item.lineNumber, "additions", content)
+      // Mark as converted to hide from UI
+      setConvertedAIItemIds((prev) => new Set(prev).add(itemId))
+      toast.success("Added to draft review")
+    } catch (error) {
+      toast.error("Failed to add to draft", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      })
+    } finally {
+      setConvertingAIItemIds((prev) => {
+        const next = new Set(prev)
+        next.delete(itemId)
+        return next
+      })
+    }
+  }, [aiReviewItems, addDraftComment])
+
   const handleSubmitReview = useCallback(async (
     event: 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE',
     body?: string
@@ -107,9 +141,9 @@ export function App() {
   }, [handleSubmitDraftReview, refetchComments])
 
   const {
-    groups, 
-    generateGroups, 
-    isGeneratingGroups, 
+    groups,
+    generateGroups,
+    isGeneratingGroups,
     error: groupingError,
     items: aiReviewItems,
     triggerReview,
@@ -117,6 +151,12 @@ export function App() {
   } = useAIReview({
     autoGenerate: false,
   })
+
+  // Filter out AI review items that have been converted to drafts
+  const visibleAIReviewItems = useMemo(
+    () => aiReviewItems.filter((item) => !convertedAIItemIds.has(item.id)),
+    [aiReviewItems, convertedAIItemIds]
+  )
 
   const {
     files: relatedFiles,
@@ -247,11 +287,13 @@ export function App() {
                 <DiffPanel.Viewer
                   files={files}
                   annotations={annotations}
-                  aiReviewItems={aiReviewItems}
+                  aiReviewItems={visibleAIReviewItems}
                   onCommentSubmit={handleCommentSubmit}
                   onEditDraft={handleEditDraft}
                   onDeleteDraft={handleDeleteDraft}
                   isDraftActionLoading={isDraftActionLoading}
+                  onConvertAIToDraft={handleConvertAIToDraft}
+                  convertingAIItemIds={convertingAIItemIds}
                 />
               )}
             </DiffPanel.Root>
@@ -300,7 +342,7 @@ export function App() {
                   />
                 </div>
                 <AIReviewSummary
-                  items={aiReviewItems}
+                  items={visibleAIReviewItems}
                   onItemClick={(item) => {
                     scrollToAnnotation(item.filePath, item.lineNumber)
                   }}

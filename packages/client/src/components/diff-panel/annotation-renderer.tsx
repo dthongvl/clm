@@ -24,6 +24,10 @@ interface AnnotationRendererProps {
   onEditDraft?: (commentId: string, content: string) => Promise<void>
   onDeleteDraft?: (commentId: string) => Promise<void>
   isDraftActionLoading?: boolean
+  /** Callback to convert an AI review item to a draft comment */
+  onConvertAIToDraft?: (itemId: string) => Promise<void>
+  /** Set of AI item IDs currently being converted */
+  convertingAIItemIds?: Set<string>
 }
 
 export const AnnotationRenderer = memo(function AnnotationRenderer({
@@ -36,6 +40,8 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
   onEditDraft,
   onDeleteDraft,
   isDraftActionLoading,
+  onConvertAIToDraft,
+  convertingAIItemIds,
 }: AnnotationRendererProps) {
   const meta = annotation.metadata
   if (!meta) return null
@@ -86,10 +92,18 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
       replies: [],
     }
 
+    const isConverting = convertingAIItemIds?.has(meta.item.id) ?? false
+
     return (
       <CommentThread.Inline
         comment={aiComment}
         lineNumber={annotation.lineNumber}
+        onConvertToDraft={
+          onConvertAIToDraft
+            ? () => onConvertAIToDraft(meta.item.id)
+            : undefined
+        }
+        isConvertingToDraft={isConverting}
       />
     )
   }

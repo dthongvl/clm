@@ -49,6 +49,8 @@ interface FileDiffCardProps {
     line: number,
     side: "additions" | "deletions"
   ) => void
+  onConvertAIToDraft?: (itemId: string) => Promise<void>
+  convertingAIItemIds?: Set<string>
 }
 
 export const FileDiffCard = memo(function FileDiffCard({
@@ -70,6 +72,8 @@ export const FileDiffCard = memo(function FileDiffCard({
   onDeleteDraft,
   isDraftActionLoading,
   onLineClick,
+  onConvertAIToDraft,
+  convertingAIItemIds,
 }: FileDiffCardProps) {
   const oldFile = useMemo(
     () => toFileContents(file.oldPath ?? file.path, file.oldContent),
@@ -159,6 +163,8 @@ export const FileDiffCard = memo(function FileDiffCard({
               onEditDraft={onEditDraft}
               onDeleteDraft={onDeleteDraft}
               isDraftActionLoading={isDraftActionLoading}
+              onConvertAIToDraft={onConvertAIToDraft}
+              convertingAIItemIds={convertingAIItemIds}
             />
           )}
         />
