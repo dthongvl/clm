@@ -136,5 +136,6 @@ export interface DraftReviewComment {
   side: 'additions' | 'deletions';
   content: string;
   authorName: string;
+  authorAvatarUrl: string;
   createdAt: string;
 }

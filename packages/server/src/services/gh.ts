@@ -361,7 +361,7 @@ export async function listPendingReviewComments(
                   body
                   line
                   originalLine
-                  author { login }
+                  author { login avatarUrl }
                   createdAt
                   pullRequestReview { id }
                 }
@@ -385,7 +385,7 @@ export async function listPendingReviewComments(
         body: string;
         line: number | null;
         originalLine: number | null;
-        author: { login: string };
+        author: { login: string; avatarUrl: string };
         createdAt: string;
         pullRequestReview: { id: string };
       }>;
@@ -427,6 +427,7 @@ export async function listPendingReviewComments(
         side: mapSideFromGh(thread.diffSide),
         content: comment.body,
         authorName: comment.author.login,
+        authorAvatarUrl: comment.author.avatarUrl,
         createdAt: comment.createdAt,
       });
     }
@@ -493,6 +494,7 @@ export async function createPendingReviewComment(
       side,
       content: node.body,
       authorName: node.author.login,
+      authorAvatarUrl: node.author.avatarUrl,
       createdAt: node.createdAt,
     };
   } catch (error) {
@@ -507,6 +509,7 @@ export interface UpdatedReviewComment {
   reviewId: string;
   content: string;
   authorName: string;
+  authorAvatarUrl: string;
   createdAt: string;
 }
 
@@ -525,7 +528,7 @@ export async function updatePendingReviewComment(
             databaseId
             id
             body
-            author { login }
+            author { login avatarUrl }
             createdAt
             pullRequestReview { id }
           }
@@ -548,6 +551,7 @@ export async function updatePendingReviewComment(
       reviewId: node.pullRequestReview.id,
       content: node.body,
       authorName: node.author.login,
+      authorAvatarUrl: node.author.avatarUrl,
       createdAt: node.createdAt,
     };
   } catch (error) {

@@ -47,7 +47,7 @@ function CollapsibleFileHeader({
     <div
       data-slot="collapsible-file-header"
       className={cn(
-        "flex items-center justify-between gap-2 border-b border-border bg-muted/50 px-3 py-2",
+        "sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-muted/50 px-3 py-2 backdrop-blur-sm",
         className
       )}
     >

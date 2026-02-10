@@ -36,7 +36,7 @@ function transformDraftReviewComment(draft: ServerDraftReviewComment): ReviewCom
     lineNumber: draft.lineNumber,
     side: draft.side,
     content: draft.content,
-    author: { type: 'human', name: draft.authorName },
+    author: { type: 'human', name: draft.authorName, avatarUrl: draft.authorAvatarUrl },
     createdAt: new Date(draft.createdAt),
     replies: [],
     isDraft: true,
