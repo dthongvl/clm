@@ -111,10 +111,21 @@ function CommentForm({
   // Auto-focus textarea on mount
   React.useEffect(() => {
     if (!autoFocus) return
-    const timer = setTimeout(() => {
-      textareaRef.current?.focus()
-    }, 0)
-    return () => clearTimeout(timer)
+
+    const textarea = textareaRef.current
+    if (!textarea || document.activeElement === textarea) return
+
+    const frame = requestAnimationFrame(() => {
+      if (!textarea.isConnected || document.activeElement === textarea) return
+
+      try {
+        textarea.focus({ preventScroll: true })
+      } catch {
+        textarea.focus()
+      }
+    })
+
+    return () => cancelAnimationFrame(frame)
   }, [autoFocus])
 
   const handleSubmit = React.useCallback(
