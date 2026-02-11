@@ -1,7 +1,7 @@
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
-import { getModelForAction } from './settings.js';
+import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 
 /**
@@ -14,7 +14,8 @@ export async function generateGrouping(prLink: string): Promise<GroupingResult> 
   
   try {
     const model = await getModelForAction('grouping');
-    const response = await opencodeClient.prompt(prompt, { model });
+    const variant = await getVariantForAction('grouping');
+    const response = await opencodeClient.prompt(prompt, { model, variant });
     return parseGroupingOutput(response);
   } catch (error) {
     logger.error('Grouping generation failed', error);

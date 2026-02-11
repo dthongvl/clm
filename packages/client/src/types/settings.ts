@@ -2,6 +2,7 @@ export type ActionKey = "grouping" | "ai-review" | "pattern-verification" | "rel
 
 export interface ActionSettings {
   model?: string
+  variant?: string
 }
 
 export interface Settings {
@@ -15,4 +16,7 @@ export interface ModelOption {
   id: string
   name: string
   provider: string
+  providerId: string
+  modelId: string
+  variants: string[]
 }

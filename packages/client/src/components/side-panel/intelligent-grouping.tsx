@@ -15,7 +15,8 @@ export interface IntelligentGroupingProps extends React.ComponentProps<"div"> {
   error?: Error | null
   models?: ModelOption[]
   currentModel?: string
-  onModelChange?: (model: string) => void
+  currentVariant?: string
+  onModelChange?: (model: string, variant?: string) => void
 }
 
 function IntelligentGrouping({
@@ -27,6 +28,7 @@ function IntelligentGrouping({
   error,
   models,
   currentModel,
+  currentVariant,
   onModelChange,
   ...props
 }: IntelligentGroupingProps) {
@@ -59,6 +61,7 @@ function IntelligentGrouping({
               actionKey="grouping"
               models={models}
               currentModel={currentModel}
+              currentVariant={currentVariant}
               onModelChange={onModelChange}
             />
           )}

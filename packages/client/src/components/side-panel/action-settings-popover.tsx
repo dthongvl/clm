@@ -21,11 +21,17 @@ interface ModelGroup {
   items: ModelOption[]
 }
 
+interface VariantOption {
+  value: string
+  label: string
+}
+
 interface ActionSettingsPopoverProps {
   actionKey: ActionKey
   models: ModelOption[]
   currentModel?: string
-  onModelChange: (model: string) => void
+  currentVariant?: string
+  onModelChange: (model: string, variant?: string) => void
   isLoading?: boolean
 }
 
@@ -33,6 +39,7 @@ function ActionSettingsPopover({
   actionKey,
   models,
   currentModel,
+  currentVariant,
   onModelChange,
   isLoading,
 }: ActionSettingsPopoverProps) {
@@ -52,6 +59,22 @@ function ActionSettingsPopover({
   const selectedModel = React.useMemo(
     () => models.find((m) => m.id === currentModel) ?? null,
     [models, currentModel],
+  )
+
+  const availableVariants = selectedModel?.variants ?? []
+  const hasVariants = availableVariants.length > 0
+
+  const variantOptions = React.useMemo<VariantOption[]>(() => {
+    const options: VariantOption[] = [{ value: "", label: "Provider default" }]
+    for (const variant of availableVariants) {
+      options.push({ value: variant, label: variant })
+    }
+    return options
+  }, [availableVariants])
+
+  const selectedVariant = React.useMemo(
+    () => variantOptions.find((v) => v.value === (currentVariant ?? "")) ?? variantOptions[0],
+    [variantOptions, currentVariant],
   )
 
   return (
@@ -78,7 +101,10 @@ function ActionSettingsPopover({
                 items={groups}
                 value={selectedModel}
                 onValueChange={(value) => {
-                  if (value) onModelChange(value.id)
+                  if (value) {
+                    // Clear variant when model changes (variant may not be valid for new model)
+                    onModelChange(value.id, undefined)
+                  }
                 }}
                 disabled={isLoading}
                 isItemEqualToValue={(a, b) => a.id === b.id}
@@ -107,6 +133,42 @@ function ActionSettingsPopover({
                   </ComboboxList>
                 </ComboboxContent>
               </Combobox>
+              {hasVariants && (
+                <>
+                  <label className="text-xs font-medium text-muted-foreground mt-2">
+                    Variant
+                  </label>
+                  <Combobox
+                    items={variantOptions}
+                    value={selectedVariant}
+                    onValueChange={(value) => {
+                      if (currentModel) {
+                        const variant = value?.value || undefined
+                        onModelChange(currentModel, variant)
+                      }
+                    }}
+                    disabled={isLoading}
+                    isItemEqualToValue={(a, b) => a.value === b.value}
+                    itemToStringLabel={(item) => item.label}
+                    itemToStringValue={(item) => item.value}
+                  >
+                    <ComboboxInput
+                      placeholder="Search variants..."
+                      className="w-full"
+                    />
+                    <ComboboxContent sideOffset={6}>
+                      <ComboboxEmpty>No variants found</ComboboxEmpty>
+                      <ComboboxList>
+                        {(item: VariantOption) => (
+                          <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                </>
+              )}
             </div>
           </Popover.Popup>
         </Popover.Positioner>

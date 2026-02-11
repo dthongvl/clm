@@ -1,7 +1,7 @@
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
 import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
-import { getModelForAction } from './settings.js';
+import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 
 /**
@@ -14,7 +14,8 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
   
   try {
     const model = await getModelForAction('ai-review');
-    const response = await opencodeClient.prompt(prompt, { model });
+    const variant = await getVariantForAction('ai-review');
+    const response = await opencodeClient.prompt(prompt, { model, variant });
     return parseReviewOutput(response);
   } catch (error) {
     logger.error('AI review generation failed', error);

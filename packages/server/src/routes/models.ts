@@ -8,6 +8,9 @@ interface ModelOption {
   id: string;
   name: string;
   provider: string;
+  providerId: string;
+  modelId: string;
+  variants: string[];
 }
 
 // GET /api/models - List available models from connected providers
@@ -29,10 +32,14 @@ app.get('/', async (c) => {
       if (!connectedSet.has(provider.id)) continue;
 
       for (const [modelId, model] of Object.entries(provider.models)) {
+        const variants = Object.keys((model as { variants?: Record<string, unknown> }).variants ?? {});
         models.push({
           id: `${provider.id}/${modelId}`,
           name: model.name,
           provider: provider.name,
+          providerId: provider.id,
+          modelId,
+          variants,
         });
       }
     }

@@ -347,7 +347,8 @@ export function App() {
                   error={groupingError}
                   models={models}
                   currentModel={settings?.grouping?.model}
-                  onModelChange={(model) => updateActionModel("grouping", model)}
+                  currentVariant={settings?.grouping?.variant}
+                  onModelChange={(model, variant) => updateActionModel("grouping", model, variant)}
                 />
               </SidePanelGroupingContent>
               <SidePanelAIReviewContent>
@@ -365,7 +366,8 @@ export function App() {
                     actionKey="ai-review"
                     models={models}
                     currentModel={settings?.["ai-review"]?.model}
-                    onModelChange={(model) => updateActionModel("ai-review", model)}
+                    currentVariant={settings?.["ai-review"]?.variant}
+                    onModelChange={(model, variant) => updateActionModel("ai-review", model, variant)}
                   />
                 </div>
                 <AIReviewSummary
@@ -386,7 +388,8 @@ export function App() {
                     }}
                     models={models}
                     currentModel={settings?.["pattern-verification"]?.model}
-                    onModelChange={(model) => updateActionModel("pattern-verification", model)}
+                    currentVariant={settings?.["pattern-verification"]?.variant}
+                    onModelChange={(model, variant) => updateActionModel("pattern-verification", model, variant)}
                   />
                 </div>
               </SidePanelAIReviewContent>
@@ -399,7 +402,8 @@ export function App() {
                   error={relatedFilesError}
                   models={models}
                   currentModel={settings?.["related-files"]?.model}
-                  onModelChange={(model) => updateActionModel("related-files", model)}
+                  currentVariant={settings?.["related-files"]?.variant}
+                  onModelChange={(model, variant) => updateActionModel("related-files", model, variant)}
                 />
               </SidePanelRelatedFilesContent>
             </SidePanel>

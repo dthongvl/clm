@@ -15,6 +15,7 @@ const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
 
 export interface ActionSettings {
   model?: string;
+  variant?: string;
 }
 
 export interface Settings {
@@ -81,4 +82,9 @@ export async function updateSettings(partial: Partial<Settings>): Promise<Settin
 export async function getModelForAction(action: ActionKey): Promise<string> {
   const settings = await getSettings();
   return settings[action]?.model || DEFAULT_MODEL;
+}
+
+export async function getVariantForAction(action: ActionKey): Promise<string | undefined> {
+  const settings = await getSettings();
+  return settings[action]?.variant;
 }

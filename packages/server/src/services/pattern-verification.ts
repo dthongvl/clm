@@ -1,7 +1,7 @@
 import type { PatternVerification, PatternVerificationResult, PatternLocation } from '../types/index.js';
 import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
-import { getModelForAction } from './settings.js';
+import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 
 export async function verifyPatterns(prLink: string): Promise<PatternVerificationResult> {
@@ -9,7 +9,8 @@ export async function verifyPatterns(prLink: string): Promise<PatternVerificatio
   
   try {
     const model = await getModelForAction('pattern-verification');
-    const response = await opencodeClient.prompt(prompt, { model });
+    const variant = await getVariantForAction('pattern-verification');
+    const response = await opencodeClient.prompt(prompt, { model, variant });
     return parseVerificationOutput(response);
   } catch (error) {
     logger.error('Pattern verification failed', error);

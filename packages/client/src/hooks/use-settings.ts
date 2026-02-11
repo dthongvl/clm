@@ -6,7 +6,7 @@ interface UseSettingsReturn {
   settings: Settings | null
   isLoading: boolean
   error: Error | null
-  updateActionModel: (action: ActionKey, model: string) => Promise<void>
+  updateActionModel: (action: ActionKey, model: string, variant?: string) => Promise<void>
 }
 
 export function useSettings(): UseSettingsReturn {
@@ -32,15 +32,15 @@ export function useSettings(): UseSettingsReturn {
     return () => { cancelled = true }
   }, [])
 
-  const updateActionModel = useCallback(async (action: ActionKey, model: string) => {
+  const updateActionModel = useCallback(async (action: ActionKey, model: string, variant?: string) => {
     // Optimistic update
     setSettings((prev) => {
       if (!prev) return prev
-      return { ...prev, [action]: { ...prev[action], model } }
+      return { ...prev, [action]: { ...prev[action], model, variant } }
     })
 
     try {
-      const updated = await updateSettingsApi({ [action]: { model } })
+      const updated = await updateSettingsApi({ [action]: { model, variant } })
       setSettings(updated)
     } catch (err) {
       console.error('Failed to update settings:', err)

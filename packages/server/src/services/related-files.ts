@@ -1,7 +1,7 @@
 import type { RelatedFilesResult, RelatedFile } from '../types/index.js';
 import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
-import { getModelForAction } from './settings.js';
+import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 
 /**
@@ -14,7 +14,8 @@ export async function findRelatedFiles(prLink: string): Promise<RelatedFilesResu
   
   try {
     const model = await getModelForAction('related-files');
-    const response = await opencodeClient.prompt(prompt, { model });
+    const variant = await getVariantForAction('related-files');
+    const response = await opencodeClient.prompt(prompt, { model, variant });
     return parseRelatedFilesOutput(response);
   } catch (error) {
     logger.error('Related files analysis failed', error);

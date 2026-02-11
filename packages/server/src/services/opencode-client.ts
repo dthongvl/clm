@@ -3,14 +3,15 @@ import { logger } from '../lib/logger.js';
 
 const OPENCODE_URL = process.env.OPENCODE_URL || 'http://127.0.0.1:4096';
 
-function parseModelString(model: string): { providerID: string; modelID: string } {
+function parseModelString(model: string, variant?: string): { providerID: string; modelID: string; variant?: string } {
   const [providerID, ...rest] = model.split('/');
   const modelID = rest.join('/') || providerID;
-  return { providerID: providerID || 'anthropic', modelID };
+  return { providerID: providerID || 'anthropic', modelID, ...(variant && { variant }) };
 }
 
 export interface PromptOptions {
   model?: string;
+  variant?: string;
   sessionId?: string;
 }
 
@@ -52,7 +53,11 @@ class OpenCodeClient {
     const sessionId = sessionResult.data.id;
 
     // Build model config if provided
-    const modelConfig = options.model ? parseModelString(options.model) : undefined;
+    const modelConfig = options.model ? parseModelString(options.model, options.variant) : undefined;
+
+    if (modelConfig?.variant) {
+      logger.debug(`Using model variant: ${modelConfig.providerID}/${modelConfig.modelID} [${modelConfig.variant}]`);
+    }
 
     // Send prompt and wait for response
     const response = await client.session.prompt({
@@ -98,10 +103,17 @@ class OpenCodeClient {
       throw new Error('Failed to subscribe to events');
     }
 
+    // Build model config if provided
+    const modelConfig = options.model ? parseModelString(options.model, options.variant) : undefined;
+
+    if (modelConfig?.variant) {
+      logger.debug(`Using model variant (stream): ${modelConfig.providerID}/${modelConfig.modelID} [${modelConfig.variant}]`);
+    }
+
     // Send prompt async (fire and forget)
     const promptBody = {
       parts: [{ type: 'text' as const, text: message }],
-      ...(options.model && { model: options.model }),
+      ...(modelConfig && { model: modelConfig }),
     };
 
     fetch(`${this.baseUrl}/session/${sessionId}/prompt_async`, {

@@ -21,7 +21,8 @@ interface PatternVerificationPanelProps extends React.ComponentProps<"div"> {
   onLocationClick?: (filePath: string, lineNumber: number) => void;
   models?: ModelOption[];
   currentModel?: string;
-  onModelChange?: (model: string) => void;
+  currentVariant?: string;
+  onModelChange?: (model: string, variant?: string) => void;
 }
 
 function PatternVerificationPanel({
@@ -33,6 +34,7 @@ function PatternVerificationPanel({
   onLocationClick,
   models,
   currentModel,
+  currentVariant,
   onModelChange,
   ...props
 }: PatternVerificationPanelProps) {
@@ -64,6 +66,7 @@ function PatternVerificationPanel({
             actionKey="pattern-verification"
             models={models}
             currentModel={currentModel}
+            currentVariant={currentVariant}
             onModelChange={onModelChange}
           />
         )}

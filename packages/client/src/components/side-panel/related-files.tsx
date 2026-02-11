@@ -14,7 +14,8 @@ export interface RelatedFilesProps extends React.ComponentProps<"div"> {
   error?: Error | null
   models?: ModelOption[]
   currentModel?: string
-  onModelChange?: (model: string) => void
+  currentVariant?: string
+  onModelChange?: (model: string, variant?: string) => void
 }
 
 function RelatedFiles({
@@ -26,6 +27,7 @@ function RelatedFiles({
   error,
   models,
   currentModel,
+  currentVariant,
   onModelChange,
   ...props
 }: RelatedFilesProps) {
@@ -58,6 +60,7 @@ function RelatedFiles({
               actionKey="related-files"
               models={models}
               currentModel={currentModel}
+              currentVariant={currentVariant}
               onModelChange={onModelChange}
             />
           )}
