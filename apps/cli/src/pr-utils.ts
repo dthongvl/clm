@@ -1,4 +1,4 @@
-import { select } from '@inquirer/prompts';
+import * as p from '@clack/prompts';
 import type { PRListItem, ParsedPRInput } from './types.js';
 
 export function formatRelativeTime(dateString: string): string {
@@ -16,16 +16,20 @@ export function formatRelativeTime(dateString: string): string {
 }
 
 export async function selectPR(prs: PRListItem[]): Promise<PRListItem> {
-  const choices = prs.map((pr) => ({
-    name: `#${pr.number} ${pr.title.slice(0, 60)}${pr.title.length > 60 ? '...' : ''} (${pr.author.login}, ${formatRelativeTime(pr.updatedAt)})`,
+  const options = prs.map((pr) => ({
+    label: `#${pr.number} ${pr.title.slice(0, 60)}${pr.title.length > 60 ? '...' : ''} (${pr.author.login}, ${formatRelativeTime(pr.updatedAt)})`,
     value: pr,
   }));
 
-  const selected = await select({
+  const selected = await p.select({
     message: 'Select a PR to review:',
-    choices,
-    pageSize: 10,
+    options,
   });
+
+  if (p.isCancel(selected)) {
+    p.cancel('Operation cancelled.');
+    process.exit(0);
+  }
 
   return selected;
 }
