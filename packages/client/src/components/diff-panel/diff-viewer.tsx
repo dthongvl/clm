@@ -5,6 +5,9 @@ import {
 } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Button } from "@/components/ui/button"
+import { ArrowUpIcon } from "lucide-react"
+import { useScrollToTop } from "@/hooks"
 import type { ReviewComment, AIReviewItem } from "@/types/review"
 import { useTheme } from "@/components/theme-provider"
 import type { DiffFileData } from "@/types/diff"
@@ -226,6 +229,10 @@ function DiffViewer({
   const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemThemeSnapshot)
   const resolvedTheme = theme === "system" ? systemTheme : theme
 
+  // Ref for scroll-to-top functionality
+  const containerRef = useRef<HTMLDivElement>(null)
+  const { showScrollTop, scrollToTop } = useScrollToTop(containerRef)
+
   // Track collapsed state for each file — start with viewed files collapsed
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(
     () => new Set(controlledViewedFiles ?? defaultViewedFiles ?? [])
@@ -433,9 +440,10 @@ function DiffViewer({
 
   return (
     <div
+      ref={containerRef}
       data-slot="diff-viewer"
       data-state="loaded"
-      className={cn("min-h-0 flex-1 overflow-hidden bg-background", className)}
+      className={cn("relative min-h-0 flex-1 overflow-hidden bg-background", className)}
       {...props}
     >
       <ScrollArea className="h-full">
@@ -473,6 +481,20 @@ function DiffViewer({
         </div>
       </div>
       </ScrollArea>
+
+      {/* Scroll to top button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className={cn(
+          "absolute bottom-4 right-4 z-10 shadow-md transition-opacity duration-200",
+          showScrollTop ? "opacity-100" : "pointer-events-none opacity-0"
+        )}
+        onClick={scrollToTop}
+        aria-label="Scroll to top"
+      >
+        <ArrowUpIcon className="size-4" />
+      </Button>
     </div>
   )
 }
