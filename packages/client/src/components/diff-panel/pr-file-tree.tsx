@@ -62,12 +62,12 @@ function FileTreeNodeRenderer({
   const { file } = node
 
   return (
-    <FileTreeFile path={node.path} name={node.name}>
+    <FileTreeFile path={node.path} name={node.name} className="flex-nowrap">
       {/* Spacer for alignment with folder chevrons */}
-      <span className="size-4" />
+      <span className="size-4 shrink-0" />
       <FileTreeIcon>{getFileIcon(file.status)}</FileTreeIcon>
-      <FileTreeName className="flex-1">{node.name}</FileTreeName>
-      <span className="ml-auto flex gap-1 text-xs text-muted-foreground">
+      <FileTreeName className="flex-1 overflow-visible text-clip whitespace-nowrap">{node.name}</FileTreeName>
+      <span className="ml-auto flex shrink-0 gap-1 text-xs text-muted-foreground">
         {file.additions > 0 && (
           <span className="text-green-600">+{file.additions}</span>
         )}
@@ -128,7 +128,7 @@ export function PRFileTree({
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <FileTree
-          className="border-0 rounded-none"
+          className="border-0 rounded-none w-max min-w-full"
           selectedPath={selectedPath}
           onSelect={onSelectFile}
           expanded={expanded}

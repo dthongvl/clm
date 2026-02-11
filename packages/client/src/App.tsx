@@ -13,20 +13,14 @@ import {
   RelatedFiles,
 } from "@/components/side-panel"
 import { Button } from "@/components/ui/button"
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable"
+
 import { ModeToggle } from "@/components/mode-toggle"
-import { useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings, usePersistedState } from "@/hooks"
+import { useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings } from "@/hooks"
 import { usePatternVerification } from "@/hooks/use-pattern-verification"
 import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
 import { ActionSettingsPopover } from "@/components/side-panel/action-settings-popover"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
 import { refreshPR } from "@/lib/api"
-import { StorageKeys } from "@/lib/storage"
-import { PanelLeftIcon, PanelLeftCloseIcon } from "lucide-react"
 
 export function App() {
   const diffContainerRef = useRef<HTMLDivElement>(null)
@@ -48,17 +42,11 @@ export function App() {
 
   const [isDraftActionLoading, setIsDraftActionLoading] = useState(false)
 
-  // AI comment to draft conversion state
   const [convertingAIItemIds, setConvertingAIItemIds] = useState<Set<string>>(new Set())
   const [convertedAIItemIds, setConvertedAIItemIds] = useState<Set<string>>(new Set())
 
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // File tree state
-  const [isFileTreeVisible, setIsFileTreeVisible] = usePersistedState(
-    StorageKeys.PR_FILE_TREE_VISIBLE,
-    true
-  )
   const [selectedFilePath, setSelectedFilePath] = useState<string>()
   
   const handleRefresh = useCallback(async () => {
@@ -136,18 +124,15 @@ export function App() {
     autoGenerate: false,
   })
 
-  // Filter out AI review items that have been converted to drafts
   const visibleAIReviewItems = useMemo(
     () => aiReviewItems.filter((item) => !convertedAIItemIds.has(item.id)),
     [aiReviewItems, convertedAIItemIds]
   )
 
   const handleConvertAIToDraft = useCallback(async (itemId: string) => {
-    // Find the AI review item
     const item = aiReviewItems.find((i) => i.id === itemId)
     if (!item) return
 
-    // Format content consistently with how it's displayed
     const content = item.suggestion
       ? `${item.message}\n\n**Suggestion:** ${item.suggestion}`
       : item.message
@@ -156,7 +141,6 @@ export function App() {
 
     try {
       await addDraftComment(item.filePath, item.lineNumber, "additions", content)
-      // Mark as converted to hide from UI
       setConvertedAIItemIds((prev) => new Set(prev).add(itemId))
       toast.success("Added to draft review")
     } catch (error) {
@@ -243,55 +227,50 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <TopBar.Root>
-        {isPRLoading ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="animate-pulse">Loading PR info...</span>
-          </div>
-        ) : prError && !pr ? (
-          <div className="flex items-center gap-2 text-destructive">
-            <span>Failed to load PR: {prError.message}</span>
-          </div>
-        ) : pr ? (
-          <TopBar.PRInfo pr={pr} />
-        ) : null}
-        <TopBar.Actions>
-          <TopBar.SubmitReviewDialog
-            draftCount={draftCount}
-            onSubmit={handleSubmitReview}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsFileTreeVisible((prev) => !prev)}
-            aria-pressed={isFileTreeVisible}
-            title={isFileTreeVisible ? "Hide file tree" : "Show file tree"}
-          >
-            {isFileTreeVisible ? (
-              <PanelLeftCloseIcon className="size-4" />
-            ) : (
-              <PanelLeftIcon className="size-4" />
-            )}
-            <span className="sr-only">{isFileTreeVisible ? "Hide Files" : "Show Files"}</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing || isPRLoading || isDiffLoading || isCommentsLoading}
-          >
-            {isRefreshing ? "Fetching branches..." : isPRLoading || isDiffLoading || isCommentsLoading ? "Loading..." : "Refresh"}
-          </Button>
-          <Button variant="outline" size="sm">
-            Settings
-          </Button>
-          <ModeToggle />
-        </TopBar.Actions>
-      </TopBar.Root>
-
       <MainLayout
-        className="min-h-0 flex-1"
+        className="h-full"
+        header={
+          <TopBar.Root>
+            {isPRLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="animate-pulse">Loading PR info...</span>
+              </div>
+            ) : prError && !pr ? (
+              <div className="flex items-center gap-2 text-destructive">
+                <span>Failed to load PR: {prError.message}</span>
+              </div>
+            ) : pr ? (
+              <TopBar.PRInfo pr={pr} />
+            ) : null}
+            <TopBar.Actions>
+              <TopBar.SubmitReviewDialog
+                draftCount={draftCount}
+                onSubmit={handleSubmitReview}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing || isPRLoading || isDiffLoading || isCommentsLoading}
+              >
+                {isRefreshing ? "Fetching branches..." : isPRLoading || isDiffLoading || isCommentsLoading ? "Loading..." : "Refresh"}
+              </Button>
+              <Button variant="outline" size="sm">
+                Settings
+              </Button>
+              <ModeToggle />
+            </TopBar.Actions>
+          </TopBar.Root>
+        }
         leftPanel={
+          <DiffPanel.PRFileTree
+            files={files}
+            selectedPath={selectedFilePath}
+            onSelectFile={handleFileTreeSelect}
+            className="h-full"
+          />
+        }
+        centerPanel={
           <ErrorBoundary
             resetKeys={[prNumber]}
             fallback={
@@ -316,39 +295,6 @@ export function App() {
                 <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-muted-foreground">
                   <p>No files to display</p>
                 </div>
-              ) : isFileTreeVisible ? (
-                <ResizablePanelGroup
-                  orientation="horizontal"
-                  className="h-full"
-                >
-                  <ResizablePanel
-                    id="file-tree"
-                    defaultSize="25%"
-                    minSize="15%"
-                    maxSize="40%"
-                  >
-                    <DiffPanel.PRFileTree
-                      files={files}
-                      selectedPath={selectedFilePath}
-                      onSelectFile={handleFileTreeSelect}
-                      className="h-full border-r"
-                    />
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel id="diff-viewer" minSize="40%">
-                    <DiffPanel.Viewer
-                      files={files}
-                      annotations={annotations}
-                      aiReviewItems={visibleAIReviewItems}
-                      onCommentSubmit={handleCommentSubmit}
-                      onEditDraft={handleEditDraft}
-                      onDeleteDraft={handleDeleteDraft}
-                      isDraftActionLoading={isDraftActionLoading}
-                      onConvertAIToDraft={handleConvertAIToDraft}
-                      convertingAIItemIds={convertingAIItemIds}
-                    />
-                  </ResizablePanel>
-                </ResizablePanelGroup>
               ) : (
                 <DiffPanel.Viewer
                   files={files}

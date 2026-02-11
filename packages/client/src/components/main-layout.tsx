@@ -1,97 +1,98 @@
-"use client"
-
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { usePersistedState } from "@/hooks"
+import { StorageKeys } from "@/lib/storage"
 import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable"
-import type { Layout } from "react-resizable-panels"
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import {
+  SidebarRightProvider,
+  SidebarRight,
+  SidebarRightContent,
+  SidebarRightTrigger,
+} from "@/components/ui/sidebar-right"
 
-const STORAGE_KEY = "code-review:main-layout-sizes"
-const LEFT_PANEL_ID = "left"
-const RIGHT_PANEL_ID = "right"
-
-export type MainLayoutProps = React.ComponentProps<"main"> & {
+export type MainLayoutProps = React.ComponentProps<"div"> & {
+  header: React.ReactNode
   leftPanel: React.ReactNode
+  centerPanel: React.ReactNode
   rightPanel: React.ReactNode
-  defaultLeftSize?: number
-}
-
-function getPersistedLayout(): Layout | undefined {
-  if (typeof window === "undefined") return undefined
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored) as Layout
-      if (
-        typeof parsed === "object" &&
-        LEFT_PANEL_ID in parsed &&
-        RIGHT_PANEL_ID in parsed
-      ) {
-        return parsed
-      }
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return undefined
-}
-
-function persistLayout(layout: Layout): void {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
-  } catch {
-    // Ignore storage errors
-  }
 }
 
 export function MainLayout({
+  header,
   leftPanel,
+  centerPanel,
   rightPanel,
-  defaultLeftSize = 70,
   className,
   ...props
 }: MainLayoutProps) {
-  const persistedLayout = React.useMemo(() => getPersistedLayout(), [])
-  const defaultLayout: Layout = persistedLayout ?? {
-    [LEFT_PANEL_ID]: defaultLeftSize,
-    [RIGHT_PANEL_ID]: 100 - defaultLeftSize,
-  }
+  const [leftOpen, setLeftOpen] = usePersistedState(
+    StorageKeys.LEFT_SIDEBAR_OPEN,
+    true
+  )
+  const [rightOpen, setRightOpen] = usePersistedState(
+    StorageKeys.RIGHT_SIDEBAR_OPEN,
+    true
+  )
 
   return (
-    <>
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring"
+    <SidebarProvider
+      defaultOpen={leftOpen}
+      open={leftOpen}
+      onOpenChange={setLeftOpen}
+    >
+      <SidebarRightProvider
+        defaultOpen={rightOpen}
+        open={rightOpen}
+        onOpenChange={setRightOpen}
       >
-        Skip to main content
-      </a>
-      <main
-        id="main-content"
-        role="main"
-        data-slot="main-layout"
-        className={cn("flex min-h-0 h-full w-full", className)}
-        {...props}
-      >
-        <ResizablePanelGroup
-          orientation="horizontal"
-          defaultLayout={defaultLayout}
-          onLayoutChanged={persistLayout}
-          className="h-full w-full"
+        <div
+          data-slot="main-layout"
+          className={cn("flex h-full w-full flex-col", className)}
+          {...props}
         >
-          <ResizablePanel id={LEFT_PANEL_ID} minSize="20%" maxSize="80%">
-            <div className="h-full overflow-hidden">{leftPanel}</div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel id={RIGHT_PANEL_ID} minSize="20%" maxSize="80%">
-            <div className="h-full overflow-hidden">{rightPanel}</div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </main>
-    </>
+          {header}
+          <div className="flex min-h-0 flex-1">
+            {!leftOpen && (
+              <div className="flex items-start border-r pt-2 px-1">
+                <SidebarTrigger />
+              </div>
+            )}
+            <Sidebar side="left" variant="sidebar" collapsible="offcanvas">
+              <SidebarHeader className="flex-row items-center justify-end">
+                <SidebarTrigger />
+              </SidebarHeader>
+              <SidebarContent>{leftPanel}</SidebarContent>
+            </Sidebar>
+
+            <main
+              id="main-content"
+              role="main"
+              className="flex-1 min-w-0 overflow-hidden"
+            >
+              {centerPanel}
+            </main>
+
+            <SidebarRight>
+              <SidebarHeader className="flex-row items-center">
+                <SidebarRightTrigger />
+              </SidebarHeader>
+              <SidebarRightContent>{rightPanel}</SidebarRightContent>
+            </SidebarRight>
+            {!rightOpen && (
+              <div className="flex items-start border-l pt-2 px-1">
+                <SidebarRightTrigger />
+              </div>
+            )}
+          </div>
+        </div>
+      </SidebarRightProvider>
+    </SidebarProvider>
   )
 }
