@@ -11,6 +11,7 @@ import {
   deletePendingReviewComment,
   submitPendingReview,
 } from '../services/gh.js';
+import { AppError } from '../lib/errors.js';
 import type { SubmitReviewEvent, DraftReviewComment } from '../types/index.js';
 
 const app = new Hono();
@@ -84,10 +85,11 @@ app.post('/draft/comments', async (c) => {
     return c.json({ comment });
   } catch (error) {
     console.error('Draft comment creation failed:', error);
-    const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes('COMMENT_LOCATION_STALE')) {
+    if (error instanceof AppError && error.code === 'COMMENT_LOCATION_STALE') {
       return c.json({ error: 'Comment location is stale', code: 'COMMENT_LOCATION_STALE' }, 409);
     }
+
+    const msg = error instanceof Error ? error.message : String(error);
     return c.json({ error: 'Failed to create comment', code: 'CREATE_COMMENT_FAILED', details: msg }, 500);
   }
 });

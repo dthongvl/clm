@@ -1,4 +1,5 @@
 import type { FileDiff } from '../types/index.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Run git command safely using Bun.spawn (no shell injection)
@@ -103,7 +104,9 @@ export async function checkGitRepo(): Promise<boolean> {
   try {
     const { exitCode } = await runGit(['rev-parse', '--git-dir']);
     return exitCode === 0;
-  } catch {
+  } catch (error) {
+    // Log the error for debugging - this helps distinguish permission errors from missing repo
+    logger.debug(`checkGitRepo failed: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -115,7 +118,9 @@ export async function verifyRef(ref: string): Promise<boolean> {
   try {
     const { exitCode } = await runGit(['rev-parse', '--verify', ref]);
     return exitCode === 0;
-  } catch {
+  } catch (error) {
+    // Log the error for debugging - helps distinguish different failure modes
+    logger.debug(`verifyRef failed for "${ref}": ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }

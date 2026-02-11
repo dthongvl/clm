@@ -1,10 +1,6 @@
 import type { PRInfo, PRComment, DraftReviewComment, SubmitReviewEvent, ViewedFileState, ViewedState } from '../types/index.js';
 import { logger } from '../lib/logger.js';
-
-interface ClassifiedError {
-  code: string;
-  message: string;
-}
+import { AppError, classifyGhError, wrapError } from '../lib/errors.js';
 
 /**
  * Run gh CLI command safely using Bun.spawn (no shell injection)
@@ -193,20 +189,15 @@ export async function getPRComments(prNumber: number, repo: string): Promise<PRC
     return [...reviewComments, ...issueComments];
   } catch (error) {
     logger.error('Failed to fetch PR comments', error);
-    return [];
+    // Re-throw with context instead of swallowing the error
+    throw wrapError(error, 'GH_API_ERROR', `Failed to fetch comments for PR #${prNumber}`, {
+      prNumber,
+      repo,
+    });
   }
 }
 
-function classifyGhError(error: unknown): ClassifiedError {
-  const msg = error instanceof Error ? error.message : String(error);
-  if (msg.includes('422') || msg.includes('pull_request_review_thread.diff_hunk')) {
-    return { code: 'COMMENT_LOCATION_STALE', message: msg };
-  }
-  if (msg.includes('404')) {
-    return { code: 'NOT_FOUND', message: msg };
-  }
-  return { code: 'UNKNOWN', message: msg };
-}
+// classifyGhError is now imported from lib/errors.ts
 
 function mapSideFromGh(side: 'LEFT' | 'RIGHT'): 'additions' | 'deletions' {
   return side === 'RIGHT' ? 'additions' : 'deletions';
@@ -214,6 +205,33 @@ function mapSideFromGh(side: 'LEFT' | 'RIGHT'): 'additions' | 'deletions' {
 
 function mapSideToGh(side: 'additions' | 'deletions'): 'RIGHT' | 'LEFT' {
   return side === 'additions' ? 'RIGHT' : 'LEFT';
+}
+
+function extractGraphQlErrorMessage(result: unknown): string | null {
+  if (!result || typeof result !== 'object') {
+    return null;
+  }
+
+  const rawErrors = (result as { errors?: unknown }).errors;
+  if (!Array.isArray(rawErrors) || rawErrors.length === 0) {
+    return null;
+  }
+
+  const messages = rawErrors
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const message = (entry as { message?: unknown }).message;
+      return typeof message === 'string' ? message : null;
+    })
+    .filter((message): message is string => Boolean(message));
+
+  if (messages.length > 0) {
+    return messages.join('; ');
+  }
+
+  return 'GitHub GraphQL request failed';
 }
 
 export async function getCurrentUserLogin(): Promise<string> {
@@ -484,7 +502,16 @@ export async function createPendingReviewComment(
     ]);
 
     const result = JSON.parse(stdout);
-    const node = result.data.addPullRequestReviewThread.thread.comments.nodes[0];
+    const graphQlErrorMessage = extractGraphQlErrorMessage(result);
+    if (graphQlErrorMessage) {
+      throw new Error(graphQlErrorMessage);
+    }
+
+    const node = result.data?.addPullRequestReviewThread?.thread?.comments?.nodes?.[0];
+    if (!node) {
+      throw new Error('GitHub did not return a review thread comment');
+    }
+
     return {
       id: node.id,
       nodeId: node.id,
@@ -499,7 +526,7 @@ export async function createPendingReviewComment(
     };
   } catch (error) {
     const classified = classifyGhError(error);
-    throw new Error(`${classified.code}: ${classified.message}`);
+    throw new AppError(classified.code, classified.message, { cause: error });
   }
 }
 
@@ -556,7 +583,7 @@ export async function updatePendingReviewComment(
     };
   } catch (error) {
     const classified = classifyGhError(error);
-    throw new Error(`${classified.code}: ${classified.message}`);
+    throw new AppError(classified.code, classified.message, { cause: error });
   }
 }
 
@@ -581,7 +608,7 @@ export async function deletePendingReviewComment(
     ]);
   } catch (error) {
     const classified = classifyGhError(error);
-    throw new Error(`${classified.code}: ${classified.message}`);
+    throw new AppError(classified.code, classified.message, { cause: error });
   }
 }
 
@@ -623,7 +650,7 @@ export async function submitPendingReview(
     await runGh(args);
   } catch (error) {
     const classified = classifyGhError(error);
-    throw new Error(`${classified.code}: ${classified.message}`);
+    throw new AppError(classified.code, classified.message, { cause: error });
   }
 }
 
@@ -762,6 +789,6 @@ export async function setPRFileViewedState(
     };
   } catch (error) {
     const classified = classifyGhError(error);
-    throw new Error(`${classified.code}: ${classified.message}`);
+    throw new AppError(classified.code, classified.message, { cause: error });
   }
 }

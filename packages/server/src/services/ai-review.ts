@@ -3,6 +3,7 @@ import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
+import { wrapError } from '../lib/errors.js';
 
 /**
  * Generate AI code review for a PR using opencode server
@@ -19,7 +20,8 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
     return parseReviewOutput(response);
   } catch (error) {
     logger.error('AI review generation failed', error);
-    throw new Error(`Failed to generate AI review: ${(error as Error).message}`);
+    // Wrap with context, preserving the original error as cause
+    throw wrapError(error, 'AI_ERROR', 'Failed to generate AI review', { prLink });
   }
 }
 

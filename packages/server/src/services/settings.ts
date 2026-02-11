@@ -55,7 +55,9 @@ export async function getSettings(): Promise<Settings> {
     }
     settingsCache = { settings: parsed, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
     return parsed;
-  } catch {
+  } catch (error) {
+    // Log error for debugging - helps distinguish missing file vs parse error vs permission error
+    logger.debug(`Failed to load settings from ${CONFIG_FILE}: ${error instanceof Error ? error.message : String(error)}`);
     const defaults = getDefaults();
     settingsCache = { settings: defaults, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
     return defaults;

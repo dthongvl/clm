@@ -110,7 +110,7 @@ class OpenCodeClient {
       logger.debug(`Using model variant (stream): ${modelConfig.providerID}/${modelConfig.modelID} [${modelConfig.variant}]`);
     }
 
-    // Send prompt async (fire and forget)
+    // Send prompt async (fire and forget, but log errors)
     const promptBody = {
       parts: [{ type: 'text' as const, text: message }],
       ...(modelConfig && { model: modelConfig }),
@@ -121,7 +121,9 @@ class OpenCodeClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(promptBody),
     }).catch(err => {
+      // Log with context for debugging async failures
       logger.error('Failed to send async prompt', err);
+      logger.debug(`Async prompt context: sessionId=${sessionId}, baseUrl=${this.baseUrl}`);
     });
 
     // Stream SSE events
@@ -168,8 +170,9 @@ class OpenCodeClient {
                 done = true;
                 break;
               }
-            } catch {
-              // Skip invalid JSON
+            } catch (parseError) {
+              // Log invalid JSON for debugging instead of silently ignoring
+              logger.debug(`Skipping invalid SSE JSON: ${data.slice(0, 100)}...`);
             }
           }
         }

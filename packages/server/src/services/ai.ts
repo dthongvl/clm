@@ -1,5 +1,6 @@
 import type { AIReviewResult, AIReviewSuggestion } from '../types/index.js';
 import { logger } from '../lib/logger.js';
+import { wrapError } from '../lib/errors.js';
 
 // Default AI binary - can be overridden via environment variable
 const AI_BINARY = process.env.CLAUDE_BINARY || process.env.AI_BINARY || 'claude';
@@ -58,16 +59,17 @@ export async function reviewDiff(
   fileContext?: { filename: string; content: string }[]
 ): Promise<AIReviewResult> {
   const prompt = buildReviewPrompt(diff, fileContext);
-  
+
   try {
     const stdout = await runAIWithStdin(prompt, { timeoutMs: 120_000 });
     return parseAIReviewOutput(stdout);
   } catch (error) {
     logger.error('AI review failed', error);
-    return {
-      suggestions: [],
-      summary: 'AI review failed to complete.',
-    };
+    // Re-throw with context instead of swallowing
+    throw wrapError(error, 'AI_ERROR', 'AI diff review failed', {
+      diffLength: diff.length,
+      fileContextCount: fileContext?.length ?? 0,
+    });
   }
 }
 
@@ -91,7 +93,11 @@ Provide a brief review comment about this line. Be concise and actionable.`;
     return stdout.trim();
   } catch (error) {
     logger.error('Line review failed', error);
-    return 'Unable to review this line at the moment.';
+    // Re-throw with context instead of swallowing
+    throw wrapError(error, 'AI_ERROR', 'AI line review failed', {
+      filename,
+      line,
+    });
   }
 }
 

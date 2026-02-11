@@ -99,18 +99,31 @@ export const logger = {
   },
 
   /**
-   * Error message with details
+   * Error message with details and full stack trace
    */
   error(context: string, error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`  ${timestamp()} ${colorize(symbols.error, colors.red)} ${colorize(context, colors.red)}`);
     console.error(`             ${colorize(message, colors.dim)}`);
-    
-    // Log stack trace in debug mode
-    if (process.env.DEBUG && error instanceof Error && error.stack) {
-      const stackLines = error.stack.split('\n').slice(1, 4);
+
+    // Always log stack trace for debugging (limit to 10 lines)
+    if (error instanceof Error && error.stack) {
+      const stackLines = error.stack.split('\n').slice(1, 11);
       for (const line of stackLines) {
         console.error(`             ${colorize(line.trim(), colors.dim)}`);
+      }
+    }
+
+    // Log cause chain if present (for wrapped errors)
+    if (error instanceof Error && error.cause) {
+      const cause = error.cause;
+      const causeMessage = cause instanceof Error ? cause.message : String(cause);
+      console.error(`             ${colorize('Caused by:', colors.yellow)} ${colorize(causeMessage, colors.dim)}`);
+      if (cause instanceof Error && cause.stack) {
+        const causeStackLines = cause.stack.split('\n').slice(1, 6);
+        for (const line of causeStackLines) {
+          console.error(`             ${colorize(line.trim(), colors.dim)}`);
+        }
       }
     }
   },

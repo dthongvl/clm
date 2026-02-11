@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/bun';
 import { logger, createLoggerMiddleware } from './lib/logger.js';
+import { AppError, createErrorResponse } from './lib/errors.js';
 import { initAppContext, getAppContext } from './lib/app-context.js';
 import diffRoutes from './routes/diff.js';
 import commentRoutes from './routes/comments.js';
@@ -92,10 +93,20 @@ app.get('*', async (c) => {
   }
 });
 
-// Error handling
+// Error handling - log detailed error info and return structured response
 app.onError((err, c) => {
-  logger.error('Server error', err);
-  return c.json({ error: 'Internal server error', details: err.message }, 500);
+  const path = c.req.path;
+  const method = c.req.method;
+
+  // Log with full context
+  logger.error(`${method} ${path} failed`, err);
+
+  // Use AppError status code if available, otherwise default to 500
+  const statusCode = err instanceof AppError ? err.statusCode : 500;
+  const errorResponse = createErrorResponse(err, 'Internal server error');
+
+  // Cast to valid HTTP status code type
+  return c.json(errorResponse, statusCode as 500 | 400 | 401 | 403 | 404 | 422 | 503 | 504);
 });
 
 // 404 handler
