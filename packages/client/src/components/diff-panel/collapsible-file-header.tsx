@@ -7,6 +7,7 @@ import {
   ArrowRight01Icon,
   Copy01Icon,
   Tick02Icon,
+  File01Icon,
 } from "@hugeicons/core-free-icons"
 
 export interface CollapsibleFileHeaderProps {
@@ -20,6 +21,10 @@ export interface CollapsibleFileHeaderProps {
   isSyncingViewed?: boolean
   onToggleCollapse: () => void
   onToggleViewed: () => void
+  /** Whether the view source action is available */
+  canViewSource?: boolean
+  /** Callback when the view source button is clicked */
+  onViewSource?: () => void
   className?: string
 }
 
@@ -33,6 +38,8 @@ function CollapsibleFileHeader({
   isSyncingViewed,
   onToggleCollapse,
   onToggleViewed,
+  canViewSource = true,
+  onViewSource,
   className,
 }: CollapsibleFileHeaderProps) {
   const [copied, setCopied] = useState(false)
@@ -42,6 +49,11 @@ function CollapsibleFileHeader({
     navigator.clipboard.writeText(filePath)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleViewSource = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onViewSource?.()
   }
 
   const fileName = filePath.split("/").pop() || filePath
@@ -103,6 +115,19 @@ function CollapsibleFileHeader({
 
       {/* Right side: diff stats and viewed checkbox */}
       <div className="flex shrink-0 items-center gap-3">
+        {/* View file button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleViewSource}
+          disabled={!canViewSource}
+          aria-label="View file source"
+          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <HugeiconsIcon icon={File01Icon} className="mr-1 size-3.5" />
+          View file
+        </Button>
+
         {/* File status badge */}
         <span
           className={cn(

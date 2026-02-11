@@ -52,6 +52,7 @@ interface FileDiffCardProps {
   ) => void
   onConvertAIToDraft?: (itemId: string) => Promise<void>
   convertingAIItemIds?: Set<string>
+  onViewHeadFile?: (payload: { filePath: string; content: string }) => void
 }
 
 export const FileDiffCard = memo(function FileDiffCard({
@@ -76,6 +77,7 @@ export const FileDiffCard = memo(function FileDiffCard({
   onLineClick,
   onConvertAIToDraft,
   convertingAIItemIds,
+  onViewHeadFile,
 }: FileDiffCardProps) {
   const oldFile = useMemo(
     () => toFileContents(file.oldPath ?? file.path, file.oldContent),
@@ -112,6 +114,10 @@ export const FileDiffCard = memo(function FileDiffCard({
     [onToggleViewed, file.path]
   )
 
+  const handleViewSource = useCallback(() => {
+    onViewHeadFile?.({ filePath: file.path, content: file.newContent })
+  }, [onViewHeadFile, file.path, file.newContent])
+
   return (
     <div
       role="listitem"
@@ -131,6 +137,8 @@ export const FileDiffCard = memo(function FileDiffCard({
         isSyncingViewed={isSyncingViewed}
         onToggleCollapse={handleToggleCollapse}
         onToggleViewed={handleToggleViewed}
+        canViewSource={file.status !== "deleted"}
+        onViewSource={handleViewSource}
       />
 
       {!isCollapsed && (

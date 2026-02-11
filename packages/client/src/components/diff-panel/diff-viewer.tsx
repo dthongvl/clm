@@ -12,6 +12,7 @@ import type { ReviewComment, AIReviewItem } from "@/types/review"
 import { useTheme } from "@/components/theme-provider"
 import type { DiffFileData } from "@/types/diff"
 import { FileDiffCard } from "./file-diff-card"
+import { FileSourceDialog } from "./file-source-dialog"
 
 export type { DiffFileData } from "@/types/diff"
 
@@ -420,6 +421,17 @@ function DiffViewer({
     [onReplySubmit]
   )
 
+  // Source view dialog state
+  const [sourceView, setSourceView] = useState<{ filePath: string; content: string } | null>(null)
+
+  const handleViewHeadFile = useCallback((payload: { filePath: string; content: string }) => {
+    setSourceView(payload)
+  }, [])
+
+  const handleSourceDialogOpenChange = useCallback((open: boolean) => {
+    if (!open) setSourceView(null)
+  }, [])
+
   if (files.length === 0) {
     return (
       <div
@@ -472,6 +484,7 @@ function DiffViewer({
               onLineClick={onLineClick}
               onConvertAIToDraft={onConvertAIToDraft}
               convertingAIItemIds={convertingAIItemIds}
+              onViewHeadFile={handleViewHeadFile}
             />
           ))}
 
@@ -495,6 +508,16 @@ function DiffViewer({
       >
         <ArrowUpIcon className="size-4" />
       </Button>
+
+      {/* Head file source dialog */}
+      <FileSourceDialog
+        open={sourceView !== null}
+        onOpenChange={handleSourceDialogOpenChange}
+        filePath={sourceView?.filePath ?? ""}
+        content={sourceView?.content ?? ""}
+        resolvedTheme={resolvedTheme}
+        refLabel="Head"
+      />
     </div>
   )
 }
