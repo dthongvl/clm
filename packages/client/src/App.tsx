@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 
 import { ModeToggle } from "@/components/mode-toggle"
-import { useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings } from "@/hooks"
+import { useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings, useViewedFiles } from "@/hooks"
 import { usePatternVerification } from "@/hooks/use-pattern-verification"
 import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
 import { ActionSettingsPopover } from "@/components/side-panel/action-settings-popover"
@@ -40,6 +40,13 @@ export function App() {
     refetch: refetchDraftComments,
   } = useDraftComments()
 
+  const {
+    viewedFiles,
+    syncingFiles: syncingViewedFiles,
+    setViewed: setFileViewed,
+    refetch: refetchViewedFiles,
+  } = useViewedFiles()
+
   const [isDraftActionLoading, setIsDraftActionLoading] = useState(false)
 
   const [convertingAIItemIds, setConvertingAIItemIds] = useState<Set<string>>(new Set())
@@ -58,13 +65,14 @@ export function App() {
         refetchDiff(),
         refetchComments(),
         refetchDraftComments(),
+        refetchViewedFiles(),
       ])
     } catch (error) {
       console.error('Failed to refresh:', error)
     } finally {
       setIsRefreshing(false)
     }
-  }, [refetchPR, refetchDiff, refetchComments, refetchDraftComments])
+  }, [refetchPR, refetchDiff, refetchComments, refetchDraftComments, refetchViewedFiles])
 
   const handleCommentSubmit = useCallback(
     async (
@@ -225,6 +233,10 @@ export function App() {
     scrollToFile(filePath)
   }, [scrollToFile])
 
+  const handleFileViewedChange = useCallback((filePath: string, isViewed: boolean) => {
+    setFileViewed(filePath, isViewed)
+  }, [setFileViewed])
+
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <MainLayout
@@ -306,6 +318,9 @@ export function App() {
                   isDraftActionLoading={isDraftActionLoading}
                   onConvertAIToDraft={handleConvertAIToDraft}
                   convertingAIItemIds={convertingAIItemIds}
+                  viewedFiles={viewedFiles}
+                  onFileViewedChange={handleFileViewedChange}
+                  syncingViewedFiles={syncingViewedFiles}
                 />
               )}
             </DiffPanel.Root>

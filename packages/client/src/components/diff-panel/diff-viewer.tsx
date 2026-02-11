@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useSyncExternalStore } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from "react"
 import {
   type DiffLineAnnotation,
   type AnnotationSide,
@@ -87,6 +87,8 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   onConvertAIToDraft?: (itemId: string) => Promise<void>
   /** Set of AI item IDs currently being converted */
   convertingAIItemIds?: Set<string>
+  /** Set of file paths currently syncing viewed state with server */
+  syncingViewedFiles?: Set<string>
 }
 
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -214,6 +216,7 @@ function DiffViewer({
   isDraftActionLoading,
   onConvertAIToDraft,
   convertingAIItemIds,
+  syncingViewedFiles,
   ...props
 }: DiffViewerProps) {
   // Get current theme from theme provider
@@ -223,8 +226,10 @@ function DiffViewer({
   const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemThemeSnapshot)
   const resolvedTheme = theme === "system" ? systemTheme : theme
 
-  // Track collapsed state for each file
-  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set())
+  // Track collapsed state for each file — start with viewed files collapsed
+  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(
+    () => new Set(controlledViewedFiles ?? defaultViewedFiles ?? [])
+  )
 
   // Internal viewed files state (used when not controlled)
   const [internalViewedFiles, setInternalViewedFiles] = useState<Set<string>>(
@@ -234,6 +239,23 @@ function DiffViewer({
   // Use controlled state if provided, otherwise use internal state
   const isControlled = controlledViewedFiles !== undefined
   const viewedFiles = isControlled ? controlledViewedFiles : internalViewedFiles
+
+  // Collapse files that become viewed in controlled mode
+  const prevViewedRef = useRef<Set<string>>(viewedFiles)
+  useEffect(() => {
+    const prev = prevViewedRef.current
+    if (viewedFiles !== prev) {
+      const newlyViewed = [...viewedFiles].filter((f) => !prev.has(f))
+      if (newlyViewed.length > 0) {
+        setCollapsedFiles((c) => {
+          const next = new Set(c)
+          for (const f of newlyViewed) next.add(f)
+          return next
+        })
+      }
+      prevViewedRef.current = viewedFiles
+    }
+  }, [viewedFiles])
 
   // Track draft annotations (open comment forms)
   const [draftAnnotations, setDraftAnnotations] = useState<DraftAnnotation[]>(
@@ -425,6 +447,7 @@ function DiffViewer({
               lineAnnotations={getAnnotationsForFile(file.path)}
               isCollapsed={collapsedFiles.has(file.path)}
               isViewed={viewedFiles.has(file.path)}
+              isSyncingViewed={syncingViewedFiles?.has(file.path)}
               resolvedTheme={resolvedTheme}
               hasOpenCommentForm={draftAnnotations.some((d) => d.filePath === file.path)}
               submittingDrafts={submittingDrafts}

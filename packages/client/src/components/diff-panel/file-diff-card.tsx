@@ -22,6 +22,7 @@ interface FileDiffCardProps {
   lineAnnotations: DiffLineAnnotation<AnnotationMetadata>[]
   isCollapsed: boolean
   isViewed: boolean
+  isSyncingViewed?: boolean
   resolvedTheme: "dark" | "light"
   hasOpenCommentForm: boolean
   submittingDrafts: Set<string>
@@ -58,6 +59,7 @@ export const FileDiffCard = memo(function FileDiffCard({
   lineAnnotations,
   isCollapsed,
   isViewed,
+  isSyncingViewed,
   resolvedTheme,
   hasOpenCommentForm,
   submittingDrafts,
@@ -126,6 +128,7 @@ export const FileDiffCard = memo(function FileDiffCard({
         deletions={file.deletions}
         isCollapsed={isCollapsed}
         isViewed={isViewed}
+        isSyncingViewed={isSyncingViewed}
         onToggleCollapse={handleToggleCollapse}
         onToggleViewed={handleToggleViewed}
       />

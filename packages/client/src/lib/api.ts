@@ -300,4 +300,31 @@ export async function fetchModels(): Promise<ModelOption[]> {
   return response.models;
 }
 
+// Viewed Files API (GitHub-backed)
+export type ViewedState = 'VIEWED' | 'UNVIEWED' | 'DISMISSED';
+
+export interface ViewedFileState {
+  path: string;
+  state: ViewedState;
+}
+
+interface ViewedFilesResponse {
+  states: ViewedFileState[];
+}
+
+export async function fetchPRViewedFiles(signal?: AbortSignal): Promise<ViewedFileState[]> {
+  const response = await fetchApi<ViewedFilesResponse>('/git/viewed-files', { signal });
+  return response.states;
+}
+
+export async function updatePRFileViewedState(
+  filePath: string,
+  viewed: boolean,
+): Promise<ViewedFileState> {
+  return fetchApi<ViewedFileState>('/git/viewed-files', {
+    method: 'POST',
+    body: JSON.stringify({ filePath, viewed }),
+  });
+}
+
 export type { ServerPRInfo, ServerFileDiff, StatusResponse, ServerPRComment, ServerChangeGroup, ServerAIReviewItem, AIReviewPRResponse, ServerRelatedFile, RefreshResponse, ServerDraftReview, ServerDraftReviewComment, DraftReviewResponse };

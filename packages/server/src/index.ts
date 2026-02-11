@@ -14,6 +14,7 @@ import refreshRoutes from './routes/refresh.js';
 import settingsRoutes from './routes/settings.js';
 import modelsRoutes from './routes/models.js';
 import reviewRoutes from './routes/reviews.js';
+import viewedFilesRoutes from './routes/viewed-files.js';
 
 initAppContext();
 
@@ -51,6 +52,7 @@ app.route('/api/git/diff', diffRoutes);
 app.route('/api/git/comments', commentRoutes);
 app.route('/api/git/pr-info', prInfoRoutes);
 app.route('/api/git/refresh', refreshRoutes);
+app.route('/api/git/viewed-files', viewedFilesRoutes);
 
 // API routes — App-level
 app.route('/api/reviews', reviewRoutes);

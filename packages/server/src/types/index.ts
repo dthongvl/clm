@@ -139,3 +139,11 @@ export interface DraftReviewComment {
   authorAvatarUrl: string;
   createdAt: string;
 }
+
+// GitHub's viewer viewed state for PR files
+export type ViewedState = 'VIEWED' | 'UNVIEWED' | 'DISMISSED';
+
+export interface ViewedFileState {
+  path: string;
+  state: ViewedState;
+}

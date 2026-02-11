@@ -1,4 +1,4 @@
-import type { PRInfo, PRComment, DraftReviewComment, SubmitReviewEvent } from '../types/index.js';
+import type { PRInfo, PRComment, DraftReviewComment, SubmitReviewEvent, ViewedFileState, ViewedState } from '../types/index.js';
 import { logger } from '../lib/logger.js';
 
 interface ClassifiedError {
@@ -621,6 +621,145 @@ export async function submitPendingReview(
       args.push('-f', `body=${body}`);
     }
     await runGh(args);
+  } catch (error) {
+    const classified = classifyGhError(error);
+    throw new Error(`${classified.code}: ${classified.message}`);
+  }
+}
+
+/**
+ * Get the GraphQL node ID for a PR
+ */
+export async function getPRNodeId(prNumber: number, repo: string): Promise<string> {
+  const [owner, name] = repo.split('/');
+  const query = `
+    query($owner: String!, $name: String!, $prNumber: Int!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $prNumber) { id }
+      }
+    }
+  `;
+
+  const stdout = await runGh([
+    'api', 'graphql',
+    '-f', `query=${query}`,
+    '-f', `owner=${owner}`,
+    '-f', `name=${name}`,
+    '-F', `prNumber=${prNumber}`,
+  ]);
+  const result = JSON.parse(stdout);
+  return result.data.repository.pullRequest.id as string;
+}
+
+/**
+ * Get viewed state for all files in a PR with pagination
+ */
+export async function getPRFileViewedStates(
+  prNumber: number,
+  repo: string,
+): Promise<ViewedFileState[]> {
+  const [owner, name] = repo.split('/');
+  const query = `
+    query($owner: String!, $name: String!, $prNumber: Int!, $after: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $prNumber) {
+          files(first: 100, after: $after) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              path
+              viewerViewedState
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  type FileNode = {
+    path: string;
+    viewerViewedState: ViewedState;
+  };
+
+  const allFiles: ViewedFileState[] = [];
+  let after: string | null = null;
+
+  do {
+    const args = [
+      'api', 'graphql',
+      '-f', `query=${query}`,
+      '-f', `owner=${owner}`,
+      '-f', `name=${name}`,
+      '-F', `prNumber=${prNumber}`,
+    ];
+    if (after) {
+      args.push('-f', `after=${after}`);
+    }
+
+    const stdout = await runGh(args);
+    const result = JSON.parse(stdout);
+    const filesConnection = result.data.repository.pullRequest.files;
+
+    for (const file of filesConnection.nodes as FileNode[]) {
+      allFiles.push({
+        path: file.path,
+        state: file.viewerViewedState,
+      });
+    }
+
+    after = filesConnection.pageInfo.hasNextPage ? filesConnection.pageInfo.endCursor : null;
+  } while (after);
+
+  return allFiles;
+}
+
+/**
+ * Set viewed state for a file in a PR
+ */
+export async function setPRFileViewedState(
+  prNumber: number,
+  repo: string,
+  filePath: string,
+  viewed: boolean,
+): Promise<ViewedFileState> {
+  try {
+    const prNodeId = await getPRNodeId(prNumber, repo);
+
+    const mutation = viewed
+      ? `
+        mutation($prId: ID!, $path: String!) {
+          markFileAsViewed(input: { pullRequestId: $prId, path: $path }) {
+            pullRequest {
+              files(first: 1, after: null) {
+                nodes { path viewerViewedState }
+              }
+            }
+          }
+        }
+      `
+      : `
+        mutation($prId: ID!, $path: String!) {
+          unmarkFileAsViewed(input: { pullRequestId: $prId, path: $path }) {
+            pullRequest {
+              files(first: 1, after: null) {
+                nodes { path viewerViewedState }
+              }
+            }
+          }
+        }
+      `;
+
+    await runGh([
+      'api', 'graphql',
+      '-f', `query=${mutation}`,
+      '-f', `prId=${prNodeId}`,
+      '-f', `path=${filePath}`,
+    ]);
+
+    // Return the expected state since the mutation doesn't return the specific file
+    return {
+      path: filePath,
+      state: viewed ? 'VIEWED' : 'UNVIEWED',
+    };
   } catch (error) {
     const classified = classifyGhError(error);
     throw new Error(`${classified.code}: ${classified.message}`);

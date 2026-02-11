@@ -10,3 +10,4 @@ export { PRContextProvider } from './use-pr-context'
 export { useRelatedFiles } from './use-related-files';
 export { useModels } from './use-models';
 export { useSettings } from './use-settings';
+export { useViewedFiles } from './use-viewed-files';

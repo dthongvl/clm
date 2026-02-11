@@ -16,6 +16,8 @@ export interface CollapsibleFileHeaderProps {
   deletions: number
   isCollapsed: boolean
   isViewed: boolean
+  /** Whether viewed state is currently syncing with server */
+  isSyncingViewed?: boolean
   onToggleCollapse: () => void
   onToggleViewed: () => void
   className?: string
@@ -28,6 +30,7 @@ function CollapsibleFileHeader({
   deletions,
   isCollapsed,
   isViewed,
+  isSyncingViewed,
   onToggleCollapse,
   onToggleViewed,
   className,
@@ -125,16 +128,23 @@ function CollapsibleFileHeader({
 
         {/* Viewed checkbox */}
         <label
-          className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground"
+          className={cn(
+            "flex items-center gap-1.5 text-xs text-muted-foreground",
+            isSyncingViewed ? "cursor-wait opacity-60" : "cursor-pointer"
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           <input
             type="checkbox"
             checked={isViewed}
             onChange={onToggleViewed}
-            className="size-3.5 cursor-pointer rounded border-border accent-primary"
+            disabled={isSyncingViewed}
+            className={cn(
+              "size-3.5 rounded border-border accent-primary",
+              isSyncingViewed ? "cursor-wait" : "cursor-pointer"
+            )}
           />
-          <span>Viewed</span>
+          <span>{isSyncingViewed ? "Syncing..." : "Viewed"}</span>
         </label>
       </div>
     </div>
