@@ -137,6 +137,7 @@ export function transformAIReviewItem(item: ServerAIReviewItem): AIReviewItem {
     severity: item.severity,
     message: item.message,
     suggestion: item.suggestion,
+    categories: item.categories ?? ['code-quality'],
   };
 }
 

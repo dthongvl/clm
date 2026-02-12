@@ -232,6 +232,8 @@ export async function generateGrouping(additionalContext?: string): Promise<Serv
 }
 
 // AI Review API
+import type { AIReviewCategory, AIReviewRunMode } from '@/types/review';
+
 interface ServerAIReviewItem {
   id: string;
   filePath: string;
@@ -239,6 +241,7 @@ interface ServerAIReviewItem {
   severity: 'critical' | 'warning' | 'info';
   message: string;
   suggestion?: string;
+  categories?: AIReviewCategory[];
 }
 
 interface AIReviewPRResponse {
@@ -246,10 +249,16 @@ interface AIReviewPRResponse {
   summary: string;
 }
 
-export async function generateAIReview(additionalContext?: string): Promise<AIReviewPRResponse> {
+interface AIReviewRequestBody {
+  additionalContext?: string;
+  reviewCategories?: AIReviewCategory[];
+  runMode?: AIReviewRunMode;
+}
+
+export async function generateAIReview(body: AIReviewRequestBody = {}): Promise<AIReviewPRResponse> {
   const response = await fetchApi<AIReviewPRResponse>('/ai/review/pr', {
     method: 'POST',
-    body: JSON.stringify(buildAIActionBody(additionalContext)),
+    body: JSON.stringify(body),
   });
   return response;
 }

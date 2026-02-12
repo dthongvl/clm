@@ -376,6 +376,7 @@ export function App() {
                     isLoading={isReviewLoading}
                     icon={AiGenerativeIcon}
                     onRun={triggerReview}
+                    enableAIReviewOptions
                   />
                   <ActionSettingsPopover
                     actionKey="ai-review"

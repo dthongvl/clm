@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test"
-import { normalizeAdditionalContext } from "./request.js"
+import {
+  normalizeAdditionalContext,
+  normalizeReviewCategories,
+  normalizeReviewRunMode,
+  REVIEW_CATEGORIES,
+} from "./request.js"
 
 describe("normalizeAdditionalContext", () => {
   it("returns undefined for missing context", () => {
@@ -70,6 +75,98 @@ describe("normalizeAdditionalContext", () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error).toBe("additionalContext exceeds maximum length of 3")
+    }
+  })
+})
+
+describe("normalizeReviewCategories", () => {
+  it("defaults to all categories when missing", () => {
+    const result = normalizeReviewCategories(undefined)
+    expect(result).toEqual({ ok: true, value: [...REVIEW_CATEGORIES] })
+  })
+
+  it("defaults to all categories when null", () => {
+    const result = normalizeReviewCategories(null)
+    expect(result).toEqual({ ok: true, value: [...REVIEW_CATEGORIES] })
+  })
+
+  it("accepts valid categories array", () => {
+    const result = normalizeReviewCategories(["security", "performance"])
+    expect(result).toEqual({ ok: true, value: ["security", "performance"] })
+  })
+
+  it("deduplicates and normalizes with whitespace/case", () => {
+    const result = normalizeReviewCategories([" Security ", "SECURITY", "performance"])
+    expect(result).toEqual({ ok: true, value: ["security", "performance"] })
+  })
+
+  it("rejects unknown category", () => {
+    const result = normalizeReviewCategories(["security", "unknown-cat"])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe("Unknown review category: unknown-cat")
+    }
+  })
+
+  it("rejects empty array", () => {
+    const result = normalizeReviewCategories([])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe("reviewCategories must include at least one category")
+    }
+  })
+
+  it("rejects non-array value", () => {
+    const result = normalizeReviewCategories("security")
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe("reviewCategories must be an array of strings")
+    }
+  })
+
+  it("filters out non-string values and rejects if none remain", () => {
+    const result = normalizeReviewCategories([123, null, {}])
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe("reviewCategories must include at least one category")
+    }
+  })
+})
+
+describe("normalizeReviewRunMode", () => {
+  it("defaults to combined when missing", () => {
+    const result = normalizeReviewRunMode(undefined)
+    expect(result).toEqual({ ok: true, value: "combined" })
+  })
+
+  it("defaults to combined when null", () => {
+    const result = normalizeReviewRunMode(null)
+    expect(result).toEqual({ ok: true, value: "combined" })
+  })
+
+  it("accepts combined mode", () => {
+    const result = normalizeReviewRunMode("combined")
+    expect(result).toEqual({ ok: true, value: "combined" })
+  })
+
+  it("accepts separate mode", () => {
+    const result = normalizeReviewRunMode("separate")
+    expect(result).toEqual({ ok: true, value: "separate" })
+  })
+
+  it("rejects invalid run mode", () => {
+    const result = normalizeReviewRunMode("fast")
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe("runMode must be 'combined' or 'separate'")
+    }
+  })
+
+  it("rejects non-string value", () => {
+    const result = normalizeReviewRunMode(123)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.error).toBe("runMode must be 'combined' or 'separate'")
     }
   })
 })

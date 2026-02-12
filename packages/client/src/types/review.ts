@@ -1,5 +1,17 @@
 export type Severity = 'critical' | 'warning' | 'info';
 
+export type AIReviewCategory =
+  | 'code-quality'
+  | 'coding-convention'
+  | 'security'
+  | 'accessibility'
+  | 'architecture'
+  | 'api-design'
+  | 'performance'
+  | 'testing';
+
+export type AIReviewRunMode = 'combined' | 'separate';
+
 /** Which side of the diff the comment is on */
 export type CommentSide = 'additions' | 'deletions';
 
@@ -20,6 +32,8 @@ export interface ReviewComment {
   isDraft?: boolean;
   reviewId?: string;
   editable?: boolean;
+  /** AI review categories (only present for AI-generated comments) */
+  aiCategories?: AIReviewCategory[];
 }
 
 export interface AIReviewItem {
@@ -29,4 +43,5 @@ export interface AIReviewItem {
   severity: Severity;
   message: string;
   suggestion?: string;
+  categories: AIReviewCategory[];
 }

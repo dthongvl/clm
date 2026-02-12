@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Popover } from "@base-ui/react/popover"
 import { Button } from "@/components/ui/button"
 import {
   Combobox,
@@ -12,6 +11,7 @@ import {
   ComboboxList,
   ComboboxCollection,
 } from "@/components/ui/combobox"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Settings02Icon } from "@hugeicons/core-free-icons"
 import type { ActionKey, ModelOption } from "@/types/settings"
@@ -78,8 +78,8 @@ function ActionSettingsPopover({
   )
 
   return (
-    <Popover.Root>
-      <Popover.Trigger
+    <Popover>
+      <PopoverTrigger
         render={
           <Button
             variant="outline"
@@ -89,10 +89,8 @@ function ActionSettingsPopover({
         }
       >
         <HugeiconsIcon icon={Settings02Icon} />
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Positioner side="bottom" align="end" sideOffset={4}>
-          <Popover.Popup className="z-50 w-64 rounded-none border border-border bg-popover p-3 shadow-md">
+      </PopoverTrigger>
+      <PopoverContent side="bottom" align="end" sideOffset={4} className="w-64 p-3">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-medium text-muted-foreground">
                 Model
@@ -170,10 +168,8 @@ function ActionSettingsPopover({
                 </>
               )}
             </div>
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+          </PopoverContent>
+    </Popover>
   )
 }
 

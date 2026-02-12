@@ -1,83 +1,144 @@
-import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
+import type { AIReviewItem, AIReviewPRResult, AIReviewCategory, AIReviewRunMode } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
+import { mapWithConcurrency } from '../utils/concurrency.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 import { wrapError } from '../lib/errors.js';
+import { buildReviewPrompt } from './ai-review-prompt.js';
+import { mergeReviewItems } from './ai-review-merge.js';
+
+const SEPARATE_MODE_CONCURRENCY = 2;
+
+export interface GeneratePRReviewOptions {
+  additionalContext?: string;
+  reviewCategories: AIReviewCategory[];
+  runMode: AIReviewRunMode;
+}
 
 /**
  * Generate AI code review for a PR using opencode server
  * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
- * @param additionalContext - Optional user-provided context to guide analysis
+ * @param options - Review options including categories and run mode
  * @returns AIReviewPRResult containing the parsed review items
  */
-export async function generatePRReview(prLink: string, additionalContext?: string): Promise<AIReviewPRResult> {
-  const prompt = buildReviewPrompt(prLink, additionalContext);
-  
+export async function generatePRReview(prLink: string, options: GeneratePRReviewOptions): Promise<AIReviewPRResult> {
+  const { additionalContext, reviewCategories, runMode } = options;
+
   try {
-    const model = await getModelForAction('ai-review');
-    const variant = await getVariantForAction('ai-review');
-    const response = await opencodeClient.prompt(prompt, { model, variant });
-    return parseReviewOutput(response);
+    if (runMode === 'separate') {
+      return await runSeparateMode(prLink, reviewCategories, additionalContext);
+    } else {
+      return await runCombinedMode(prLink, reviewCategories, additionalContext);
+    }
   } catch (error) {
     logger.error('AI review generation failed', error);
-    // Wrap with context, preserving the original error as cause
     throw wrapError(error, 'AI_ERROR', 'Failed to generate AI review', { prLink });
   }
 }
 
-function buildReviewPrompt(prLink: string, additionalContext?: string): string {
-  const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-  const repo = match ? match[1] : '';
-  const prNumber = match ? match[2] : '';
+/**
+ * Combined mode: single prompt with all selected categories
+ */
+async function runCombinedMode(
+  prLink: string,
+  categories: AIReviewCategory[],
+  additionalContext?: string,
+): Promise<AIReviewPRResult> {
+  const prompt = buildReviewPrompt({
+    prLink,
+    categories,
+    additionalContext,
+  });
 
-  let prompt = `You are a senior code reviewer. Analyze GitHub PR #${prNumber} in ${repo} and produce high-signal review findings.
+  const model = await getModelForAction('ai-review');
+  const variant = await getVariantForAction('ai-review');
+  const response = await opencodeClient.prompt(prompt, { model, variant });
+  
+  return parseReviewOutput(response, categories);
+}
 
-Execution context:
-- You are in the repository working directory.
-- You can use local git CLI and GitHub CLI (gh).
-- Use local git for diff analysis and gh for PR metadata.
+/**
+ * Separate mode: one prompt per category, then merge/dedupe results
+ */
+async function runSeparateMode(
+  prLink: string,
+  categories: AIReviewCategory[],
+  additionalContext?: string,
+): Promise<AIReviewPRResult> {
+  const model = await getModelForAction('ai-review');
+  const variant = await getVariantForAction('ai-review');
 
-Step 1: Gather PR context.
-- Read PR title/body, base/head refs, and changed-file scope.
-- Understand the intent before judging implementation.
-
-Step 2: Inspect code changes.
-- Use local git commands to compare base and head branches and inspect the patch.
-- Use new-file line numbers from the diff when reporting findings.
-- Read nearby code when needed to avoid false positives.
-
-Step 3: Identify meaningful findings.
-- critical: bugs, security issues, data loss, race conditions, major performance regressions
-- warning: correctness risks, edge cases, missing error handling, maintainability issues
-- info: useful improvements with practical impact
-- Avoid trivial style nitpicks unless they hide real risk.
-- Prefer fewer high-confidence findings over many weak guesses.
-
-Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
-{"summary":"Brief overall summary of the PR and key findings","items":[{"severity":"critical","filePath":"path/to/file.ts","lineNumber":42,"message":"Clear description of the issue and why it matters","suggestion":"Optional concrete fix"}]}`;
-
-  if (additionalContext) {
-    prompt += `
-
-User-provided additional context (optional guidance):
-${additionalContext}
-
-Use this context to prioritize analysis when relevant.
-Do not violate required JSON schema and output constraints.`;
+  interface CategoryResult {
+    category: AIReviewCategory;
+    items: AIReviewItem[];
+    summary: string;
+    error?: string;
   }
 
-  prompt += `
+  const results = await mapWithConcurrency<AIReviewCategory, CategoryResult>(
+    categories,
+    SEPARATE_MODE_CONCURRENCY,
+    async (category) => {
+      try {
+        const prompt = buildReviewPrompt({
+          prLink,
+          categories: [category],
+          additionalContext,
+          categoryScopeLabel: `${category}-only`,
+        });
 
-Output constraints:
-- Return only the JSON object; no markdown, no code fences, no extra prose.
-- Output must be valid minified JSON on a single line.
-- severity must be exactly: critical, warning, or info.
-- lineNumber must map to the changed file's new-line numbering.
-- message must be actionable and include impact.
-- If there are no meaningful findings, return \`"items":[]\` with a concise summary.`;
+        const response = await opencodeClient.prompt(prompt, { model, variant });
+        const parsed = parseReviewOutput(response, [category]);
+        
+        return {
+          category,
+          items: parsed.items,
+          summary: parsed.summary,
+        };
+      } catch (error) {
+        logger.warn(`Category ${category} review failed: ${(error as Error).message}`);
+        return {
+          category,
+          items: [],
+          summary: '',
+          error: (error as Error).message,
+        };
+      }
+    },
+  );
 
-  return prompt;
+  // Collect all items and merge/dedupe
+  const allItems: AIReviewItem[] = [];
+  const summaries: string[] = [];
+  const failedCategories: string[] = [];
+
+  for (const result of results) {
+    if (result.error) {
+      failedCategories.push(result.category);
+    } else {
+      allItems.push(...result.items);
+      if (result.summary) {
+        summaries.push(result.summary);
+      }
+    }
+  }
+
+  const mergedItems = mergeReviewItems(allItems);
+  
+  // Build combined summary
+  let summary = summaries.length > 0
+    ? summaries.join(' ')
+    : 'No significant findings.';
+  
+  if (failedCategories.length > 0) {
+    summary += ` (Note: ${failedCategories.join(', ')} review(s) failed)`;
+  }
+
+  return {
+    items: mergedItems,
+    summary,
+  };
 }
 
 interface JsonReviewItem {
@@ -88,6 +149,7 @@ interface JsonReviewItem {
   lineNumber?: number;
   message?: string;
   suggestion?: string;
+  categories?: string[];
 }
 
 interface JsonReviewResult {
@@ -95,7 +157,7 @@ interface JsonReviewResult {
   items?: JsonReviewItem[];
 }
 
-function parseReviewOutput(output: string): AIReviewPRResult {
+function parseReviewOutput(output: string, fallbackCategories: AIReviewCategory[]): AIReviewPRResult {
   const jsonContent = extractJsonBlock(output);
   if (!jsonContent) {
     logger.warn('No JSON review found in AI output');
@@ -109,12 +171,15 @@ function parseReviewOutput(output: string): AIReviewPRResult {
   }
 
   const summary = parsed.summary || '';
-  const items = parseJsonReviewItems(parsed.items || []);
+  const items = parseJsonReviewItems(parsed.items || [], fallbackCategories);
 
   return { items, summary };
 }
 
-function parseJsonReviewItems(jsonItems: JsonReviewItem[]): AIReviewItem[] {
+function parseJsonReviewItems(
+  jsonItems: JsonReviewItem[],
+  fallbackCategories: AIReviewCategory[],
+): AIReviewItem[] {
   if (!Array.isArray(jsonItems)) {
     return [];
   }
@@ -134,6 +199,19 @@ function parseJsonReviewItems(jsonItems: JsonReviewItem[]): AIReviewItem[] {
     const message = item.message || '';
     const suggestion = item.suggestion || undefined;
     
+    // Parse categories from response, fallback to provided categories
+    let categories: AIReviewCategory[];
+    if (Array.isArray(item.categories) && item.categories.length > 0) {
+      // Validate and filter to known categories
+      const validCategories = item.categories
+        .filter((c): c is AIReviewCategory => 
+          typeof c === 'string' && isValidCategory(c)
+        );
+      categories = validCategories.length > 0 ? validCategories : fallbackCategories;
+    } else {
+      categories = fallbackCategories;
+    }
+    
     if (filePath && message) {
       items.push({
         id: `ai-review-${itemId++}`,
@@ -142,9 +220,25 @@ function parseJsonReviewItems(jsonItems: JsonReviewItem[]): AIReviewItem[] {
         lineNumber,
         message,
         suggestion,
+        categories,
       });
     }
   }
   
   return items;
+}
+
+const VALID_CATEGORIES = new Set<string>([
+  'code-quality',
+  'coding-convention',
+  'security',
+  'accessibility',
+  'architecture',
+  'api-design',
+  'performance',
+  'testing',
+]);
+
+function isValidCategory(value: string): value is AIReviewCategory {
+  return VALID_CATEGORIES.has(value.toLowerCase());
 }

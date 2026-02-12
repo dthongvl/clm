@@ -90,6 +90,7 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
       severity: meta.item.severity,
       createdAt: new Date(),
       replies: [],
+      aiCategories: meta.item.categories,
     }
 
     const isConverting = convertingAIItemIds?.has(meta.item.id) ?? false

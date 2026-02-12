@@ -19,8 +19,19 @@ import {
 } from "@/components/ui/popover"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Loading03Icon, SparklesIcon, UserIcon } from "@hugeicons/core-free-icons"
-import type { ReviewComment } from "@/types/review"
+import type { ReviewComment, AIReviewCategory } from "@/types/review"
 import { CommentForm } from "./comment-form"
+
+const CATEGORY_SHORT_LABELS: Record<AIReviewCategory, string> = {
+  "code-quality": "Quality",
+  "coding-convention": "Convention",
+  "security": "Security",
+  "accessibility": "A11y",
+  "architecture": "Arch",
+  "api-design": "API",
+  "performance": "Perf",
+  "testing": "Testing",
+}
 
 /**
  * Props for the InlineCommentThread component.
@@ -97,6 +108,11 @@ function CommentItem({
     timeStyle: "short",
   }).format(new Date(comment.createdAt))
 
+  // Show up to 2 category badges + overflow count
+  const categories = comment.aiCategories || []
+  const visibleCategories = categories.slice(0, 2)
+  const remainingCount = categories.length - 2
+
   return (
     <div
       data-slot="comment-item"
@@ -125,6 +141,16 @@ function CommentItem({
               <SeverityBadge severity={comment.severity}>
                 {comment.severity}
               </SeverityBadge>
+            )}
+            {visibleCategories.map((category) => (
+              <Badge key={category} variant="outline" className="h-4 px-1.5 text-[10px]">
+                {CATEGORY_SHORT_LABELS[category]}
+              </Badge>
+            ))}
+            {remainingCount > 0 && (
+              <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                +{remainingCount}
+              </Badge>
             )}
             <span className="text-muted-foreground">·</span>
             {comment.isStreaming ? (

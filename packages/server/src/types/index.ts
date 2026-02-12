@@ -76,6 +76,18 @@ export interface GroupingResult {
   groups: ChangeGroup[];
 }
 
+export type AIReviewCategory =
+  | "code-quality"
+  | "coding-convention"
+  | "security"
+  | "accessibility"
+  | "architecture"
+  | "api-design"
+  | "performance"
+  | "testing";
+
+export type AIReviewRunMode = "combined" | "separate";
+
 export interface AIReviewItem {
   id: string;
   filePath: string;
@@ -83,6 +95,7 @@ export interface AIReviewItem {
   severity: 'critical' | 'warning' | 'info';
   message: string;
   suggestion?: string;
+  categories: AIReviewCategory[];
 }
 
 export interface AIReviewPRResult {

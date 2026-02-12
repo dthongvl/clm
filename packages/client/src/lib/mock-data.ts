@@ -173,6 +173,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "critical",
     message: "API key is hardcoded in the source code",
     suggestion: "Use environment variables to store sensitive credentials",
+    categories: ["security"],
   },
   {
     id: "2",
@@ -181,6 +182,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "warning",
     message: "Missing error handling for async operations",
     suggestion: "Add try-catch block and error state management",
+    categories: ["code-quality"],
   },
   {
     id: "3",
@@ -188,6 +190,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     lineNumber: 8,
     severity: "info",
     message: "Consider memoizing this component for better performance",
+    categories: ["performance"],
   },
   {
     id: "4",
@@ -195,6 +198,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     lineNumber: 5,
     severity: "warning",
     message: "Dependency array may be missing dependencies",
+    categories: ["code-quality"],
   },
   {
     id: "5",
@@ -203,6 +207,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "critical",
     message: "JWT secret should not be committed to version control",
     suggestion: "Move JWT_SECRET to environment variables and add to .gitignore",
+    categories: ["security"],
   },
   {
     id: "6",
@@ -211,6 +216,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "warning",
     message: "Token expiration is set to 30 days which may be too long",
     suggestion: "Consider using shorter expiration with refresh tokens",
+    categories: ["security", "api-design"],
   },
   {
     id: "7",
@@ -219,6 +225,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "warning",
     message: "Session data is stored in memory, will be lost on restart",
     suggestion: "Use Redis or database for session persistence",
+    categories: ["architecture"],
   },
   {
     id: "8",
@@ -227,6 +234,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "critical",
     message: "SQL injection vulnerability in query parameter",
     suggestion: "Use parameterized queries or an ORM",
+    categories: ["security"],
   },
   {
     id: "9",
@@ -235,6 +243,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "warning",
     message: "Missing rate limiting on this endpoint",
     suggestion: "Add rate limiting middleware to prevent abuse",
+    categories: ["security", "api-design"],
   },
   {
     id: "10",
@@ -242,6 +251,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     lineNumber: 12,
     severity: "info",
     message: "Consider adding request validation middleware",
+    categories: ["api-design"],
   },
   {
     id: "11",
@@ -250,6 +260,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "warning",
     message: "Password is logged in debug mode",
     suggestion: "Remove sensitive data from logs",
+    categories: ["security"],
   },
   {
     id: "12",
@@ -257,6 +268,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     lineNumber: 8,
     severity: "info",
     message: "Missing aria-label for icon-only button variant",
+    categories: ["accessibility"],
   },
   {
     id: "13",
@@ -265,6 +277,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     severity: "warning",
     message: "Focus trap not implemented for modal",
     suggestion: "Use a focus trap library or implement focus management",
+    categories: ["accessibility"],
   },
   {
     id: "14",
@@ -272,6 +285,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     lineNumber: 5,
     severity: "info",
     message: "Consider adding an index on email column for faster lookups",
+    categories: ["performance"],
   },
   {
     id: "15",
@@ -279,6 +293,7 @@ export const mockAIReviewItems: AIReviewItem[] = [
     lineNumber: 18,
     severity: "info",
     message: "Mock implementations could be more comprehensive",
+    categories: ["testing"],
   },
 ]
 
