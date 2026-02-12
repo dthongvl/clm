@@ -6,7 +6,7 @@ interface UsePatternVerificationReturn {
   result: PatternVerificationResult | null;
   isLoading: boolean;
   error: Error | null;
-  verify: () => Promise<void>;
+  verify: (additionalContext?: string) => Promise<boolean>;
 }
 
 export function usePatternVerification(): UsePatternVerificationReturn {
@@ -14,15 +14,17 @@ export function usePatternVerification(): UsePatternVerificationReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const verify = useCallback(async () => {
+  const verify = useCallback(async (additionalContext?: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await verifyPatterns();
+      const data = await verifyPatterns(additionalContext);
       setResult(data);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Unknown error'));
+      return false;
     } finally {
       setIsLoading(false);
     }

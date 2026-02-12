@@ -2,14 +2,15 @@ import { cn } from "@/lib/utils"
 import type { RelatedFile } from "@/types"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { AiGenerativeIcon, Loading03Icon, AlertCircleIcon, File01Icon } from "@hugeicons/core-free-icons"
+import { AiGenerativeIcon, AlertCircleIcon, File01Icon } from "@hugeicons/core-free-icons"
 import { ActionSettingsPopover } from "./action-settings-popover"
+import { ActionTriggerWithContext } from "./action-trigger-with-context"
 import type { ModelOption } from "@/types/settings"
 
 export interface RelatedFilesProps extends React.ComponentProps<"div"> {
   files: RelatedFile[]
   onFileClick?: (filePath: string) => void
-  onFindFiles?: () => void
+  onFindFiles?: (additionalContext?: string) => Promise<boolean>
   isLoading?: boolean
   error?: Error | null
   models?: ModelOption[]
@@ -40,21 +41,14 @@ function RelatedFiles({
     >
       {onFindFiles && (
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onFindFiles}
-            disabled={isLoading}
-            className="flex-1"
-            aria-label={isLoading ? "Finding related files..." : "Find related files"}
-          >
-            <HugeiconsIcon
-              icon={isLoading ? Loading03Icon : AiGenerativeIcon}
-              className={cn(isLoading && "animate-spin")}
-              data-icon="inline-start"
-            />
-            {isLoading ? "Finding..." : files.length > 0 ? "Refresh Related Files" : "Find Related Files"}
-          </Button>
+          <ActionTriggerWithContext
+            label={files.length > 0 ? "Refresh Related Files" : "Find Related Files"}
+            loadingLabel="Finding..."
+            ariaLabel="Find related files"
+            isLoading={isLoading}
+            icon={AiGenerativeIcon}
+            onRun={onFindFiles}
+          />
           {models && onModelChange && (
             <ActionSettingsPopover
               actionKey="related-files"
@@ -80,7 +74,7 @@ function RelatedFiles({
             <Button
               variant="outline"
               size="sm"
-              onClick={onFindFiles}
+              onClick={() => onFindFiles()}
               disabled={isLoading}
               className="mt-1"
             >

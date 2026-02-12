@@ -11,8 +11,10 @@ import {
   IntelligentGrouping,
   AIReviewSummary,
   RelatedFiles,
+  ActionTriggerWithContext,
 } from "@/components/side-panel"
 import { Button } from "@/components/ui/button"
+import { AiGenerativeIcon } from "@hugeicons/core-free-icons"
 
 import { ModeToggle } from "@/components/mode-toggle"
 import { useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings, useViewedFiles } from "@/hooks"
@@ -367,15 +369,14 @@ export function App() {
               </SidePanelGroupingContent>
               <SidePanelAIReviewContent>
                 <div className="mb-4 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={triggerReview}
-                    disabled={isReviewLoading}
-                    className="flex-1"
-                  >
-                    {isReviewLoading ? "Generating AI Review..." : "Generate AI Review"}
-                  </Button>
+                  <ActionTriggerWithContext
+                    label="Generate AI Review"
+                    loadingLabel="Generating AI Review..."
+                    ariaLabel="Generate AI review"
+                    isLoading={isReviewLoading}
+                    icon={AiGenerativeIcon}
+                    onRun={triggerReview}
+                  />
                   <ActionSettingsPopover
                     actionKey="ai-review"
                     models={models}

@@ -1,23 +1,22 @@
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { VerificationBadge } from "@/components/ui/verification-badge"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { 
   CheckmarkSquare01Icon, 
-  Loading03Icon, 
   AlertCircleIcon,
   ArrowRight01Icon
 } from "@hugeicons/core-free-icons"
 import type { PatternVerification, PatternVerificationResult } from "@/types/verification"
 import { ActionSettingsPopover } from "./action-settings-popover"
+import { ActionTriggerWithContext } from "./action-trigger-with-context"
 import type { ModelOption } from "@/types/settings"
 
 interface PatternVerificationPanelProps extends React.ComponentProps<"div"> {
   result: PatternVerificationResult | null;
   isLoading: boolean;
   error: Error | null;
-  onVerify: () => void;
+  onVerify: (additionalContext?: string) => Promise<boolean>;
   onLocationClick?: (filePath: string, lineNumber: number) => void;
   models?: ModelOption[];
   currentModel?: string;
@@ -47,20 +46,14 @@ function PatternVerificationPanel({
       {...props}
     >
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onVerify}
-          disabled={isLoading}
-          className="flex-1"
-        >
-          <HugeiconsIcon
-            icon={isLoading ? Loading03Icon : CheckmarkSquare01Icon}
-            className={cn(isLoading && "animate-spin")}
-            data-icon="inline-start"
-          />
-          {isLoading ? "Verifying..." : result ? "Re-verify Patterns" : "Verify Patterns"}
-        </Button>
+        <ActionTriggerWithContext
+          label={result ? "Re-verify Patterns" : "Verify Patterns"}
+          loadingLabel="Verifying..."
+          ariaLabel="Verify patterns"
+          isLoading={isLoading}
+          icon={CheckmarkSquare01Icon}
+          onRun={onVerify}
+        />
         {models && onModelChange && (
           <ActionSettingsPopover
             actionKey="pattern-verification"

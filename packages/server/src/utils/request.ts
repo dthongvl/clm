@@ -35,3 +35,27 @@ export function parsePositiveInt(value: string | undefined): number | null {
   if (Number.isNaN(parsed) || parsed < 1) return null;
   return parsed;
 }
+
+const DEFAULT_ADDITIONAL_CONTEXT_MAX_LENGTH = 2000;
+
+/**
+ * Normalize and validate optional additional context from request body.
+ * Returns trimmed string or undefined if empty/whitespace-only.
+ */
+export function normalizeAdditionalContext(
+  value: unknown,
+  maxLength = DEFAULT_ADDITIONAL_CONTEXT_MAX_LENGTH,
+): { ok: true; value: string | undefined } | { ok: false; error: string } {
+  if (value == null) return { ok: true, value: undefined };
+  if (typeof value !== 'string') {
+    return { ok: false, error: 'additionalContext must be a string' };
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: undefined };
+  if (trimmed.length > maxLength) {
+    return { ok: false, error: `additionalContext exceeds maximum length of ${maxLength}` };
+  }
+
+  return { ok: true, value: trimmed };
+}

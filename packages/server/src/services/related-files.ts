@@ -7,10 +7,11 @@ import { logger } from '../lib/logger.js';
 /**
  * Find files related to the PR changes that might be relevant for code review
  * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
+ * @param additionalContext - Optional user-provided context to guide analysis
  * @returns RelatedFilesResult containing the list of related files
  */
-export async function findRelatedFiles(prLink: string): Promise<RelatedFilesResult> {
-  const prompt = buildRelatedFilesPrompt(prLink);
+export async function findRelatedFiles(prLink: string, additionalContext?: string): Promise<RelatedFilesResult> {
+  const prompt = buildRelatedFilesPrompt(prLink, additionalContext);
   
   try {
     const model = await getModelForAction('related-files');
@@ -23,12 +24,12 @@ export async function findRelatedFiles(prLink: string): Promise<RelatedFilesResu
   }
 }
 
-function buildRelatedFilesPrompt(prLink: string): string {
+function buildRelatedFilesPrompt(prLink: string, additionalContext?: string): string {
   const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `Analyze GitHub PR #${prNumber} in ${repo} and find files that are NOT in the PR but are important review context.
+  let prompt = `Analyze GitHub PR #${prNumber} in ${repo} and find files that are NOT in the PR but are important review context.
 
 Execution context:
 - You are in the repository working directory.
@@ -50,7 +51,19 @@ Step 3: Find related non-PR files.
 - Exclude files already changed in this PR.
 
 Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
-{"files":[{"filePath":"path/to/related/file.ts","explanation":"Why this file is related, what dependency/flow connects it, and what reviewer should verify"}]}
+{"files":[{"filePath":"path/to/related/file.ts","explanation":"Why this file is related, what dependency/flow connects it, and what reviewer should verify"}]}`;
+
+  if (additionalContext) {
+    prompt += `
+
+User-provided additional context (optional guidance):
+${additionalContext}
+
+Use this context to prioritize analysis when relevant.
+Do not violate required JSON schema and output constraints.`;
+  }
+
+  prompt += `
 
 Output constraints:
 - Return only the JSON object; no markdown, no code fences, no extra prose.
@@ -59,6 +72,8 @@ Output constraints:
 - Order by reviewer value (most important first).
 - Limit to the 10 most relevant files.
 - If no strong related files exist, return \`"files":[]\`.`;
+
+  return prompt;
 }
 
 interface JsonRelatedFile {

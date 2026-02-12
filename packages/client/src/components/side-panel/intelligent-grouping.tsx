@@ -3,14 +3,15 @@ import type { ChangeGroup } from "@/types/grouping"
 import { Button } from "@/components/ui/button"
 import { ChangeGroupCard } from "./change-group-card"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { AiGenerativeIcon, Loading03Icon, AlertCircleIcon } from "@hugeicons/core-free-icons"
+import { AiGenerativeIcon, AlertCircleIcon } from "@hugeicons/core-free-icons"
 import { ActionSettingsPopover } from "./action-settings-popover"
+import { ActionTriggerWithContext } from "./action-trigger-with-context"
 import type { ModelOption } from "@/types/settings"
 
 export interface IntelligentGroupingProps extends React.ComponentProps<"div"> {
   groups: ChangeGroup[]
   onFileClick?: (filePath: string) => void
-  onGenerateGroups?: () => void
+  onGenerateGroups?: (additionalContext?: string) => Promise<boolean>
   isGenerating?: boolean
   error?: Error | null
   models?: ModelOption[]
@@ -41,21 +42,14 @@ function IntelligentGrouping({
     >
       {onGenerateGroups && (
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onGenerateGroups}
-            disabled={isGenerating}
-            className="flex-1"
-            aria-label={isGenerating ? "Generating groups..." : "Generate AI groupings"}
-          >
-            <HugeiconsIcon
-              icon={isGenerating ? Loading03Icon : AiGenerativeIcon}
-              className={cn(isGenerating && "animate-spin")}
-              data-icon="inline-start"
-            />
-            {isGenerating ? "Generating..." : groups.length > 0 ? "Regenerate Groupings" : "Generate AI Groupings"}
-          </Button>
+          <ActionTriggerWithContext
+            label={groups.length > 0 ? "Regenerate Groupings" : "Generate AI Groupings"}
+            loadingLabel="Generating..."
+            ariaLabel="Generate AI groupings"
+            isLoading={isGenerating}
+            icon={AiGenerativeIcon}
+            onRun={onGenerateGroups}
+          />
           {models && onModelChange && (
             <ActionSettingsPopover
               actionKey="grouping"
@@ -81,7 +75,7 @@ function IntelligentGrouping({
             <Button
               variant="outline"
               size="sm"
-              onClick={onGenerateGroups}
+              onClick={() => onGenerateGroups()}
               disabled={isGenerating}
               className="mt-1"
             >

@@ -4,8 +4,14 @@ import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 
-export async function verifyPatterns(prLink: string): Promise<PatternVerificationResult> {
-  const prompt = buildVerificationPrompt(prLink);
+/**
+ * Verify that cross-file updates in a PR are complete and consistent
+ * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
+ * @param additionalContext - Optional user-provided context to guide analysis
+ * @returns PatternVerificationResult containing the verification findings
+ */
+export async function verifyPatterns(prLink: string, additionalContext?: string): Promise<PatternVerificationResult> {
+  const prompt = buildVerificationPrompt(prLink, additionalContext);
   
   try {
     const model = await getModelForAction('pattern-verification');
@@ -18,12 +24,12 @@ export async function verifyPatterns(prLink: string): Promise<PatternVerificatio
   }
 }
 
-function buildVerificationPrompt(prLink: string): string {
+function buildVerificationPrompt(prLink: string, additionalContext?: string): string {
   const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `Analyze GitHub PR #${prNumber} in ${repo} and verify that cross-file updates are complete and consistent.
+  let prompt = `Analyze GitHub PR #${prNumber} in ${repo} and verify that cross-file updates are complete and consistent.
 
 Execution context:
 - You are in the repository working directory.
@@ -47,7 +53,19 @@ Step 3: Verify completeness.
 - Flag likely misses or suspicious leftovers.
 
 Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
-{"summary":"Brief summary of verification findings","verifications":[{"id":"verify-1","pattern":"functionName renamed to newFunctionName","description":"What changed and what should be checked","status":"verified","details":"Found 8 call sites; all 8 are updated","locations":[{"filePath":"path/to/file.ts","lineNumber":42,"status":"updated","snippet":"newFunctionName(args)"}]}]}
+{"summary":"Brief summary of verification findings","verifications":[{"id":"verify-1","pattern":"functionName renamed to newFunctionName","description":"What changed and what should be checked","status":"verified","details":"Found 8 call sites; all 8 are updated","locations":[{"filePath":"path/to/file.ts","lineNumber":42,"status":"updated","snippet":"newFunctionName(args)"}]}]}`;
+
+  if (additionalContext) {
+    prompt += `
+
+User-provided additional context (optional guidance):
+${additionalContext}
+
+Use this context to prioritize analysis when relevant.
+Do not violate required JSON schema and output constraints.`;
+  }
+
+  prompt += `
 
 Output constraints:
 - Return only the JSON object; no markdown, no code fences, no extra prose.
@@ -56,6 +74,8 @@ Output constraints:
 - Use \`incomplete\` when updates are likely missing.
 - Use \`warning\` when uncertain and human review is needed.
 - If no verification patterns are found, return \`"verifications":[]\` with a short summary.`;
+
+  return prompt;
 }
 
 interface JsonPatternLocation {

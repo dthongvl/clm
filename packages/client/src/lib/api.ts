@@ -219,10 +219,14 @@ interface GroupingResponse {
   groups: ServerChangeGroup[];
 }
 
-export async function generateGrouping(): Promise<ServerChangeGroup[]> {
+function buildAIActionBody(additionalContext?: string) {
+  return additionalContext ? { additionalContext } : {};
+}
+
+export async function generateGrouping(additionalContext?: string): Promise<ServerChangeGroup[]> {
   const response = await fetchApi<GroupingResponse>('/ai/grouping', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(buildAIActionBody(additionalContext)),
   });
   return response.groups;
 }
@@ -242,10 +246,10 @@ interface AIReviewPRResponse {
   summary: string;
 }
 
-export async function generateAIReview(): Promise<AIReviewPRResponse> {
+export async function generateAIReview(additionalContext?: string): Promise<AIReviewPRResponse> {
   const response = await fetchApi<AIReviewPRResponse>('/ai/review/pr', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(buildAIActionBody(additionalContext)),
   });
   return response;
 }
@@ -260,10 +264,10 @@ interface RelatedFilesResponse {
   files: ServerRelatedFile[];
 }
 
-export async function findRelatedFiles(): Promise<ServerRelatedFile[]> {
+export async function findRelatedFiles(additionalContext?: string): Promise<ServerRelatedFile[]> {
   const response = await fetchApi<RelatedFilesResponse>('/ai/related-files', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(buildAIActionBody(additionalContext)),
   });
   return response.files;
 }
@@ -271,10 +275,10 @@ export async function findRelatedFiles(): Promise<ServerRelatedFile[]> {
 // Pattern Verification API
 import type { PatternVerificationResult } from '@/types/verification'
 
-export async function verifyPatterns(): Promise<PatternVerificationResult> {
+export async function verifyPatterns(additionalContext?: string): Promise<PatternVerificationResult> {
   return fetchApi<PatternVerificationResult>('/ai/pattern-verification', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(buildAIActionBody(additionalContext)),
   });
 }
 

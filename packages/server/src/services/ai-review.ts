@@ -8,10 +8,11 @@ import { wrapError } from '../lib/errors.js';
 /**
  * Generate AI code review for a PR using opencode server
  * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
+ * @param additionalContext - Optional user-provided context to guide analysis
  * @returns AIReviewPRResult containing the parsed review items
  */
-export async function generatePRReview(prLink: string): Promise<AIReviewPRResult> {
-  const prompt = buildReviewPrompt(prLink);
+export async function generatePRReview(prLink: string, additionalContext?: string): Promise<AIReviewPRResult> {
+  const prompt = buildReviewPrompt(prLink, additionalContext);
   
   try {
     const model = await getModelForAction('ai-review');
@@ -25,12 +26,12 @@ export async function generatePRReview(prLink: string): Promise<AIReviewPRResult
   }
 }
 
-function buildReviewPrompt(prLink: string): string {
+function buildReviewPrompt(prLink: string, additionalContext?: string): string {
   const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `You are a senior code reviewer. Analyze GitHub PR #${prNumber} in ${repo} and produce high-signal review findings.
+  let prompt = `You are a senior code reviewer. Analyze GitHub PR #${prNumber} in ${repo} and produce high-signal review findings.
 
 Execution context:
 - You are in the repository working directory.
@@ -54,7 +55,19 @@ Step 3: Identify meaningful findings.
 - Prefer fewer high-confidence findings over many weak guesses.
 
 Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
-{"summary":"Brief overall summary of the PR and key findings","items":[{"severity":"critical","filePath":"path/to/file.ts","lineNumber":42,"message":"Clear description of the issue and why it matters","suggestion":"Optional concrete fix"}]}
+{"summary":"Brief overall summary of the PR and key findings","items":[{"severity":"critical","filePath":"path/to/file.ts","lineNumber":42,"message":"Clear description of the issue and why it matters","suggestion":"Optional concrete fix"}]}`;
+
+  if (additionalContext) {
+    prompt += `
+
+User-provided additional context (optional guidance):
+${additionalContext}
+
+Use this context to prioritize analysis when relevant.
+Do not violate required JSON schema and output constraints.`;
+  }
+
+  prompt += `
 
 Output constraints:
 - Return only the JSON object; no markdown, no code fences, no extra prose.
@@ -63,6 +76,8 @@ Output constraints:
 - lineNumber must map to the changed file's new-line numbering.
 - message must be actionable and include impact.
 - If there are no meaningful findings, return \`"items":[]\` with a concise summary.`;
+
+  return prompt;
 }
 
 interface JsonReviewItem {

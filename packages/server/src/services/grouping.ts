@@ -7,10 +7,11 @@ import { logger } from '../lib/logger.js';
 /**
  * Generate intelligent grouping for a PR using opencode server
  * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
+ * @param additionalContext - Optional user-provided context to guide analysis
  * @returns GroupingResult containing the parsed groups
  */
-export async function generateGrouping(prLink: string): Promise<GroupingResult> {
-  const prompt = buildGroupingPrompt(prLink);
+export async function generateGrouping(prLink: string, additionalContext?: string): Promise<GroupingResult> {
+  const prompt = buildGroupingPrompt(prLink, additionalContext);
   
   try {
     const model = await getModelForAction('grouping');
@@ -23,12 +24,12 @@ export async function generateGrouping(prLink: string): Promise<GroupingResult> 
   }
 }
 
-function buildGroupingPrompt(prLink: string): string {
+function buildGroupingPrompt(prLink: string, additionalContext?: string): string {
   const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `Analyze GitHub PR #${prNumber} in ${repo} and create reviewer-friendly change groups.
+  let prompt = `Analyze GitHub PR #${prNumber} in ${repo} and create reviewer-friendly change groups.
 
 Execution context:
 - You are in the repository working directory.
@@ -51,7 +52,19 @@ Step 3: Assign a risk level to each group.
 - LOW: tests, docs, comments, formatting, tooling-only changes
 
 Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
-{"groups":[{"id":"group-1","title":"Short descriptive title","riskLevel":"high","riskReason":"Brief reason for this risk level","explanation":"Quick explanation of this group: why files belong together, what behavior changed, and key reviewer focus points","files":[{"path":"path/to/file.ts","additions":10,"deletions":5}]}]}
+{"groups":[{"id":"group-1","title":"Short descriptive title","riskLevel":"high","riskReason":"Brief reason for this risk level","explanation":"Quick explanation of this group: why files belong together, what behavior changed, and key reviewer focus points","files":[{"path":"path/to/file.ts","additions":10,"deletions":5}]}]}`;
+
+  if (additionalContext) {
+    prompt += `
+
+User-provided additional context (optional guidance):
+${additionalContext}
+
+Use this context to prioritize analysis when relevant.
+Do not violate required JSON schema and output constraints.`;
+  }
+
+  prompt += `
 
 Output constraints:
 - Return only the JSON object; no markdown, no code fences, no extra prose.
@@ -60,6 +73,8 @@ Output constraints:
 - A file may appear in multiple groups if it serves multiple concerns.
 - Prioritize clarity and review order over perfect taxonomy.
 - If the PR is tiny/simple, return a single group.`;
+
+  return prompt;
 }
 
 interface JsonFileEntry {

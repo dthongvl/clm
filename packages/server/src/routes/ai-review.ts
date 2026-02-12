@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { reviewDiff, reviewLine, checkAIBinary } from '../services/ai.js';
 import { generatePRReview } from '../services/ai-review.js';
 import { buildPRLink } from '../utils/github.js';
-import { safeJson, isPositiveInt } from '../utils/request.js';
+import { safeJson, isPositiveInt, normalizeAdditionalContext } from '../utils/request.js';
 import { getAppContext } from '../lib/app-context.js';
 import { logger } from '../lib/logger.js';
 
@@ -18,6 +18,10 @@ interface LineReviewBody {
   line: number;
   code: string;
   diff?: string;
+}
+
+interface AIActionBody {
+  additionalContext?: unknown;
 }
 
 // POST /api/ai/review
@@ -91,10 +95,18 @@ app.post('/line', async (c) => {
 app.post('/pr', async (c) => {
   const { prNumber, repo } = getAppContext();
 
+  const result = await safeJson<AIActionBody>(c);
+  if (!result.ok) return result.response;
+
+  const contextResult = normalizeAdditionalContext(result.data.additionalContext);
+  if (!contextResult.ok) {
+    return c.json({ error: contextResult.error }, 400);
+  }
+
   try {
     const prLink = buildPRLink(repo, prNumber);
     logger.ai(`Generating PR review for #${prNumber}`);
-    const reviewResult = await generatePRReview(prLink);
+    const reviewResult = await generatePRReview(prLink, contextResult.value);
     return c.json(reviewResult);
   } catch (error) {
     logger.error('AI PR review failed', error);
