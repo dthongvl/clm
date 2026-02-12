@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   FileTree,
   FileTreeFolder,
@@ -101,9 +101,9 @@ export function PRFileTree({
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   // Update expanded state when tree changes (e.g., after filtering)
-  useMemo(() => {
-    setExpanded(getDefaultExpandedFolders(tree))
-  }, [tree])
+  useEffect(() => {
+    setExpanded(defaultExpanded)
+  }, [defaultExpanded])
 
   return (
     <div className={cn("flex h-full flex-col", className)}>

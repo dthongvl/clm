@@ -17,6 +17,39 @@ export interface PRFileTreeFileNode {
 export type PRFileTreeNode = PRFileTreeFolderNode | PRFileTreeFileNode
 
 /**
+ * Compact linear folder chains into a single display node.
+ * Example: app/javascript/core -> one folder node named "app/javascript/core".
+ */
+function compactFolderNode(node: PRFileTreeFolderNode): PRFileTreeFolderNode {
+  const compactedNameSegments = [node.name]
+  let terminalNode = node
+
+  while (
+    terminalNode.children.length === 1 &&
+    terminalNode.children[0].type === "folder"
+  ) {
+    const onlyChild = terminalNode.children[0]
+    compactedNameSegments.push(onlyChild.name)
+    terminalNode = onlyChild
+  }
+
+  return {
+    type: "folder",
+    path: terminalNode.path,
+    name: compactedNameSegments.join("/"),
+    children: terminalNode.children.map((child) =>
+      child.type === "folder" ? compactFolderNode(child) : child
+    ),
+  }
+}
+
+function compactTree(nodes: PRFileTreeNode[]): PRFileTreeNode[] {
+  return nodes.map((node) =>
+    node.type === "folder" ? compactFolderNode(node) : node
+  )
+}
+
+/**
  * Build a hierarchical file tree from flat diff file paths.
  * Folders are sorted before files, then alphabetically by name.
  */
@@ -101,7 +134,7 @@ export function buildPRFileTree(files: DiffFileData[]): PRFileTreeNode[] {
     return sorted
   }
 
-  return sortTree(Array.from(root.values()))
+  return compactTree(sortTree(Array.from(root.values())))
 }
 
 /**
