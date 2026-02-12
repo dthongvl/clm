@@ -1,5 +1,5 @@
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
-import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
+import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -28,88 +28,78 @@ function buildGroupingPrompt(prLink: string): string {
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `Analyze GitHub PR #${prNumber} in ${repo} and group files for code review.
+  return `Analyze GitHub PR #${prNumber} in ${repo} and create reviewer-friendly change groups.
 
-Step 1: Get PR information and branch names:
-gh pr view ${prNumber} --repo ${repo} --json title,body,baseRefName,headRefName,files
+Execution context:
+- You are in the repository working directory.
+- You can use local git CLI and GitHub CLI (gh).
+- Use gh for PR metadata and changed-file stats.
+- Use local git to inspect full diffs between base and head.
 
-Step 2: Fetch the latest branches and get the diff locally (faster than gh pr diff):
-git fetch origin <baseRefName> <headRefName>
-git diff origin/<baseRefName>...origin/<headRefName>
+Step 1: Gather PR context.
+- Read title/body, base/head refs, and changed files with additions/deletions.
+- Understand intent and review surface.
 
-Step 3: Read the PR description to understand the intent and context of the changes. Then analyze the diff and group logically connected changes. Order groups so reviewers can understand the PR from top to bottom.
+Step 2: Analyze the patch.
+- Inspect local git diff between base and head.
+- Identify logically connected changes and dependency chains.
+- Order groups so reviewers can follow the PR from highest risk to lowest.
 
-Step 4: For each group, assess the risk level:
-- HIGH: Core business logic, payment/billing, authentication, security, database migrations, data processing pipelines
-- MEDIUM: API endpoints, shared utilities, configuration, non-critical features
-- LOW: Tests, documentation, comments, formatting, dev tooling, experimental features
+Step 3: Assign a risk level to each group.
+- HIGH: core business logic, auth/security, billing/payments, migrations, data pipelines
+- MEDIUM: API behavior, shared utilities, configuration, non-critical features
+- LOW: tests, docs, comments, formatting, tooling-only changes
 
-Step 5: Return ONLY a YAML code block in this exact format (no other text):
+Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
+{"groups":[{"id":"group-1","title":"Short descriptive title","riskLevel":"high","riskReason":"Brief reason for this risk level","explanation":"Quick explanation of this group: why files belong together, what behavior changed, and key reviewer focus points","files":[{"path":"path/to/file.ts","additions":10,"deletions":5}]}]}
 
-\`\`\`yaml
-groups:
-  - id: group-1
-    title: Short descriptive title
-    riskLevel: high  # must be: high, medium, or low
-    riskReason: Brief reason why this risk level was assigned
-    explanation: |
-      Quick explanation of this group:
-      - Why these files are grouped together
-      - What functionality or feature they implement/modify
-      - Key changes in each file and how they relate
-      - Any important context for reviewers (dependencies, side effects, etc.)
-    files:
-      - path: path/to/file.ts
-        additions: 10
-        deletions: 5
-\`\`\`
-
-Rules:
-- Files can appear in multiple groups if they serve multiple purposes
-- Order groups by risk level (high-risk first, then medium, then low)
-- Provide detailed explanations that help reviewers understand the changes without reading all the code
-- Use actual additions/deletions from the gh output for each file
-- Return ONLY the YAML code block, nothing else`;
+Output constraints:
+- Return only the JSON object; no markdown, no code fences, no extra prose.
+- Output must be valid minified JSON on a single line.
+- Use actual additions/deletions from PR metadata for each file.
+- A file may appear in multiple groups if it serves multiple concerns.
+- Prioritize clarity and review order over perfect taxonomy.
+- If the PR is tiny/simple, return a single group.`;
 }
 
-interface YamlFileEntry {
+interface JsonFileEntry {
   path: string;
   additions?: number;
   deletions?: number;
 }
 
-interface YamlGroup {
+interface JsonGroup {
   id?: string;
   title?: string;
   explanation?: string;
   riskLevel?: string;
   riskReason?: string;
-  files?: (YamlFileEntry | string)[];
+  files?: (JsonFileEntry | string)[];
 }
 
-interface YamlGroupingResult {
-  groups?: YamlGroup[];
+interface JsonGroupingResult {
+  groups?: JsonGroup[];
 }
 
 function parseGroupingOutput(output: string): GroupingResult {
-  const yamlContent = extractYamlBlock(output, ['groups']);
-  if (!yamlContent) {
-    logger.warn('No YAML grouping found in AI output');
+  const jsonContent = extractJsonBlock(output);
+  if (!jsonContent) {
+    logger.warn('No JSON grouping found in AI output');
     logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { groups: [] };
   }
-  const parsed = parseYamlSafe<YamlGroupingResult>(yamlContent);
+  const parsed = parseJsonSafe<JsonGroupingResult>(jsonContent);
   if (!parsed?.groups || !Array.isArray(parsed.groups)) {
-    logger.warn('Invalid YAML structure in grouping response');
+    logger.warn('Invalid JSON structure in grouping response');
     return { groups: [] };
   }
 
-  const groups = parseYamlGroups(parsed.groups);
+  const groups = parseJsonGroups(parsed.groups);
   return { groups };
 }
 
-function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
-  return yamlGroups.map((group, index) => {
+function parseJsonGroups(jsonGroups: JsonGroup[]): ChangeGroup[] {
+  return jsonGroups.map((group, index) => {
     const files: string[] = [];
     let totalAdditions = 0;
     let totalDeletions = 0;
@@ -143,4 +133,3 @@ function parseYamlGroups(yamlGroups: YamlGroup[]): ChangeGroup[] {
     };
   });
 }
-

@@ -1,5 +1,5 @@
 import type { PatternVerification, PatternVerificationResult, PatternLocation } from '../types/index.js';
-import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
+import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -23,98 +23,88 @@ function buildVerificationPrompt(prLink: string): string {
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `Analyze GitHub PR #${prNumber} in ${repo} and verify that all related code locations were updated consistently.
+  return `Analyze GitHub PR #${prNumber} in ${repo} and verify that cross-file updates are complete and consistent.
 
-Step 1: Use the \`gh\` CLI tool to fetch the PR diff:
-gh pr diff ${prNumber} --repo ${repo}
+Execution context:
+- You are in the repository working directory.
+- You can use local git CLI and GitHub CLI (gh).
+- Use gh to get PR metadata and base/head refs.
+- Use local git diff and code search to verify all affected locations.
 
-Step 2: Identify patterns that require verification:
-- Renamed functions/methods/classes: Were all call sites updated?
-- Changed function signatures: Were all callers updated with new parameters?
-- Modified API endpoints: Were all clients updated?
-- Updated type/interface definitions: Were all usages updated?
-- Changed constants/config values: Were all references updated?
-- Renamed files: Were all imports updated?
+Step 1: Gather context and patch.
+- Read PR title/body and changed files.
+- Inspect local diff between base and head branches.
 
-Step 3: For each pattern found, search the codebase to verify completeness:
-- Use grep or search to find all occurrences
-- Check if each occurrence was properly updated in the PR
-- Flag any locations that appear to be missed
+Step 2: Detect patterns that require consistency checks.
+- Renamed symbols (functions, methods, classes, files)
+- Signature or type-contract changes
+- API route/request/response changes
+- Constant, config, or schema changes with broad references
 
-Step 4: Return ONLY a YAML code block in this exact format (no other text):
+Step 3: Verify completeness.
+- Search the codebase for related occurrences.
+- Confirm each relevant location is updated or intentionally unchanged.
+- Flag likely misses or suspicious leftovers.
 
-\`\`\`yaml
-summary: Brief summary of verification findings
-verifications:
-  - id: verify-1
-    pattern: "functionName renamed to newFunctionName"
-    description: What was changed and what needs to be verified
-    status: verified  # must be: verified, incomplete, or warning
-    details: "Found 8 call sites, all 8 were updated in this PR"
-    locations:
-      - filePath: path/to/file.ts
-        lineNumber: 42
-        status: updated  # must be: updated, missing, or suspicious
-        snippet: "newFunctionName(args)"
-\`\`\`
+Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
+{"summary":"Brief summary of verification findings","verifications":[{"id":"verify-1","pattern":"functionName renamed to newFunctionName","description":"What changed and what should be checked","status":"verified","details":"Found 8 call sites; all 8 are updated","locations":[{"filePath":"path/to/file.ts","lineNumber":42,"status":"updated","snippet":"newFunctionName(args)"}]}]}
 
-Rules:
-- status "verified": All locations were properly updated
-- status "incomplete": Some locations appear to be missed
-- status "warning": Potential issues that need human review
-- Only include verifications for patterns that actually need checking
-- If no patterns need verification, return empty verifications array
-- Focus on high-value verifications (renames, signature changes, API changes)
-- Return ONLY the YAML code block, nothing else`;
+Output constraints:
+- Return only the JSON object; no markdown, no code fences, no extra prose.
+- Output must be valid minified JSON on a single line.
+- Include only patterns that actually need cross-file verification.
+- Use \`incomplete\` when updates are likely missing.
+- Use \`warning\` when uncertain and human review is needed.
+- If no verification patterns are found, return \`"verifications":[]\` with a short summary.`;
 }
 
-interface YamlPatternLocation {
+interface JsonPatternLocation {
   filePath?: string;
   lineNumber?: number;
   status?: string;
   snippet?: string;
 }
 
-interface YamlPatternVerification {
+interface JsonPatternVerification {
   id?: string;
   pattern?: string;
   description?: string;
   status?: string;
   details?: string;
-  locations?: YamlPatternLocation[];
+  locations?: JsonPatternLocation[];
 }
 
-interface YamlVerificationResult {
+interface JsonVerificationResult {
   summary?: string;
-  verifications?: YamlPatternVerification[];
+  verifications?: JsonPatternVerification[];
 }
 
 function parseVerificationOutput(output: string): PatternVerificationResult {
-  const yamlContent = extractYamlBlock(output, ['summary', 'verifications']);
-  if (!yamlContent) {
-    logger.warn('No YAML found in verification output');
+  const jsonContent = extractJsonBlock(output);
+  if (!jsonContent) {
+    logger.warn('No JSON found in verification output');
     logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { verifications: [], summary: '' };
   }
-  const parsed = parseYamlSafe<YamlVerificationResult>(yamlContent);
+  const parsed = parseJsonSafe<JsonVerificationResult>(jsonContent);
   if (!parsed) {
-    logger.error('Failed to parse verification YAML', new Error('YAML parse failed'));
+    logger.error('Failed to parse verification JSON', new Error('JSON parse failed'));
     return { verifications: [], summary: '' };
   }
 
   const summary = parsed.summary || '';
-  const verifications = parseYamlVerifications(parsed.verifications || []);
+  const verifications = parseJsonVerifications(parsed.verifications || []);
 
   return { verifications, summary };
 }
 
-function parseYamlVerifications(yamlVerifications: YamlPatternVerification[]): PatternVerification[] {
-  if (!Array.isArray(yamlVerifications)) {
+function parseJsonVerifications(jsonVerifications: JsonPatternVerification[]): PatternVerification[] {
+  if (!Array.isArray(jsonVerifications)) {
     return [];
   }
   
-  return yamlVerifications
-    .filter((v): v is YamlPatternVerification => !!v && typeof v.pattern === 'string')
+  return jsonVerifications
+    .filter((v): v is JsonPatternVerification => !!v && typeof v.pattern === 'string')
     .map((v, index) => {
       const statusRaw = (v.status || 'warning').toLowerCase();
       const status = ['verified', 'incomplete', 'warning'].includes(statusRaw)
@@ -122,7 +112,7 @@ function parseYamlVerifications(yamlVerifications: YamlPatternVerification[]): P
         : 'warning';
 
       const locations: PatternLocation[] = (v.locations || [])
-        .filter((loc): loc is YamlPatternLocation => !!loc && typeof loc.filePath === 'string')
+        .filter((loc): loc is JsonPatternLocation => !!loc && typeof loc.filePath === 'string')
         .map(loc => {
           const locStatusRaw = (loc.status || 'suspicious').toLowerCase();
           const locStatus = ['updated', 'missing', 'suspicious'].includes(locStatusRaw)

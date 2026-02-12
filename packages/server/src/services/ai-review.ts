@@ -1,5 +1,5 @@
 import type { AIReviewItem, AIReviewPRResult } from '../types/index.js';
-import { extractYamlBlock, parseYamlSafe } from '../utils/yaml-extract.js';
+import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
@@ -30,43 +30,42 @@ function buildReviewPrompt(prLink: string): string {
   const repo = match ? match[1] : '';
   const prNumber = match ? match[2] : '';
 
-  return `You are a code reviewer. Analyze GitHub PR #${prNumber} in ${repo} and provide detailed code review feedback.
+  return `You are a senior code reviewer. Analyze GitHub PR #${prNumber} in ${repo} and produce high-signal review findings.
 
-Step 1: Get PR information and branch names:
-gh pr view ${prNumber} --repo ${repo} --json title,body,baseRefName,headRefName
+Execution context:
+- You are in the repository working directory.
+- You can use local git CLI and GitHub CLI (gh).
+- Use local git for diff analysis and gh for PR metadata.
 
-Step 2: Fetch the latest branches and get the diff locally (faster than gh pr diff):
-git fetch origin <baseRefName> <headRefName>
-git diff origin/<baseRefName>...origin/<headRefName>
+Step 1: Gather PR context.
+- Read PR title/body, base/head refs, and changed-file scope.
+- Understand the intent before judging implementation.
 
-Step 3: Read and analyze the diff carefully. Look for:
-- Critical issues: bugs, security vulnerabilities, performance problems, data loss risks
-- Warnings: code smells, potential improvements, best practice violations, error handling issues
-- Info: suggestions, style improvements, documentation needs, minor optimizations
+Step 2: Inspect code changes.
+- Use local git commands to compare base and head branches and inspect the patch.
+- Use new-file line numbers from the diff when reporting findings.
+- Read nearby code when needed to avoid false positives.
 
-Step 4: Return ONLY a YAML code block in this exact format (no other text):
+Step 3: Identify meaningful findings.
+- critical: bugs, security issues, data loss, race conditions, major performance regressions
+- warning: correctness risks, edge cases, missing error handling, maintainability issues
+- info: useful improvements with practical impact
+- Avoid trivial style nitpicks unless they hide real risk.
+- Prefer fewer high-confidence findings over many weak guesses.
 
-\`\`\`yaml
-summary: Brief overall summary of the PR and key findings
-items:
-  - severity: critical  # must be: critical, warning, or info
-    file_path: path/to/file.ts
-    line_number: 42
-    message: Clear description of the issue or suggestion
-    suggestion: Optional suggested code fix or improvement
-\`\`\`
+Step 4: Return ONLY one minified JSON object (single line) with this exact schema:
+{"summary":"Brief overall summary of the PR and key findings","items":[{"severity":"critical","filePath":"path/to/file.ts","lineNumber":42,"message":"Clear description of the issue and why it matters","suggestion":"Optional concrete fix"}]}
 
-Rules:
-- severity must be one of: critical, warning, info
-- line_number must reference the actual line in the changed file (use the new line numbers from the diff)
-- message should be actionable and explain why this is important
-- suggestion is optional but helpful when applicable
-- Focus on meaningful issues, not trivial style preferences
-- Include context about why something is problematic
-- Return ONLY the YAML code block, nothing else`;
+Output constraints:
+- Return only the JSON object; no markdown, no code fences, no extra prose.
+- Output must be valid minified JSON on a single line.
+- severity must be exactly: critical, warning, or info.
+- lineNumber must map to the changed file's new-line numbering.
+- message must be actionable and include impact.
+- If there are no meaningful findings, return \`"items":[]\` with a concise summary.`;
 }
 
-interface YamlReviewItem {
+interface JsonReviewItem {
   severity?: string;
   file_path?: string;
   filePath?: string;
@@ -76,39 +75,39 @@ interface YamlReviewItem {
   suggestion?: string;
 }
 
-interface YamlReviewResult {
+interface JsonReviewResult {
   summary?: string;
-  items?: YamlReviewItem[];
+  items?: JsonReviewItem[];
 }
 
 function parseReviewOutput(output: string): AIReviewPRResult {
-  const yamlContent = extractYamlBlock(output, ['summary', 'items']);
-  if (!yamlContent) {
-    logger.warn('No YAML review found in AI output');
+  const jsonContent = extractJsonBlock(output);
+  if (!jsonContent) {
+    logger.warn('No JSON review found in AI output');
     logger.debug(`Output preview: ${output.slice(0, 200)}...`);
     return { items: [], summary: '' };
   }
-  const parsed = parseYamlSafe<YamlReviewResult>(yamlContent);
+  const parsed = parseJsonSafe<JsonReviewResult>(jsonContent);
   if (!parsed) {
-    logger.error('Failed to parse review YAML', new Error('YAML parse failed'));
+    logger.error('Failed to parse review JSON', new Error('JSON parse failed'));
     return { items: [], summary: '' };
   }
 
   const summary = parsed.summary || '';
-  const items = parseYamlReviewItems(parsed.items || []);
+  const items = parseJsonReviewItems(parsed.items || []);
 
   return { items, summary };
 }
 
-function parseYamlReviewItems(yamlItems: YamlReviewItem[]): AIReviewItem[] {
-  if (!Array.isArray(yamlItems)) {
+function parseJsonReviewItems(jsonItems: JsonReviewItem[]): AIReviewItem[] {
+  if (!Array.isArray(jsonItems)) {
     return [];
   }
   
   const items: AIReviewItem[] = [];
   let itemId = 1;
   
-  for (const item of yamlItems) {
+  for (const item of jsonItems) {
     const severityRaw = (item.severity || 'info').toLowerCase();
     const severity = ['critical', 'warning', 'info'].includes(severityRaw)
       ? (severityRaw as AIReviewItem['severity'])
@@ -134,4 +133,3 @@ function parseYamlReviewItems(yamlItems: YamlReviewItem[]): AIReviewItem[] {
   
   return items;
 }
-
