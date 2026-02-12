@@ -118,6 +118,10 @@ export const FileDiffCard = memo(function FileDiffCard({
     onViewHeadFile?.({ filePath: file.path, content: file.newContent })
   }, [onViewHeadFile, file.path, file.newContent])
 
+  // Disable content-visibility optimization when there are annotations to prevent layout jumping
+  // when annotations are added/removed (e.g., submitting a comment then clicking + to add another)
+  const hasAnnotations = lineAnnotations.length > 0
+
   return (
     <div
       role="listitem"
@@ -125,7 +129,7 @@ export const FileDiffCard = memo(function FileDiffCard({
       data-state={isCollapsed ? "collapsed" : "expanded"}
       data-viewed={isViewed}
       className="overflow-clip rounded-lg border border-border"
-      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 500px" }}
+      style={hasAnnotations ? undefined : { contentVisibility: "auto", containIntrinsicBlockSize: "auto 500px" }}
     >
       <CollapsibleFileHeader
         filePath={file.path}

@@ -1,5 +1,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from "react"
 import {
+  forwardRef,
+  useImperativeHandle,
+} from "react"
+import {
   type DiffLineAnnotation,
   type AnnotationSide,
 } from "@pierre/diffs/react"
@@ -93,6 +97,15 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   convertingAIItemIds?: Set<string>
   /** Set of file paths currently syncing viewed state with server */
   syncingViewedFiles?: Set<string>
+}
+
+/**
+ * Ref handle for DiffViewer component.
+ * Provides imperative methods for controlling the viewer.
+ */
+export interface DiffViewerRef {
+  /** Expand a collapsed file by path */
+  expandFile: (filePath: string) => void
 }
 
 const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
@@ -204,7 +217,7 @@ function useAnnotationIndex(
  * - Supports both controlled and uncontrolled state for viewed files
  * - Keyboard accessible: Cmd+Enter to submit comments, Escape to cancel
  */
-function DiffViewer({
+const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewer({
   files,
   annotations = [],
   onLineClick,
@@ -222,7 +235,7 @@ function DiffViewer({
   convertingAIItemIds,
   syncingViewedFiles,
   ...props
-}: DiffViewerProps) {
+}, ref) {
   // Get current theme from theme provider
   const { theme } = useTheme()
 
@@ -281,6 +294,21 @@ function DiffViewer({
   )
 
   const getAnnotationsForFile = useAnnotationIndex(annotations, draftAnnotations, aiReviewItems)
+
+  // Expose imperative methods via ref
+  useImperativeHandle(ref, () => ({
+    expandFile: (filePath: string) => {
+      const normalizedPath = filePath.replace(/^\/+/, "")
+      setCollapsedFiles((prev) => {
+        if (prev.has(normalizedPath)) {
+          const next = new Set(prev)
+          next.delete(normalizedPath)
+          return next
+        }
+        return prev
+      })
+    },
+  }), [])
 
   const handleToggleCollapse = useCallback((filePath: string) => {
     setCollapsedFiles((prev) => {
@@ -520,7 +548,7 @@ function DiffViewer({
       />
     </div>
   )
-}
+})
 
 // Export with named export matching the file name
 export { DiffViewer }

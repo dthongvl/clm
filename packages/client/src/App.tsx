@@ -2,7 +2,7 @@ import { useRef, useCallback, useState, useMemo, useEffect } from "react"
 import { toast } from "sonner"
 import { TopBar } from "@/components/top-bar"
 import { MainLayout } from "@/components/main-layout"
-import { DiffPanel } from "@/components/diff-panel"
+import { DiffPanel, type DiffViewerRef } from "@/components/diff-panel"
 import {
   SidePanel,
   SidePanelGroupingContent,
@@ -24,6 +24,7 @@ import { refreshPR } from "@/lib/api"
 
 export function App() {
   const diffContainerRef = useRef<HTMLDivElement>(null)
+  const diffViewerRef = useRef<DiffViewerRef>(null)
 
   const { prNumber } = usePRContext()
 
@@ -208,7 +209,10 @@ export function App() {
     const container = diffContainerRef.current
     if (!container) return
 
-    const fileElement = container.querySelector(`[data-file-path="${CSS.escape(filePath)}"]`)
+    // Normalize file path to match how data-file-path is set (strip leading slashes)
+    const normalizedPath = filePath.replace(/^\/+/, "")
+
+    const fileElement = container.querySelector(`[data-file-path="${CSS.escape(normalizedPath)}"]`)
     if (fileElement) {
       fileElement.scrollIntoView({ behavior: "instant", block: "start" })
     }
@@ -218,14 +222,23 @@ export function App() {
     const container = diffContainerRef.current
     if (!container) return
 
-    const annotationElement = container.querySelector(
-      `[data-file-path="${CSS.escape(filePath)}"] [data-annotation-line="${lineNumber}"]`
-    )
-    if (annotationElement) {
-      annotationElement.scrollIntoView({ behavior: "instant", block: "center" })
-    } else {
-      scrollToFile(filePath)
-    }
+    // Normalize file path to match how data-file-path is set (strip leading slashes)
+    const normalizedPath = filePath.replace(/^\/+/, "")
+
+    // Expand the file first if it's collapsed (so the annotation element will be rendered)
+    diffViewerRef.current?.expandFile(normalizedPath)
+
+    // Use requestAnimationFrame to wait for React to render the expanded content
+    requestAnimationFrame(() => {
+      const annotationElement = container.querySelector(
+        `[data-file-path="${CSS.escape(normalizedPath)}"] [data-annotation-line="${lineNumber}"]`
+      )
+      if (annotationElement) {
+        annotationElement.scrollIntoView({ behavior: "instant", block: "center" })
+      } else {
+        scrollToFile(normalizedPath)
+      }
+    })
   }, [scrollToFile])
 
   const handleFileTreeSelect = useCallback((filePath: string) => {
@@ -309,6 +322,7 @@ export function App() {
                 </div>
               ) : (
                 <DiffPanel.Viewer
+                  ref={diffViewerRef}
                   files={files}
                   annotations={annotations}
                   aiReviewItems={visibleAIReviewItems}
