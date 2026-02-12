@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowDown01Icon,
@@ -159,15 +160,11 @@ function CollapsibleFileHeader({
           )}
           onClick={(e) => e.stopPropagation()}
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={isViewed}
-            onChange={onToggleViewed}
+            onCheckedChange={onToggleViewed}
             disabled={isSyncingViewed}
-            className={cn(
-              "size-3.5 rounded border-border accent-primary",
-              isSyncingViewed ? "cursor-wait" : "cursor-pointer"
-            )}
+            className="size-3.5"
           />
           <span>{isSyncingViewed ? "Syncing..." : "Viewed"}</span>
         </label>

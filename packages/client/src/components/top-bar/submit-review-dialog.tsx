@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 type ReviewEvent = "COMMENT" | "REQUEST_CHANGES" | "APPROVE"
 
@@ -72,7 +73,7 @@ function SubmitReviewDialog({ draftCount, onSubmit, disabled }: SubmitReviewDial
             rows={3}
             className="border-transparent bg-muted/50 focus-visible:border-input focus-visible:bg-transparent"
           />
-          <fieldset className="flex flex-col gap-2">
+          <RadioGroup value={event} onValueChange={(value) => setEvent(value as ReviewEvent)}>
             {EVENT_OPTIONS.map((option) => (
               <label
                 key={option.value}
@@ -82,21 +83,14 @@ function SubmitReviewDialog({ draftCount, onSubmit, disabled }: SubmitReviewDial
                     : "border-border hover:border-muted-foreground/30"
                 }`}
               >
-                <input
-                  type="radio"
-                  name="review-event"
-                  value={option.value}
-                  checked={event === option.value}
-                  onChange={() => setEvent(option.value)}
-                  className="mt-0.5 accent-primary"
-                />
+                <RadioGroupItem value={option.value} className="mt-0.5" />
                 <div>
                   <div className="text-xs font-medium">{option.label}</div>
                   <div className="text-xs text-muted-foreground">{option.description}</div>
                 </div>
               </label>
             ))}
-          </fieldset>
+          </RadioGroup>
         </div>
         <div className="flex justify-end">
           <Button
