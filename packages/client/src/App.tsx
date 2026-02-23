@@ -1,8 +1,8 @@
-import { useRef, useCallback, useState, useMemo, useEffect } from "react"
+import { useMemo, useEffect } from "react"
 import { toast } from "sonner"
 import { TopBar } from "@/components/top-bar"
 import { MainLayout } from "@/components/main-layout"
-import { DiffPanel, type DiffViewerRef } from "@/components/diff-panel"
+import { DiffPanel } from "@/components/diff-panel"
 import {
   SidePanel,
   SidePanelGroupingContent,
@@ -17,111 +17,50 @@ import { Button } from "@/components/ui/button"
 import { AiGenerativeIcon } from "@hugeicons/core-free-icons"
 
 import { ModeToggle } from "@/components/mode-toggle"
-import { useAIReview, usePR, useDiff, useComments, useDraftComments, usePRContext, useRelatedFiles, useModels, useSettings, useViewedFiles } from "@/hooks"
+import { useAIReview, usePR, useDiff, useComments, usePRContext, useRelatedFiles, useModels, useSettings, useViewedFiles } from "@/hooks"
 import { usePatternVerification } from "@/hooks/use-pattern-verification"
+import { useDiffNavigation } from "@/hooks/use-diff-navigation"
+import { useRefresh } from "@/hooks/use-refresh"
+import { useDraftActions } from "@/hooks/use-draft-actions"
+import { useAIConversion } from "@/hooks/use-ai-conversion"
 import { PatternVerificationPanel } from "@/components/side-panel/pattern-verification"
 import { ActionSettingsPopover } from "@/components/side-panel/action-settings-popover"
 import { ErrorBoundary, ErrorFallback } from "@/components/error-boundary"
-import { refreshPR } from "@/lib/api"
 
 export function App() {
-  const diffContainerRef = useRef<HTMLDivElement>(null)
-  const diffViewerRef = useRef<DiffViewerRef>(null)
-
   const { prNumber } = usePRContext()
 
-  const { pr, isLoading: isPRLoading, error: prError, refetch: refetchPR } = usePR()
-  const { files, isLoading: isDiffLoading, error: diffError, refetch: refetchDiff } = useDiff()
-  const { comments, isLoading: isCommentsLoading, refetch: refetchComments } = useComments()
+  const { pr, isLoading: isPRLoading, error: prError } = usePR()
+  const { files, isLoading: isDiffLoading, error: diffError } = useDiff()
+  const { comments, isLoading: isCommentsLoading } = useComments()
+
+  const {
+    diffContainerRef,
+    diffViewerRef,
+    selectedFilePath,
+    scrollToFile,
+    scrollToAnnotation,
+    handleFileTreeSelect,
+  } = useDiffNavigation()
+
+  const { isRefreshing, handleRefresh } = useRefresh()
+
   const {
     draftComments,
-    addDraftComment,
-    updateDraftComment,
-    removeDraftComment,
-    submitDraftReview: handleSubmitDraftReview,
     draftCount,
-    refetch: refetchDraftComments,
-  } = useDraftComments()
+    isDraftActionLoading,
+    addDraftComment,
+    handleCommentSubmit,
+    handleEditDraft,
+    handleDeleteDraft,
+    handleSubmitReview,
+  } = useDraftActions()
 
   const {
     viewedFiles,
     syncingFiles: syncingViewedFiles,
     setViewed: setFileViewed,
-    refetch: refetchViewedFiles,
   } = useViewedFiles()
-
-  const [isDraftActionLoading, setIsDraftActionLoading] = useState(false)
-
-  const [convertingAIItemIds, setConvertingAIItemIds] = useState<Set<string>>(new Set())
-  const [convertedAIItemIds, setConvertedAIItemIds] = useState<Set<string>>(new Set())
-
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const [selectedFilePath, setSelectedFilePath] = useState<string>()
-  
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true)
-    try {
-      await refreshPR()
-      await Promise.all([
-        refetchPR(),
-        refetchDiff(),
-        refetchComments(),
-        refetchDraftComments(),
-        refetchViewedFiles(),
-      ])
-    } catch (error) {
-      console.error('Failed to refresh:', error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }, [refetchPR, refetchDiff, refetchComments, refetchDraftComments, refetchViewedFiles])
-
-  const handleCommentSubmit = useCallback(
-    async (
-      filePath: string,
-      lineNumber: number,
-      side: "additions" | "deletions",
-      content: string
-    ) => {
-      await addDraftComment(filePath, lineNumber, side, content)
-    },
-    [addDraftComment]
-  )
-
-  const handleEditDraft = useCallback(async (commentId: string, content: string) => {
-    setIsDraftActionLoading(true)
-    try {
-      await updateDraftComment(commentId, content)
-    } finally {
-      setIsDraftActionLoading(false)
-    }
-  }, [updateDraftComment])
-
-  const handleDeleteDraft = useCallback(async (commentId: string) => {
-    setIsDraftActionLoading(true)
-    try {
-      await removeDraftComment(commentId)
-    } finally {
-      setIsDraftActionLoading(false)
-    }
-  }, [removeDraftComment])
-
-  const handleSubmitReview = useCallback(async (
-    event: 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE',
-    body?: string
-  ) => {
-    try {
-      await handleSubmitDraftReview(event, body)
-      toast.success("Review submitted successfully")
-      await refetchComments()
-    } catch (error) {
-      toast.error("Failed to submit review", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      })
-      throw error
-    }
-  }, [handleSubmitDraftReview, refetchComments])
 
   const {
     groups,
@@ -135,37 +74,11 @@ export function App() {
     autoGenerate: false,
   })
 
-  const visibleAIReviewItems = useMemo(
-    () => aiReviewItems.filter((item) => !convertedAIItemIds.has(item.id)),
-    [aiReviewItems, convertedAIItemIds]
-  )
-
-  const handleConvertAIToDraft = useCallback(async (itemId: string) => {
-    const item = aiReviewItems.find((i) => i.id === itemId)
-    if (!item) return
-
-    const content = item.suggestion
-      ? `${item.message}\n\n**Suggestion:** ${item.suggestion}`
-      : item.message
-
-    setConvertingAIItemIds((prev) => new Set(prev).add(itemId))
-
-    try {
-      await addDraftComment(item.filePath, item.lineNumber, "additions", content)
-      setConvertedAIItemIds((prev) => new Set(prev).add(itemId))
-      toast.success("Added to draft review")
-    } catch (error) {
-      toast.error("Failed to add to draft", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      })
-    } finally {
-      setConvertingAIItemIds((prev) => {
-        const next = new Set(prev)
-        next.delete(itemId)
-        return next
-      })
-    }
-  }, [aiReviewItems, addDraftComment])
+  const {
+    visibleAIReviewItems,
+    convertingAIItemIds,
+    handleConvertAIToDraft,
+  } = useAIConversion(aiReviewItems, addDraftComment)
 
   const {
     files: relatedFiles,
@@ -206,51 +119,6 @@ export function App() {
     () => [...comments, ...draftComments],
     [comments, draftComments]
   )
-
-  const scrollToFile = useCallback((filePath: string) => {
-    const container = diffContainerRef.current
-    if (!container) return
-
-    // Normalize file path to match how data-file-path is set (strip leading slashes)
-    const normalizedPath = filePath.replace(/^\/+/, "")
-
-    const fileElement = container.querySelector(`[data-file-path="${CSS.escape(normalizedPath)}"]`)
-    if (fileElement) {
-      fileElement.scrollIntoView({ behavior: "instant", block: "start" })
-    }
-  }, [])
-
-  const scrollToAnnotation = useCallback((filePath: string, lineNumber: number) => {
-    const container = diffContainerRef.current
-    if (!container) return
-
-    // Normalize file path to match how data-file-path is set (strip leading slashes)
-    const normalizedPath = filePath.replace(/^\/+/, "")
-
-    // Expand the file first if it's collapsed (so the annotation element will be rendered)
-    diffViewerRef.current?.expandFile(normalizedPath)
-
-    // Use requestAnimationFrame to wait for React to render the expanded content
-    requestAnimationFrame(() => {
-      const annotationElement = container.querySelector(
-        `[data-file-path="${CSS.escape(normalizedPath)}"] [data-annotation-line="${lineNumber}"]`
-      )
-      if (annotationElement) {
-        annotationElement.scrollIntoView({ behavior: "instant", block: "center" })
-      } else {
-        scrollToFile(normalizedPath)
-      }
-    })
-  }, [scrollToFile])
-
-  const handleFileTreeSelect = useCallback((filePath: string) => {
-    setSelectedFilePath(filePath)
-    scrollToFile(filePath)
-  }, [scrollToFile])
-
-  const handleFileViewedChange = useCallback((filePath: string, isViewed: boolean) => {
-    setFileViewed(filePath, isViewed)
-  }, [setFileViewed])
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -335,7 +203,7 @@ export function App() {
                   onConvertAIToDraft={handleConvertAIToDraft}
                   convertingAIItemIds={convertingAIItemIds}
                   viewedFiles={viewedFiles}
-                  onFileViewedChange={handleFileViewedChange}
+                  onFileViewedChange={setFileViewed}
                   syncingViewedFiles={syncingViewedFiles}
                 />
               )}

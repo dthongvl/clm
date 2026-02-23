@@ -129,7 +129,7 @@ export const FileDiffCard = memo(function FileDiffCard({
       data-state={isCollapsed ? "collapsed" : "expanded"}
       data-viewed={isViewed}
       className="overflow-clip rounded-lg border border-border"
-      style={hasAnnotations ? undefined : { contentVisibility: "auto", containIntrinsicBlockSize: "auto 500px" }}
+      style={{ contentVisibility: "auto", containIntrinsicBlockSize: hasAnnotations ? "auto 800px" : "auto 500px" }}
     >
       <CollapsibleFileHeader
         filePath={file.path}

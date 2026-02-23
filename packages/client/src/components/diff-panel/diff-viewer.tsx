@@ -108,12 +108,16 @@ export interface DiffViewerRef {
   expandFile: (filePath: string) => void
 }
 
-const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+const getMediaQuery = () =>
+  typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)") : null
+
 const subscribeSystemTheme = (cb: () => void) => {
-  mediaQuery.addEventListener("change", cb)
-  return () => mediaQuery.removeEventListener("change", cb)
+  const mq = getMediaQuery()
+  if (!mq) return () => {}
+  mq.addEventListener("change", cb)
+  return () => mq.removeEventListener("change", cb)
 }
-const getSystemThemeSnapshot = (): "dark" | "light" => mediaQuery.matches ? "dark" : "light"
+const getSystemThemeSnapshot = (): "dark" | "light" => getMediaQuery()?.matches ? "dark" : "light"
 
 /** Metadata for annotations - can be a comment, draft form, or AI review item */
 export type AnnotationMetadata =

@@ -1,4 +1,10 @@
 const STORAGE_PREFIX = "code-review:"
+const STORAGE_VERSION = 1
+
+interface StorageWrapper<T> {
+  v: number
+  data: T
+}
 
 export function getStorageItem<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback
@@ -6,7 +12,19 @@ export function getStorageItem<T>(key: string, fallback: T): T {
   try {
     const item = localStorage.getItem(`${STORAGE_PREFIX}${key}`)
     if (item === null) return fallback
-    return JSON.parse(item) as T
+    const parsed = JSON.parse(item) as unknown
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "v" in parsed &&
+      "data" in parsed &&
+      (parsed as StorageWrapper<T>).v === STORAGE_VERSION
+    ) {
+      return (parsed as StorageWrapper<T>).data
+    }
+    // Legacy or version mismatch — remove stale entry
+    localStorage.removeItem(`${STORAGE_PREFIX}${key}`)
+    return fallback
   } catch {
     return fallback
   }
@@ -16,7 +34,8 @@ export function setStorageItem<T>(key: string, value: T): void {
   if (typeof window === "undefined") return
 
   try {
-    localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(value))
+    const wrapper: StorageWrapper<T> = { v: STORAGE_VERSION, data: value }
+    localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(wrapper))
   } catch {
     // Storage quota exceeded or other error - silently fail
   }

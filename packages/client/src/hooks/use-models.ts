@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { fetchModels } from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
+import { fetchModels } from '@/api/settings'
 import type { ModelOption } from '@/types/settings'
 
 interface UseModelsReturn {
@@ -9,27 +9,14 @@ interface UseModelsReturn {
 }
 
 export function useModels(): UseModelsReturn {
-  const [models, setModels] = useState<ModelOption[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['models'],
+    queryFn: () => fetchModels(),
+  })
 
-  useEffect(() => {
-    let cancelled = false
-
-    fetchModels()
-      .then((data) => {
-        if (!cancelled) setModels(data)
-      })
-      .catch((err) => {
-        console.error('Failed to fetch models:', err)
-        if (!cancelled) setError(err instanceof Error ? err : new Error('Failed to fetch models'))
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [])
-
-  return { models, isLoading, error }
+  return {
+    models: data ?? [],
+    isLoading,
+    error: error ?? null,
+  }
 }

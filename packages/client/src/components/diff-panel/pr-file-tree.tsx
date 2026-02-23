@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import {
   FileTree,
   FileTreeFolder,
@@ -86,12 +86,13 @@ export function PRFileTree({
   className,
 }: PRFileTreeProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const deferredSearchQuery = useDeferredValue(searchQuery)
 
   const filteredFiles = useMemo(() => {
-    if (!searchQuery.trim()) return files
-    const query = searchQuery.toLowerCase()
+    if (!deferredSearchQuery.trim()) return files
+    const query = deferredSearchQuery.toLowerCase()
     return files.filter((file) => file.path.toLowerCase().includes(query))
-  }, [files, searchQuery])
+  }, [files, deferredSearchQuery])
 
   const tree = useMemo(() => buildPRFileTree(filteredFiles), [filteredFiles])
   const defaultExpanded = useMemo(

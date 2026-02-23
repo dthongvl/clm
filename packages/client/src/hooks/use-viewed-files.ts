@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { fetchPRViewedFiles, updatePRFileViewedState } from '@/lib/api';
+import { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchPRViewedFiles, updatePRFileViewedState } from '@/api/viewed-files';
 import { toast } from 'sonner';
 
 interface UseViewedFilesReturn {
@@ -27,56 +28,22 @@ interface UseViewedFilesReturn {
  * - Prevents duplicate toggles while syncing
  */
 export function useViewedFiles(): UseViewedFilesReturn {
-  const [viewedFiles, setViewedFiles] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient()
   const [syncingFiles, setSyncingFiles] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchViewedState = useCallback(async () => {
-    // Cancel any in-flight request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const states = await fetchPRViewedFiles(abortControllerRef.current.signal);
-
-      // Map to Set: only VIEWED state counts as viewed
-      // DISMISSED is treated as not viewed per GitHub's behavior
+  const { data: viewedFiles = new Set<string>(), isLoading, error, refetch } = useQuery({
+    queryKey: ['pr-viewed-files'],
+    queryFn: async ({ signal }) => {
+      const states = await fetchPRViewedFiles(signal);
       const viewed = new Set<string>();
       for (const file of states) {
         if (file.state === 'VIEWED') {
           viewed.add(file.path);
         }
       }
-      setViewedFiles(viewed);
-    } catch (err) {
-      // Ignore abort errors
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
-      const error = err instanceof Error ? err : new Error('Failed to fetch viewed files');
-      setError(error);
-      // Don't show toast on initial load failure - it's not critical
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchViewedState();
-
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [fetchViewedState]);
+      return viewed;
+    },
+  });
 
   const setViewed = useCallback(async (filePath: string, viewed: boolean) => {
     // Ignore if already syncing this file
@@ -84,9 +51,11 @@ export function useViewedFiles(): UseViewedFilesReturn {
       return;
     }
 
+    // Capture previous state for rollback
+    const previousViewedFiles = queryClient.getQueryData<Set<string>>(['pr-viewed-files']);
+
     // Optimistic update
-    const previousViewedFiles = new Set(viewedFiles);
-    setViewedFiles((prev) => {
+    queryClient.setQueryData<Set<string>>(['pr-viewed-files'], (prev) => {
       const next = new Set(prev);
       if (viewed) {
         next.add(filePath);
@@ -105,13 +74,11 @@ export function useViewedFiles(): UseViewedFilesReturn {
 
     try {
       await updatePRFileViewedState(filePath, viewed);
-      setError(null);
-    } catch (err) {
+    } catch {
       // Rollback on failure
-      setViewedFiles(previousViewedFiles);
-
-      const error = err instanceof Error ? err : new Error('Failed to update viewed state');
-      setError(error);
+      if (previousViewedFiles) {
+        queryClient.setQueryData(['pr-viewed-files'], previousViewedFiles);
+      }
       toast.error(`Failed to mark file as ${viewed ? 'viewed' : 'unviewed'}`);
     } finally {
       setSyncingFiles((prev) => {
@@ -120,14 +87,14 @@ export function useViewedFiles(): UseViewedFilesReturn {
         return next;
       });
     }
-  }, [viewedFiles, syncingFiles]);
+  }, [queryClient, syncingFiles]);
 
   return {
     viewedFiles,
     syncingFiles,
-    error,
+    error: error ?? null,
     isLoading,
     setViewed,
-    refetch: fetchViewedState,
+    refetch: async () => { await refetch() },
   };
 }

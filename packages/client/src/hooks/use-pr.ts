@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { PRInfo } from '@/types/pr';
-import { fetchPRInfo, fetchStatus } from '@/lib/api';
+import { fetchPRInfo } from '@/api/pr';
+import { fetchStatus } from '@/api/status';
 import { transformPRInfo } from '@/lib/transforms';
 
 interface UsePRReturn {
@@ -11,43 +12,16 @@ interface UsePRReturn {
 }
 
 export function usePR(): UsePRReturn {
-  const [pr, setPR] = useState<PRInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const fetchData = useCallback(async () => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const serverPR = await fetchPRInfo(abortControllerRef.current.signal);
-      const clientPR = transformPRInfo(serverPR);
-      setPR(clientPR);
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setError(err instanceof Error ? err : new Error('Failed to fetch PR info'));
-      setPR(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, [fetchData]);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['pr-info'],
+    queryFn: ({ signal }) => fetchPRInfo(signal).then(transformPRInfo),
+  });
 
   return {
-    pr,
+    pr: data ?? null,
     isLoading,
-    error,
-    refetch: fetchData,
+    error: error ?? null,
+    refetch: async () => { await refetch() },
   };
 }
 
@@ -59,31 +33,15 @@ interface UseStatusReturn {
 }
 
 export function useStatus(): UseStatusReturn {
-  const [ghAvailable, setGhAvailable] = useState(false);
-  const [currentRepo, setCurrentRepo] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    async function checkStatus() {
-      try {
-        const status = await fetchStatus();
-        setGhAvailable(status.ghAvailable);
-        setCurrentRepo(status.currentRepo);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to fetch status'));
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    checkStatus();
-  }, []);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['status'],
+    queryFn: () => fetchStatus(),
+  });
 
   return {
-    ghAvailable,
-    currentRepo,
+    ghAvailable: data?.ghAvailable ?? false,
+    currentRepo: data?.currentRepo ?? null,
     isLoading,
-    error,
+    error: error ?? null,
   };
 }

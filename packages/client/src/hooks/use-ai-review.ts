@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import type { AIReviewItem, ChangeGroup, AIReviewCategory, AIReviewRunMode } from '@/types';
-import { generateGrouping, generateAIReview } from '@/lib/api';
+import { generateGrouping, generateAIReview } from '@/api/ai';
 import { transformAIReviewItems, transformChangeGroups } from '@/lib/transforms';
 
 export interface TriggerReviewOptions {

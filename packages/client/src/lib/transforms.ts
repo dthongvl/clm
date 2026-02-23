@@ -4,7 +4,10 @@ import type { PRInfo, PRState } from '@/types/pr';
 import type { DiffFileData } from '@/types/diff';
 import type { ReviewComment, AIReviewItem, CommentSide } from '@/types/review';
 import type { ChangeGroup } from '@/types/grouping';
-import type { ServerPRInfo, ServerFileDiff, ServerPRComment, ServerAIReviewItem, ServerChangeGroup } from './api';
+import type { ServerPRInfo } from '@/api/pr';
+import type { ServerFileDiff } from '@/api/diff';
+import type { ServerPRComment } from '@/api/comments';
+import type { ServerAIReviewItem, ServerChangeGroup } from '@/api/ai';
 
 /**
  * Transform server PR info to client PR info format

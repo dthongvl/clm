@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchDraftReview,
   createDraftReviewComment,
@@ -6,7 +7,7 @@ import {
   deleteDraftReviewComment,
   submitDraftReview as submitDraftReviewApi,
   type ServerDraftReviewComment,
-} from '@/lib/api';
+} from '@/api/draft-reviews';
 import type { ReviewComment } from '@/types/review';
 
 interface UseDraftCommentsReturn {
@@ -46,27 +47,15 @@ function transformDraftReviewComment(draft: ServerDraftReviewComment): ReviewCom
 }
 
 export function useDraftComments(): UseDraftCommentsReturn {
-  const [draftComments, setDraftComments] = useState<ReviewComment[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchComments = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
+  const { data: draftComments = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['draft-comments'],
+    queryFn: async () => {
       const response = await fetchDraftReview();
-      setDraftComments(response.comments.map(transformDraftReviewComment));
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch draft comments'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+      return response.comments.map(transformDraftReviewComment);
+    },
+  });
 
   const addDraftComment = useCallback(
     async (
@@ -75,53 +64,52 @@ export function useDraftComments(): UseDraftCommentsReturn {
       side: 'additions' | 'deletions',
       content: string
     ) => {
-      const newComment = await createDraftReviewComment(
-        filePath,
-        lineNumber,
-        side,
-        content
-      );
-
-      setDraftComments((prev) => [...prev, transformDraftReviewComment(newComment)]);
+      const newComment = await createDraftReviewComment(filePath, lineNumber, side, content);
+      queryClient.setQueryData<ReviewComment[]>(['draft-comments'], (prev) => [
+        ...(prev ?? []),
+        transformDraftReviewComment(newComment),
+      ]);
     },
-    []
+    [queryClient]
   );
 
   const updateDraftComment = useCallback(
     async (commentId: string, content: string) => {
       const updated = await updateDraftReviewComment(commentId, content);
-      setDraftComments((prev) =>
-        prev.map((c) => (c.id === commentId ? transformDraftReviewComment(updated) : c))
+      queryClient.setQueryData<ReviewComment[]>(['draft-comments'], (prev) =>
+        (prev ?? []).map((c) => (c.id === commentId ? transformDraftReviewComment(updated) : c))
       );
     },
-    []
+    [queryClient]
   );
 
   const removeDraftComment = useCallback(
     async (commentId: string) => {
       await deleteDraftReviewComment(commentId);
-      setDraftComments((prev) => prev.filter((c) => c.id !== commentId));
+      queryClient.setQueryData<ReviewComment[]>(['draft-comments'], (prev) =>
+        (prev ?? []).filter((c) => c.id !== commentId)
+      );
     },
-    []
+    [queryClient]
   );
 
   const submitReview = useCallback(
     async (event: 'COMMENT' | 'REQUEST_CHANGES' | 'APPROVE', body?: string) => {
       await submitDraftReviewApi(event, body);
-      setDraftComments([]);
+      queryClient.setQueryData(['draft-comments'], []);
     },
-    []
+    [queryClient]
   );
 
   return {
     draftComments,
     isLoading,
-    error,
+    error: error ?? null,
     addDraftComment,
     updateDraftComment,
     removeDraftComment,
     submitDraftReview: submitReview,
     draftCount: draftComments.length,
-    refetch: fetchComments,
+    refetch: async () => { await refetch() },
   };
 }

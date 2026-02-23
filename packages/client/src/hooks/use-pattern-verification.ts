@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { PatternVerificationResult } from '@/types/verification';
-import { verifyPatterns } from '@/lib/api';
+import { verifyPatterns } from '@/api/ai';
 
 interface UsePatternVerificationReturn {
   result: PatternVerificationResult | null;

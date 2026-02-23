@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import type { RelatedFile } from '@/types';
-import { findRelatedFiles } from '@/lib/api';
+import { findRelatedFiles } from '@/api/ai';
 
 interface UseRelatedFilesOptions {
   autoGenerate?: boolean;

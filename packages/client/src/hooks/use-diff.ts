@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { DiffFileData } from '@/types/diff';
-import { fetchPRDiff } from '@/lib/api';
+import { fetchPRDiff } from '@/api/diff';
 import { transformFileDiffs } from '@/lib/transforms';
 
 interface UseDiffOptions {
@@ -15,42 +15,15 @@ interface UseDiffReturn {
 }
 
 export function useDiff({ includeContent = true }: UseDiffOptions = {}): UseDiffReturn {
-  const [files, setFiles] = useState<DiffFileData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  const fetchData = useCallback(async () => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const serverFiles = await fetchPRDiff(includeContent, abortControllerRef.current.signal);
-      const clientFiles = transformFileDiffs(serverFiles);
-      setFiles(clientFiles);
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      setError(err instanceof Error ? err : new Error('Failed to fetch diff'));
-      setFiles([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [includeContent]);
-
-  useEffect(() => {
-    fetchData();
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, [fetchData]);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['pr-diff', includeContent],
+    queryFn: ({ signal }) => fetchPRDiff(includeContent, signal).then(transformFileDiffs),
+  });
 
   return {
-    files,
+    files: data ?? [],
     isLoading,
-    error,
-    refetch: fetchData,
+    error: error ?? null,
+    refetch: async () => { await refetch() },
   };
 }
