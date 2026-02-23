@@ -3,6 +3,7 @@ import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
+import { wrapError } from '../lib/errors.js';
 
 /**
  * Verify that cross-file updates in a PR are complete and consistent
@@ -20,7 +21,7 @@ export async function verifyPatterns(prLink: string, additionalContext?: string)
     return parseVerificationOutput(response);
   } catch (error) {
     logger.error('Pattern verification failed', error);
-    throw new Error(`Failed to verify patterns: ${(error as Error).message}`);
+    throw wrapError(error, 'AI_ERROR', 'Failed to verify patterns', { prLink });
   }
 }
 

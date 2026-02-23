@@ -22,15 +22,10 @@ app.post('/', async (c) => {
     return c.json({ error: contextResult.error }, 400);
   }
 
-  try {
-    const prLink = buildPRLink(repo, prNumber);
-    logger.ai(`Verifying patterns for PR #${prNumber}`);
-    const verificationResult = await verifyPatterns(prLink, contextResult.value);
-    return c.json(verificationResult);
-  } catch (error) {
-    logger.error('Pattern verification failed', error);
-    return c.json({ error: 'Failed to verify patterns', details: (error as Error).message }, 500);
-  }
+  const prLink = buildPRLink(repo, prNumber);
+  logger.ai(`Verifying patterns for PR #${prNumber}`);
+  const verificationResult = await verifyPatterns(prLink, contextResult.value);
+  return c.json(verificationResult);
 });
 
 export default app;

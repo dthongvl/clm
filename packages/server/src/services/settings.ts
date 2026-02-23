@@ -2,6 +2,7 @@ import { parse, stringify } from 'smol-toml';
 import { homedir } from 'os';
 import { join } from 'path';
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 
 const CONFIG_DIR = join(homedir(), '.config', 'codereview');
@@ -13,17 +14,20 @@ export const ACTION_KEYS: ActionKey[] = ['grouping', 'ai-review', 'pattern-verif
 
 const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
 
-export interface ActionSettings {
-  model?: string;
-  variant?: string;
-}
+const actionSettingsSchema = z.object({
+  model: z.string().optional(),
+  variant: z.string().optional(),
+}).strict();
 
-export interface Settings {
-  grouping?: ActionSettings;
-  'ai-review'?: ActionSettings;
-  'pattern-verification'?: ActionSettings;
-  'related-files'?: ActionSettings;
-}
+const settingsSchema = z.object({
+  grouping: actionSettingsSchema.optional(),
+  'ai-review': actionSettingsSchema.optional(),
+  'pattern-verification': actionSettingsSchema.optional(),
+  'related-files': actionSettingsSchema.optional(),
+}).strict();
+
+export type ActionSettings = z.infer<typeof actionSettingsSchema>;
+export type Settings = z.infer<typeof settingsSchema>;
 
 let settingsCache: { settings: Settings; expiresAt: number } | null = null;
 const SETTINGS_CACHE_TTL_MS = 30_000;
@@ -62,6 +66,18 @@ export async function getSettings(): Promise<Settings> {
     settingsCache = { settings: defaults, expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS };
     return defaults;
   }
+}
+
+const settingsInputSchema = settingsSchema.partial();
+
+export function validateSettingsInput(
+  input: unknown,
+): { ok: true; data: Partial<Settings> } | { ok: false; error: string } {
+  const result = settingsInputSchema.safeParse(input);
+  if (!result.success) {
+    return { ok: false, error: result.error.issues.map((i) => i.message).join('; ') };
+  }
+  return { ok: true, data: result.data };
 }
 
 export async function updateSettings(partial: Partial<Settings>): Promise<Settings> {

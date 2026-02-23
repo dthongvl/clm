@@ -11,7 +11,7 @@ import {
   deletePendingReviewComment,
   submitPendingReview,
 } from '../services/gh.js';
-import { AppError } from '../lib/errors.js';
+import { AppError, wrapError } from '../lib/errors.js';
 import type { SubmitReviewEvent, DraftReviewComment } from '../types/index.js';
 
 const app = new Hono();
@@ -45,8 +45,7 @@ app.get('/draft', async (c) => {
     const comments = await listPendingReviewComments(prNumber, repo, review.id);
     return c.json({ review, comments });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to fetch draft review', code: 'FETCH_DRAFT_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to fetch draft review');
   }
 });
 
@@ -84,13 +83,10 @@ app.post('/draft/comments', async (c) => {
     const comment = await createPendingReviewComment(prNumber, repo, filePath, lineNumber, side, content, review.nodeId);
     return c.json({ comment });
   } catch (error) {
-    console.error('Draft comment creation failed:', error);
     if (error instanceof AppError && error.code === 'COMMENT_LOCATION_STALE') {
-      return c.json({ error: 'Comment location is stale', code: 'COMMENT_LOCATION_STALE' }, 409);
+      throw error;
     }
-
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to create comment', code: 'CREATE_COMMENT_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to create comment');
   }
 });
 
@@ -135,8 +131,7 @@ app.patch('/draft/comments/:commentId', async (c) => {
     };
     return c.json({ comment });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to update comment', code: 'UPDATE_COMMENT_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to update comment');
   }
 });
 
@@ -164,8 +159,7 @@ app.delete('/draft/comments/:commentId', async (c) => {
     await deletePendingReviewComment(target.nodeId);
     return c.json({});
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to delete comment', code: 'DELETE_COMMENT_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to delete comment');
   }
 });
 
@@ -202,8 +196,7 @@ app.post('/draft/submit', async (c) => {
     await submitPendingReview(prNumber, repo, review.nodeId, event, body);
     return c.json({ submitted: true });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to submit review', code: 'SUBMIT_REVIEW_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to submit review');
   }
 });
 

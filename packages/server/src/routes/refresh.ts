@@ -3,6 +3,7 @@ import { getPRInfo } from '../services/gh.js';
 import { fetchBranches } from '../services/git.js';
 import { setPRContext } from '../services/pr-context.js';
 import { getAppContext } from '../lib/app-context.js';
+import { wrapError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
@@ -27,8 +28,7 @@ app.post('/', async (c) => {
       refs: { baseRef, headRef },
     });
   } catch (error) {
-    logger.error('Failed to refresh', error);
-    return c.json({ error: 'Failed to refresh', details: (error as Error).message }, 500);
+    throw wrapError(error, 'GH_CLI_ERROR', 'Failed to refresh PR');
   }
 });
 

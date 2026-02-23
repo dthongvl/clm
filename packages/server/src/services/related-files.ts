@@ -3,6 +3,7 @@ import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
+import { wrapError } from '../lib/errors.js';
 
 /**
  * Find files related to the PR changes that might be relevant for code review
@@ -20,7 +21,7 @@ export async function findRelatedFiles(prLink: string, additionalContext?: strin
     return parseRelatedFilesOutput(response);
   } catch (error) {
     logger.error('Related files analysis failed', error);
-    throw new Error(`Failed to find related files: ${(error as Error).message}`);
+    throw wrapError(error, 'AI_ERROR', 'Failed to find related files', { prLink });
   }
 }
 

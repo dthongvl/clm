@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { opencodeClient } from '../services/opencode-client.js';
-import { logger } from '../lib/logger.js';
+import { wrapError } from '../lib/errors.js';
 
 const app = new Hono();
 
@@ -46,8 +46,7 @@ app.get('/', async (c) => {
 
     return c.json({ models });
   } catch (error) {
-    logger.error('Failed to fetch models', error);
-    return c.json({ error: 'Failed to fetch models', details: (error as Error).message }, 500);
+    throw wrapError(error, 'AI_ERROR', 'Failed to fetch models');
   }
 });
 

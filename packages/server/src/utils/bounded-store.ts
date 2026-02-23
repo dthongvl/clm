@@ -152,7 +152,7 @@ export class BoundedArrayStore<K, V> {
     });
   }
 
-  filter(key: K, predicate: (item: V) => boolean): V[] {
+  retain(key: K, predicate: (item: V) => boolean): V[] {
     const entry = this.store.get(key);
     if (!entry) return [];
     

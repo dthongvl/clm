@@ -1,8 +1,7 @@
 import { Hono } from 'hono';
-import { getSettings, updateSettings } from '../services/settings.js';
+import { getSettings, updateSettings, validateSettingsInput } from '../services/settings.js';
 import { safeJson } from '../utils/request.js';
-import { logger } from '../lib/logger.js';
-import type { Settings } from '../services/settings.js';
+import { wrapError } from '../lib/errors.js';
 
 const app = new Hono();
 
@@ -12,22 +11,25 @@ app.get('/', async (c) => {
     const settings = await getSettings();
     return c.json(settings);
   } catch (error) {
-    logger.error('Failed to get settings', error);
-    return c.json({ error: 'Failed to get settings', details: (error as Error).message }, 500);
+    throw wrapError(error, 'FILE_ERROR', 'Failed to get settings');
   }
 });
 
 // PUT /api/settings - Update settings (partial merge)
 app.put('/', async (c) => {
-  const result = await safeJson<Partial<Settings>>(c);
+  const result = await safeJson<unknown>(c);
   if (!result.ok) return result.response;
 
+  const validation = validateSettingsInput(result.data);
+  if (!validation.ok) {
+    return c.json({ error: validation.error }, 400);
+  }
+
   try {
-    const updated = await updateSettings(result.data);
+    const updated = await updateSettings(validation.data);
     return c.json(updated);
   } catch (error) {
-    logger.error('Failed to update settings', error);
-    return c.json({ error: 'Failed to update settings', details: (error as Error).message }, 500);
+    throw wrapError(error, 'FILE_ERROR', 'Failed to update settings');
   }
 });
 

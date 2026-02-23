@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { safeJson } from '../utils/request.js';
 import { getAppContext } from '../lib/app-context.js';
+import { wrapError } from '../lib/errors.js';
 import { getPRFileViewedStates, setPRFileViewedState } from '../services/gh.js';
 import type { ViewedFileState } from '../types/index.js';
 
@@ -21,8 +22,7 @@ app.get('/', async (c) => {
     const states = await getPRFileViewedStates(prNumber, repo);
     return c.json({ states });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to fetch viewed files', code: 'FETCH_VIEWED_FILES_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to fetch viewed files');
   }
 });
 
@@ -49,8 +49,7 @@ app.post('/', async (c) => {
     const state = await setPRFileViewedState(prNumber, repo, filePath, viewed);
     return c.json(state);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return c.json({ error: 'Failed to update viewed state', code: 'UPDATE_VIEWED_STATE_FAILED', details: msg }, 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to update viewed state');
   }
 });
 

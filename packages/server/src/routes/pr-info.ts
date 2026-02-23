@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getPRInfo, checkGhCli, getCurrentRepo } from '../services/gh.js';
 import { getAppContext } from '../lib/app-context.js';
+import { wrapError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();
@@ -14,8 +15,7 @@ app.get('/', async (c) => {
     const prInfo = await getPRInfo(prNumber, repo);
     return c.json(prInfo);
   } catch (error) {
-    logger.error('Failed to fetch PR info', error);
-    return c.json({ error: 'Failed to fetch PR info', details: (error as Error).message }, 500);
+    throw wrapError(error, 'GH_CLI_ERROR', 'Failed to fetch PR info');
   }
 });
 

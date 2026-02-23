@@ -3,6 +3,7 @@ import { getDiff, getFileContent } from '../services/git.js';
 import { getPRContext } from '../services/pr-context.js';
 import { mapWithConcurrency } from '../utils/concurrency.js';
 import { getAppContext } from '../lib/app-context.js';
+import { wrapError } from '../lib/errors.js';
 import type { FileDiff } from '../types/index.js';
 import { logger } from '../lib/logger.js';
 
@@ -45,8 +46,7 @@ app.get('/', async (c) => {
 
     return c.json({ files });
   } catch (error) {
-    logger.error('Failed to fetch diff', error);
-    return c.json({ error: 'Failed to fetch PR diff', details: (error as Error).message }, 500);
+    throw wrapError(error, 'GIT_ERROR', 'Failed to fetch PR diff');
   }
 });
 
@@ -75,8 +75,7 @@ app.get('/file', async (c) => {
       head: { ref: refs.headRef, content: headContent },
     });
   } catch (error) {
-    logger.error('Failed to fetch file', error);
-    return c.json({ error: 'Failed to fetch file content', details: (error as Error).message }, 500);
+    throw wrapError(error, 'GIT_ERROR', 'Failed to fetch file content');
   }
 });
 

@@ -3,6 +3,7 @@ import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { opencodeClient } from './opencode-client.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
+import { wrapError } from '../lib/errors.js';
 
 /**
  * Generate intelligent grouping for a PR using opencode server
@@ -20,7 +21,7 @@ export async function generateGrouping(prLink: string, additionalContext?: strin
     return parseGroupingOutput(response);
   } catch (error) {
     logger.error('Grouping generation failed', error);
-    throw new Error(`Failed to generate grouping: ${(error as Error).message}`);
+    throw wrapError(error, 'AI_ERROR', 'Failed to generate grouping', { prLink });
   }
 }
 

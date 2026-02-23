@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { postComment, getPRComments } from '../services/gh.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 import { getAppContext } from '../lib/app-context.js';
+import { wrapError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { AppError, createErrorResponse } from '../lib/errors.js';
 
 const app = new Hono();
 
@@ -23,9 +23,7 @@ app.get('/', async (c) => {
     const comments = await getPRComments(prNumber, repo);
     return c.json({ comments });
   } catch (error) {
-    logger.error('Failed to fetch comments', error);
-    const statusCode = error instanceof AppError ? error.statusCode : 500;
-    return c.json(createErrorResponse(error, 'Failed to fetch comments'), statusCode as 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to fetch comments');
   }
 });
 
@@ -61,9 +59,7 @@ app.post('/', async (c) => {
     await postComment(prNumber, commentBody, commitId, path, line, repo);
     return c.json({});
   } catch (error) {
-    logger.error('Failed to post comment', error);
-    const statusCode = error instanceof AppError ? error.statusCode : 500;
-    return c.json(createErrorResponse(error, 'Failed to post comment'), statusCode as 500);
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to post comment');
   }
 });
 

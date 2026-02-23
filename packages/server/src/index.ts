@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/bun';
+import { fileURLToPath } from 'node:url';
 import { logger, createLoggerMiddleware } from './lib/logger.js';
 import { AppError, createErrorResponse } from './lib/errors.js';
 import { initAppContext, getAppContext } from './lib/app-context.js';
@@ -73,7 +74,7 @@ app.get('/api/health', (c) => {
 
 // Serve static files from client build directory
 // This will be the built React app
-const clientDistPath = import.meta.resolve('../../client/dist').replace('file://', '');
+const clientDistPath = fileURLToPath(import.meta.resolve('../../client/dist'));
 app.use('/*', serveStatic({ root: clientDistPath }));
 
 // Fallback to index.html for client-side routing (non-API routes only)
@@ -84,7 +85,7 @@ app.get('*', async (c) => {
   }
   
   try {
-    const indexPath = import.meta.resolve('../../client/dist/index.html').replace('file://', '');
+    const indexPath = fileURLToPath(import.meta.resolve('../../client/dist/index.html'));
     const file = Bun.file(indexPath);
     const content = await file.text();
     return c.html(content);
