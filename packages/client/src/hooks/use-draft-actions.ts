@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDraftComments } from './use-draft-comments'
+import { replyToComment, deleteCommentById, editCommentById } from '@/api/comments'
 
 export function useDraftActions() {
   const queryClient = useQueryClient()
@@ -62,6 +63,42 @@ export function useDraftActions() {
     }
   }, [handleSubmitDraftReview, queryClient])
 
+  const handleEditReply = useCallback(async (commentId: string, content: string) => {
+    try {
+      await editCommentById(commentId, content)
+      await queryClient.invalidateQueries({ queryKey: ['pr-comments'] })
+    } catch (error) {
+      toast.error("Failed to edit comment", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      })
+      throw error
+    }
+  }, [queryClient])
+
+  const handleDeleteReply = useCallback(async (commentId: string) => {
+    try {
+      await deleteCommentById(commentId)
+      await queryClient.invalidateQueries({ queryKey: ['pr-comments'] })
+    } catch (error) {
+      toast.error("Failed to delete comment", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      })
+      throw error
+    }
+  }, [queryClient])
+
+  const handleReplySubmit = useCallback(async (commentId: string, content: string) => {
+    try {
+      await replyToComment(commentId, content)
+      await queryClient.invalidateQueries({ queryKey: ['pr-comments'] })
+    } catch (error) {
+      toast.error("Failed to reply", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      })
+      throw error
+    }
+  }, [queryClient])
+
   return {
     draftComments,
     draftCount,
@@ -71,5 +108,8 @@ export function useDraftActions() {
     handleEditDraft,
     handleDeleteDraft,
     handleSubmitReview,
+    handleReplySubmit,
+    handleEditReply,
+    handleDeleteReply,
   }
 }

@@ -89,6 +89,10 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   onEditDraft?: (commentId: string, content: string) => Promise<void>
   /** Callback when a draft comment is deleted */
   onDeleteDraft?: (commentId: string) => Promise<void>
+  /** Callback when a reply comment is edited */
+  onEditReply?: (commentId: string, content: string) => Promise<void>
+  /** Callback when a reply comment is deleted */
+  onDeleteReply?: (commentId: string) => Promise<void>
   /** Whether a draft action (edit/delete) is currently loading */
   isDraftActionLoading?: boolean
   /** Callback to convert an AI review item to a draft comment */
@@ -234,6 +238,8 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
   aiReviewItems = [],
   onEditDraft,
   onDeleteDraft,
+  onEditReply,
+  onDeleteReply,
   isDraftActionLoading,
   onConvertAIToDraft,
   convertingAIItemIds,
@@ -512,6 +518,8 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
               onSubmitReply={onReplySubmit ? submitReply : undefined}
               onEditDraft={onEditDraft}
               onDeleteDraft={onDeleteDraft}
+              onEditReply={onEditReply}
+              onDeleteReply={onDeleteReply}
               isDraftActionLoading={isDraftActionLoading}
               onLineClick={onLineClick}
               onConvertAIToDraft={onConvertAIToDraft}

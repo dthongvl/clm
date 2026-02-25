@@ -44,6 +44,8 @@ interface FileDiffCardProps {
   onSubmitReply?: (commentId: string, content: string) => Promise<void>
   onEditDraft?: (commentId: string, content: string) => Promise<void>
   onDeleteDraft?: (commentId: string) => Promise<void>
+  onEditReply?: (commentId: string, content: string) => Promise<void>
+  onDeleteReply?: (commentId: string) => Promise<void>
   isDraftActionLoading?: boolean
   onLineClick?: (
     filePath: string,
@@ -73,6 +75,8 @@ export const FileDiffCard = memo(function FileDiffCard({
   onSubmitReply,
   onEditDraft,
   onDeleteDraft,
+  onEditReply,
+  onDeleteReply,
   isDraftActionLoading,
   onLineClick,
   onConvertAIToDraft,
@@ -177,6 +181,8 @@ export const FileDiffCard = memo(function FileDiffCard({
               onSubmitReply={onSubmitReply}
               onEditDraft={onEditDraft}
               onDeleteDraft={onDeleteDraft}
+              onEditReply={onEditReply}
+              onDeleteReply={onDeleteReply}
               isDraftActionLoading={isDraftActionLoading}
               onConvertAIToDraft={onConvertAIToDraft}
               convertingAIItemIds={convertingAIItemIds}

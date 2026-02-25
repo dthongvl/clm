@@ -25,3 +25,23 @@ export async function fetchPRComments(signal?: AbortSignal): Promise<ServerPRCom
   const response = await fetchApi<CommentsResponse>('/git/comments', { signal });
   return response.comments;
 }
+
+export async function replyToComment(commentId: string, body: string): Promise<void> {
+  await fetchApi(`/git/comments/${commentId}/replies`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function editCommentById(commentId: string, body: string): Promise<void> {
+  await fetchApi(`/git/comments/${commentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function deleteCommentById(commentId: string): Promise<void> {
+  await fetchApi(`/git/comments/${commentId}`, {
+    method: 'DELETE',
+  });
+}

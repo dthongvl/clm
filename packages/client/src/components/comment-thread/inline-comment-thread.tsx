@@ -55,6 +55,10 @@ export interface InlineCommentThreadProps {
   onConvertToDraft?: () => Promise<void>
   /** Whether the AI comment is currently being converted to a draft */
   isConvertingToDraft?: boolean
+  /** Callback when a reply comment is edited */
+  onEditReply?: (commentId: string, content: string) => Promise<void>
+  /** Callback when a reply comment is deleted */
+  onDeleteReply?: (commentId: string) => Promise<void>
 }
 
 /**
@@ -98,10 +102,31 @@ function AuthorAvatar({ isAI, avatarUrl, name }: { isAI: boolean; avatarUrl?: st
 function CommentItem({
   comment,
   isReply = false,
+  onEdit,
+  onDelete,
 }: {
   comment: ReviewComment
   isReply?: boolean
+  onEdit?: (commentId: string, content: string) => Promise<void>
+  onDelete?: (commentId: string) => Promise<void>
 }) {
+  const [isDeletePopoverOpen, setIsDeletePopoverOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(comment.content)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleEditSave = async () => {
+    if (!onEdit || !editContent.trim()) return
+    setIsSaving(true)
+    try {
+      await onEdit(comment.id, editContent.trim())
+      setIsEditing(false)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const isAI = comment.author.type === "ai"
   const formattedDate = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
@@ -173,7 +198,41 @@ function CommentItem({
             )}
           </div>
           <div data-slot="comment-content" className="mt-2">
-            {comment.isStreaming && !comment.content ? (
+            {isEditing ? (
+              <>
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={3}
+                  className="border-transparent bg-muted/50 focus-visible:border-input focus-visible:bg-transparent"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault()
+                      handleEditSave()
+                    } else if (e.key === "Escape") {
+                      e.preventDefault()
+                      setIsEditing(false)
+                      setEditContent(comment.content)
+                    }
+                  }}
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <Button size="sm" onClick={handleEditSave} disabled={!editContent.trim() || isSaving}>
+                    {isSaving ? (
+                      <>
+                        <HugeiconsIcon icon={Loading03Icon} className="size-3 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setIsEditing(false); setEditContent(comment.content) }}>
+                    Cancel
+                  </Button>
+                </div>
+              </>
+            ) : comment.isStreaming && !comment.content ? (
               <div className="flex flex-col gap-2">
                 <Skeleton className="h-3 w-full" />
                 <Skeleton className="h-3 w-4/5" />
@@ -183,6 +242,59 @@ function CommentItem({
               <Markdown>{comment.content}</Markdown>
             )}
           </div>
+          {(onEdit || onDelete) && !isEditing && (
+            <div className="mt-1.5 flex items-center gap-1">
+              {onEdit && (
+                <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-foreground" onClick={() => setIsEditing(true)}>
+                  Edit
+                </Button>
+              )}
+              {onDelete && (
+                <Popover open={isDeletePopoverOpen} onOpenChange={setIsDeletePopoverOpen}>
+                  <PopoverTrigger
+                    render={
+                      <Button variant="ghost" size="xs" disabled={isDeleting} className="text-muted-foreground hover:text-destructive">
+                        {isDeleting ? (
+                          <>
+                            <HugeiconsIcon icon={Loading03Icon} className="size-3 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          "Delete"
+                        )}
+                      </Button>
+                    }
+                  />
+                  <PopoverContent side="top" className="w-auto max-w-56">
+                    <PopoverHeader>
+                      <PopoverTitle>Delete reply?</PopoverTitle>
+                      <PopoverDescription>
+                        This action cannot be undone.
+                      </PopoverDescription>
+                    </PopoverHeader>
+                    <div className="flex justify-end gap-2">
+                      <PopoverClose render={<Button variant="outline" size="xs">Cancel</Button>} />
+                      <Button
+                        size="xs"
+                        variant="destructive"
+                        onClick={async () => {
+                          setIsDeletePopoverOpen(false)
+                          setIsDeleting(true)
+                          try {
+                            await onDelete(comment.id)
+                          } finally {
+                            setIsDeleting(false)
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -214,6 +326,8 @@ function InlineCommentThread({
   isDraftActionLoading,
   onConvertToDraft,
   isConvertingToDraft,
+  onEditReply,
+  onDeleteReply,
 }: InlineCommentThreadProps) {
   const [isReplyFormOpen, setIsReplyFormOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -289,7 +403,7 @@ function InlineCommentThread({
             {comment.replies!.map((reply, index) => (
               <div key={reply.id}>
                 {index > 0 && <Separator />}
-                <CommentItem comment={reply} isReply />
+                <CommentItem comment={reply} isReply onEdit={onEditReply} onDelete={onDeleteReply} />
               </div>
             ))}
           </div>

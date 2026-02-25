@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { postComment, getPRComments } from '../services/gh.js';
+import { postComment, getPRComments, replyToComment, deleteComment, editComment } from '../services/gh.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 import { getAppContext } from '../lib/app-context.js';
 import { wrapError } from '../lib/errors.js';
@@ -60,6 +60,88 @@ app.post('/', async (c) => {
     return c.json({});
   } catch (error) {
     throw wrapError(error, 'GH_API_ERROR', 'Failed to post comment');
+  }
+});
+
+// POST /api/git/comments/:commentId/replies
+// Body: { body: string }
+app.post('/:commentId/replies', async (c) => {
+  const { prNumber, repo } = getAppContext();
+  const commentId = Number(c.req.param('commentId'));
+
+  if (!isPositiveInt(commentId)) {
+    return c.json({ error: 'commentId must be a positive integer' }, 400);
+  }
+
+  const result = await safeJson<{ body: string }>(c);
+  if (!result.ok) return result.response;
+
+  const { body: replyBody } = result.data;
+
+  if (!replyBody || typeof replyBody !== 'string') {
+    return c.json({ error: 'body is required and must be a string' }, 400);
+  }
+
+  if (replyBody.length > 65536) {
+    return c.json({ error: 'body exceeds maximum length of 65536 characters' }, 400);
+  }
+
+  try {
+    logger.github(`Replying to comment #${commentId} on PR #${prNumber}`);
+    await replyToComment(prNumber, commentId, replyBody, repo);
+    return c.json({});
+  } catch (error) {
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to reply to comment');
+  }
+});
+
+// PATCH /api/git/comments/:commentId
+// Body: { body: string }
+app.patch('/:commentId', async (c) => {
+  const { repo } = getAppContext();
+  const commentId = Number(c.req.param('commentId'));
+
+  if (!isPositiveInt(commentId)) {
+    return c.json({ error: 'commentId must be a positive integer' }, 400);
+  }
+
+  const result = await safeJson<{ body: string }>(c);
+  if (!result.ok) return result.response;
+
+  const { body: editBody } = result.data;
+
+  if (!editBody || typeof editBody !== 'string') {
+    return c.json({ error: 'body is required and must be a string' }, 400);
+  }
+
+  if (editBody.length > 65536) {
+    return c.json({ error: 'body exceeds maximum length of 65536 characters' }, 400);
+  }
+
+  try {
+    logger.github(`Editing comment #${commentId}`);
+    await editComment(commentId, editBody, repo);
+    return c.json({});
+  } catch (error) {
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to edit comment');
+  }
+});
+
+// DELETE /api/git/comments/:commentId
+app.delete('/:commentId', async (c) => {
+  const { repo } = getAppContext();
+  const commentId = Number(c.req.param('commentId'));
+
+  if (!isPositiveInt(commentId)) {
+    return c.json({ error: 'commentId must be a positive integer' }, 400);
+  }
+
+  try {
+    logger.github(`Deleting comment #${commentId}`);
+    await deleteComment(commentId, repo);
+    return c.json({});
+  } catch (error) {
+    throw wrapError(error, 'GH_API_ERROR', 'Failed to delete comment');
   }
 });
 

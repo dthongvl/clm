@@ -54,6 +54,9 @@ export function App() {
     handleEditDraft,
     handleDeleteDraft,
     handleSubmitReview,
+    handleReplySubmit,
+    handleEditReply,
+    handleDeleteReply,
   } = useDraftActions()
 
   const {
@@ -197,8 +200,11 @@ export function App() {
                   annotations={annotations}
                   aiReviewItems={visibleAIReviewItems}
                   onCommentSubmit={handleCommentSubmit}
+                  onReplySubmit={handleReplySubmit}
                   onEditDraft={handleEditDraft}
                   onDeleteDraft={handleDeleteDraft}
+                  onEditReply={handleEditReply}
+                  onDeleteReply={handleDeleteReply}
                   isDraftActionLoading={isDraftActionLoading}
                   onConvertAIToDraft={handleConvertAIToDraft}
                   convertingAIItemIds={convertingAIItemIds}

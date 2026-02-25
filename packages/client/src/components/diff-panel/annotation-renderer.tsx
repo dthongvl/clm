@@ -23,6 +23,8 @@ interface AnnotationRendererProps {
   onSubmitReply?: (commentId: string, content: string) => Promise<void>
   onEditDraft?: (commentId: string, content: string) => Promise<void>
   onDeleteDraft?: (commentId: string) => Promise<void>
+  onEditReply?: (commentId: string, content: string) => Promise<void>
+  onDeleteReply?: (commentId: string) => Promise<void>
   isDraftActionLoading?: boolean
   /** Callback to convert an AI review item to a draft comment */
   onConvertAIToDraft?: (itemId: string) => Promise<void>
@@ -39,6 +41,8 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
   onSubmitReply,
   onEditDraft,
   onDeleteDraft,
+  onEditReply,
+  onDeleteReply,
   isDraftActionLoading,
   onConvertAIToDraft,
   convertingAIItemIds,
@@ -117,6 +121,8 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
       isSubmittingReply={submittingReplies.has(meta.comment.id)}
       onEditDraft={onEditDraft}
       onDeleteDraft={onDeleteDraft}
+      onEditReply={onEditReply}
+      onDeleteReply={onDeleteReply}
       isDraftActionLoading={isDraftActionLoading}
     />
   )

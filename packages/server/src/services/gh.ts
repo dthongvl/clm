@@ -165,6 +165,43 @@ export async function postComment(
   }
 }
 
+export async function replyToComment(
+  prNumber: number,
+  commentId: number,
+  body: string,
+  repo: string
+): Promise<void> {
+  const apiPath = `repos/${repo}/pulls/${prNumber}/comments/${commentId}/replies`;
+  await runGh([
+    'api', apiPath,
+    '-f', `body=${body}`,
+  ]);
+}
+
+export async function deleteComment(
+  commentId: number,
+  repo: string
+): Promise<void> {
+  const apiPath = `repos/${repo}/pulls/comments/${commentId}`;
+  await runGh([
+    'api', apiPath,
+    '-X', 'DELETE',
+  ]);
+}
+
+export async function editComment(
+  commentId: number,
+  body: string,
+  repo: string
+): Promise<void> {
+  const apiPath = `repos/${repo}/pulls/comments/${commentId}`;
+  await runGh([
+    'api', apiPath,
+    '-X', 'PATCH',
+    '-f', `body=${body}`,
+  ]);
+}
+
 export async function getCurrentRepo(): Promise<string | null> {
   try {
     const stdout = await runGh(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']);
