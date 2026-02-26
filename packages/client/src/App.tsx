@@ -260,6 +260,9 @@ export function App() {
                     onModelChange={(model, variant) => updateActionModel("ai-review", model, variant)}
                   />
                 </div>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  AI analyzes the diff and surfaces potential issues by severity — click any issue to jump directly to the relevant line. Pattern Verification checks whether all related code locations were consistently updated.
+                </p>
                 <AIReviewSummary
                   items={visibleAIReviewItems}
                   onItemClick={(item) => {

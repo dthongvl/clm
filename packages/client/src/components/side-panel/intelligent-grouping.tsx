@@ -62,6 +62,10 @@ function IntelligentGrouping({
         </div>
       )}
 
+      <p className="text-xs text-muted-foreground">
+        AI organizes your PR's file changes into logical groups — making large PRs easier to navigate by showing related changes together instead of a flat file list.
+      </p>
+
       {error ? (
         <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
           <div className="flex items-center gap-2 text-destructive">

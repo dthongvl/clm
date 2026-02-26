@@ -21,3 +21,14 @@ export async function fetchPRDiff(includeContent = true, signal?: AbortSignal): 
   const response = await fetchApi<DiffResponse>(`/git/diff${query ? `?${query}` : ''}`, { signal });
   return response.files;
 }
+
+interface FileContentResponse {
+  filename: string;
+  base: { ref: string; content: string | null };
+  head: { ref: string; content: string | null };
+}
+
+export async function fetchFileContent(filename: string, signal?: AbortSignal): Promise<FileContentResponse> {
+  const params = new URLSearchParams({ filename });
+  return fetchApi<FileContentResponse>(`/git/diff/file?${params.toString()}`, { signal });
+}

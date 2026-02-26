@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import type { RelatedFile } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -5,6 +6,9 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { AiGenerativeIcon, AlertCircleIcon, File01Icon } from "@hugeicons/core-free-icons"
 import { ActionSettingsPopover } from "./action-settings-popover"
 import { ActionTriggerWithContext } from "./action-trigger-with-context"
+import { FileSourceDialog } from "@/components/diff-panel/file-source-dialog"
+import { useTheme } from "@/components/theme-provider"
+import { fetchFileContent } from "@/api/diff"
 import type { ModelOption } from "@/types/settings"
 
 export interface RelatedFilesProps extends React.ComponentProps<"div"> {
@@ -32,6 +36,35 @@ function RelatedFiles({
   onModelChange,
   ...props
 }: RelatedFilesProps) {
+  const { theme } = useTheme()
+  const resolvedTheme = theme === "system"
+    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    : theme
+
+  const [sourceView, setSourceView] = useState<{ filePath: string; content: string } | null>(null)
+  const [isFetchingContent, setIsFetchingContent] = useState(false)
+
+  const handleFileClick = useCallback(async (filePath: string) => {
+    onFileClick?.(filePath)
+
+    setIsFetchingContent(true)
+    try {
+      const result = await fetchFileContent(filePath)
+      setSourceView({
+        filePath,
+        content: result.head.content ?? result.base.content ?? "",
+      })
+    } catch (err) {
+      console.error("Failed to fetch file content:", err)
+    } finally {
+      setIsFetchingContent(false)
+    }
+  }, [onFileClick])
+
+  const handleSourceDialogOpenChange = useCallback((open: boolean) => {
+    if (!open) setSourceView(null)
+  }, [])
+
   return (
     <div
       data-slot="related-files"
@@ -60,6 +93,10 @@ function RelatedFiles({
           )}
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground">
+        AI discovers files in the repository that are related to the current changes but weren't modified — helping you spot missing updates and understand the broader impact of the PR.
+      </p>
 
       {error ? (
         <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
@@ -106,11 +143,20 @@ function RelatedFiles({
               key={file.filePath}
               file={file}
               index={index + 1}
-              onClick={() => onFileClick?.(file.filePath)}
+              disabled={isFetchingContent}
+              onClick={() => handleFileClick(file.filePath)}
             />
           ))}
         </div>
       )}
+
+      <FileSourceDialog
+        open={sourceView !== null}
+        onOpenChange={handleSourceDialogOpenChange}
+        filePath={sourceView?.filePath ?? ""}
+        content={sourceView?.content ?? ""}
+        resolvedTheme={resolvedTheme}
+      />
     </div>
   )
 }
@@ -134,9 +180,9 @@ function RelatedFileCard({ file, index, className, ...props }: RelatedFileCardPr
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
           {index}
         </span>
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <HugeiconsIcon icon={File01Icon} className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="truncate font-mono text-sm">{file.filePath}</span>
+        <div className="flex min-w-0 flex-1 items-start gap-1.5">
+          <HugeiconsIcon icon={File01Icon} className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="break-all font-mono text-sm">{file.filePath}</span>
         </div>
       </div>
       <p className="whitespace-pre-wrap text-xs text-muted-foreground leading-relaxed">
