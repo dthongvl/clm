@@ -5,7 +5,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { z } from 'zod';
 import { logger } from '../lib/logger.js';
 
-const CONFIG_DIR = join(homedir(), '.config', 'codereview');
+const CONFIG_DIR = join(homedir(), '.config', 'clm');
 const CONFIG_FILE = join(CONFIG_DIR, 'settings.toml');
 
 export type ActionKey = 'grouping' | 'ai-review' | 'pattern-verification' | 'related-files';

@@ -9,7 +9,7 @@ const OPENCODE_HOSTNAME = process.env.OPENCODE_HOSTNAME || '127.0.0.1';
 const HEALTH_CHECK_TIMEOUT_MS = 30_000;
 const HEALTH_CHECK_INTERVAL_MS = 500;
 
-const PID_FILE = join(tmpdir(), 'codereview-opencode.json');
+const PID_FILE = join(tmpdir(), 'clm-opencode.json');
 
 export interface OpencodeInfo {
   pid: number;

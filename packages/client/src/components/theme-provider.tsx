@@ -19,7 +19,7 @@ const ThemeProviderContext = createContext<ThemeProviderState | null>(null)
 export function ThemeProvider({
   children,
   defaultTheme = "system",
-  storageKey = "codereview-ui-theme",
+  storageKey = "clm-ui-theme",
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(

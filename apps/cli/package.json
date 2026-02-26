@@ -1,11 +1,11 @@
 {
-  "name": "@codereview/cli",
+  "name": "@clm/cli",
   "version": "1.0.0",
-  "description": "CLI tool for local code review with AI assistance",
+  "description": "CLM (Code Looks Good To Me) - CLI tool for reviewing GitHub PRs with AI assistance",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "codereview": "./bin/codereview"
+    "clm": "./bin/clm"
   },
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
@@ -26,7 +26,7 @@
   "engines": {
     "bun": ">=1.0.0"
   },
-  "keywords": ["cli", "code review", "github", "pr", "ai"],
+  "keywords": ["cli", "clm", "code review", "github", "pr", "ai"],
   "author": "thongvl",
   "license": "MIT"
 }

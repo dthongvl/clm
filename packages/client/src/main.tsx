@@ -12,7 +12,7 @@ import { PRContextProvider } from './hooks'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="codereview-ui-theme">
+      <ThemeProvider defaultTheme="system" storageKey="clm-ui-theme">
         <PRContextProvider>
           <TooltipProvider>
             <App />

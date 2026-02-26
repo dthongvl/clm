@@ -1,4 +1,4 @@
-# Code Review Tool
+# CLM — Code Looks Good To Me
 
 A local CLI tool that provides a web UI to review GitHub PRs with AI assistance. It runs entirely on your machine — your code and diffs never leave your local environment.
 
@@ -13,8 +13,8 @@ A local CLI tool that provides a web UI to review GitHub PRs with AI assistance.
 
 ```bash
 # Clone the repository
-git clone https://github.com/dthongvl/code-review.git
-cd code-review
+git clone https://github.com/dthongvl/clm.git
+cd clm
 
 # Install dependencies
 pnpm install
@@ -35,7 +35,7 @@ This runs Turborepo to build everything in the correct order:
 
 ### Global Installation (recommended)
 
-After building, link the CLI globally so you can run `codereview` from any repository:
+After building, link the CLI globally so you can run `clm` from any repository:
 
 ```bash
 cd apps/cli
@@ -45,7 +45,7 @@ bun link
 Then from any Git repository with a GitHub remote:
 
 ```bash
-codereview [PR_NUMBER_OR_URL]
+clm [PR_NUMBER_OR_URL]
 ```
 
 ### Without Global Install
@@ -53,7 +53,7 @@ codereview [PR_NUMBER_OR_URL]
 You can also run it directly without linking:
 
 ```bash
-bun <path-to-repo>/apps/cli/bin/codereview [PR_NUMBER_OR_URL]
+bun <path-to-repo>/apps/cli/bin/clm [PR_NUMBER_OR_URL]
 ```
 
 ## Usage
@@ -62,13 +62,13 @@ Navigate to a Git repository with a GitHub remote and run:
 
 ```bash
 # Interactive PR selection (shows PRs requesting your review)
-codereview
+clm
 
 # Review a specific PR by number
-codereview 123
+clm 123
 
 # Review a specific PR by URL
-codereview https://github.com/owner/repo/pull/123
+clm https://github.com/owner/repo/pull/123
 ```
 
 This will:
@@ -80,6 +80,50 @@ This will:
 5. Open your browser to the review UI
 
 Press `Ctrl+C` to stop all processes.
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  $ clm 123                                                       │
+│                                                                  │
+│  CLI (@clm/cli)                                                  │
+│  ├── Detect repo & PR info ──────────► gh CLI ──► GitHub API     │
+│  ├── Fetch branches ─────────────────► git CLI                   │
+│  ├── Start OpenCode server                                       │
+│  ├── Start CLM server (port 3000)                                │
+│  └── Open browser                                                │
+└──────────────┬───────────────────────────┬───────────────────────┘
+               │                           │
+               ▼                           ▼
+┌──────────────────────────┐ ┌──────────────────────────────────┐
+│  Server (@clm/server)    │ │  OpenCode Server                 │
+│  Hono on port 3000       │ │  AI backend                      │
+│                          │ └──────────────┬───────────────────┘
+│  Git features:           │                │
+│  ├── /api/diff       ────┼──► git diff    │
+│  ├── /api/comments   ────┼──► gh api      │
+│  ├── /api/reviews    ────┼──► gh api      │
+│  └── /api/pr-info    ────┼──► gh api      │
+│                          │                │
+│  AI features:            │                │
+│  ├── /api/ai/review  ────┼────────────────┘
+│  ├── /api/ai/grouping ───┼────────────────►  OpenCode API
+│  ├── /api/ai/patterns ───┼────────────────►  (LLM access)
+│  ├── /api/ai/related  ───┼────────────────►
+│  └── /api/ai/chat     ───┼────────────────►
+│                          │
+└──────────┬───────────────┘
+           │
+           ▼
+┌──────────────────────────┐
+│  Client (@clm/client)    │
+│  React + Vite SPA        │
+│                          │
+│  Served as static files  │
+│  from the CLM server     │
+└──────────────────────────┘
+```
 
 ## Features
 
@@ -132,7 +176,7 @@ Press `Ctrl+C` to stop all processes.
 ### Settings & Configuration
 
 - Per-action model selection (grouping, AI review, pattern verification, related files)
-- Settings persisted to `~/.config/codereview/settings.toml`
+- Settings persisted to `~/.config/clm/settings.toml`
 - Default model: `google/gemini-3-flash-preview`
 
 ## Development
@@ -145,8 +189,8 @@ pnpm dev
 pnpm lint
 
 # Type-check individual packages
-pnpm --filter @codereview/client check-types
-pnpm --filter @codereview/server check-types
+pnpm --filter @clm/client check-types
+pnpm --filter @clm/server check-types
 pnpm cli:typecheck
 
 # Run CLI in dev mode (from a git repo directory)
@@ -157,17 +201,17 @@ pnpm cli:dev
 
 ```
 apps/
-└── cli/              # CLI entry point (@codereview/cli)
+└── cli/              # CLI entry point (@clm/cli)
     ├── bin/           # Executable entry
     └── src/           # CLI logic (git, github, server launcher)
 packages/
-├── client/           # React + Vite frontend (@codereview/client)
+├── client/           # React + Vite frontend (@clm/client)
 │   └── src/
 │       ├── components/  # UI components (diff panel, side panel, top bar, comments)
 │       ├── hooks/       # React hooks (diff, comments, AI review, settings)
 │       ├── api/         # API client functions
 │       └── types/       # TypeScript type definitions
-└── server/           # Hono API server (@codereview/server)
+└── server/           # Hono API server (@clm/server)
     └── src/
         ├── routes/      # API endpoints (diff, comments, reviews, AI review, settings)
         ├── services/    # Business logic (gh CLI, git, AI review, grouping)

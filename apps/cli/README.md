@@ -1,6 +1,6 @@
-# @codereview/cli
+# @clm/cli
 
-A CLI tool for local code review with AI assistance. This tool spins up a web UI to review GitHub PRs using the `gh` CLI and provides intelligent AI-powered feedback.
+CLM (Code Looks Good To Me) — a CLI tool that spins up a web UI to review GitHub PRs using the `gh` CLI and provides intelligent AI-powered feedback.
 
 ## Installation
 
@@ -16,10 +16,10 @@ bun install --cwd apps/cli
 
 ```bash
 # Review a specific PR
-codereview <PR_NUMBER>
+clm <PR_NUMBER>
 
 # Example
-codereview 123
+clm 123
 ```
 
 ## How It Works

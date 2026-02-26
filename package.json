@@ -1,5 +1,5 @@
 {
-  "name": "codereview",
+  "name": "clm",
   "version": "1.0.0",
   "description": "A local CLI tool that provides a web UI to review GitHub PRs with AI assistance.",
   "scripts": {
@@ -11,7 +11,7 @@
     "cli:build": "bun run --cwd apps/cli build",
     "cli:typecheck": "bun run --cwd apps/cli typecheck"
   },
-  "keywords": ["code review", "ai", "github", "pr", "cli"],
+  "keywords": ["clm", "code review", "ai", "github", "pr", "cli"],
   "author": "thongvl",
   "license": "MIT",
   "packageManager": "pnpm@10.28.2",

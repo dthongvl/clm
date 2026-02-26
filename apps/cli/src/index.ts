@@ -22,12 +22,12 @@ registerShutdownHandlers();
 
 async function main() {
   program
-    .name('codereview')
+    .name('clm')
     .description('Local CLI tool for reviewing GitHub PRs with AI assistance')
     .version('1.0.0')
     .argument('[pr]', 'GitHub PR number or URL (e.g., 123 or https://github.com/owner/repo/pull/123)')
     .action(async (prInput?: string) => {
-      logger.header('Code Review');
+      logger.header('CLM');
 
       // Check for gh CLI
       const hasGh = await checkGhCLI();
@@ -155,7 +155,7 @@ async function main() {
         logger.dim(`Please open ${url} manually`);
       }
 
-      logger.ready('Code review UI is ready!');
+      logger.ready('CLM is ready!');
       logger.dim('Press Ctrl+C to stop');
     });
 

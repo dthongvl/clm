@@ -1,4 +1,4 @@
-const STORAGE_PREFIX = "code-review:"
+const STORAGE_PREFIX = "clm:"
 const STORAGE_VERSION = 1
 
 interface StorageWrapper<T> {
