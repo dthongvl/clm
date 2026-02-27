@@ -115,12 +115,19 @@ app.notFound((c) => {
   return c.json({ error: 'Not found' }, 404);
 });
 
-// Start server
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+// Start server with random free port (port 0 lets OS assign)
+const requestedPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 0;
 
-logger.serverStart(port);
-
-export default {
-  port,
+const server = Bun.serve({
+  port: requestedPort,
   fetch: app.fetch,
-};
+});
+
+const actualPort = server.port;
+
+// Output port in parseable format for CLI to capture
+console.log(`__CLM_PORT__:${actualPort}`);
+
+logger.serverStart(actualPort);
+
+export { server, actualPort as port };

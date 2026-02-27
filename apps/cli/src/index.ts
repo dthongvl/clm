@@ -129,22 +129,24 @@ async function main() {
       }
 
       // Start the server
+      let serverPort: number;
       try {
-        const serverProcess = await startServer({
+        const serverResult = await startServer({
           prNumber,
           opencodeUrl: opencodeLauncher.baseUrl,
           repo,
           baseRef: prInfo.baseBranch,
           headRef: prInfo.headBranch,
         });
-        setServerProcess(serverProcess);
+        setServerProcess(serverResult.process);
+        serverPort = serverResult.port;
       } catch (error) {
         logger.error('Failed to start server', (error as Error).message);
         await shutdown();
         process.exit(1);
       }
 
-      const url = 'http://localhost:3000';
+      const url = `http://localhost:${serverPort}`;
 
       // Open browser
       try {
