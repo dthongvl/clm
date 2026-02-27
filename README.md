@@ -33,27 +33,26 @@ This runs Turborepo to build everything in the correct order:
 - **Server** — Bun single-file build → `packages/server/dist/`
 - **CLI** — Bun single-file build → `apps/cli/dist/`
 
-### Global Installation (recommended)
+### Running the CLI
 
-After building, link the CLI globally so you can run `clm` from any repository:
+After building, run the CLI directly from any Git repository with a GitHub remote:
 
 ```bash
-cd apps/cli
-bun link
+bun <path-to-clm>/apps/cli/bin/clm [PR_NUMBER_OR_URL]
 ```
 
-Then from any Git repository with a GitHub remote:
+### Adding to PATH (optional)
+
+To run `clm` from anywhere, create a symlink in a directory that's in your PATH:
+
+```bash
+ln -s <path-to-clm>/apps/cli/bin/clm ~/.local/bin/clm
+```
+
+Then from any Git repository:
 
 ```bash
 clm [PR_NUMBER_OR_URL]
-```
-
-### Without Global Install
-
-You can also run it directly without linking:
-
-```bash
-bun <path-to-repo>/apps/cli/bin/clm [PR_NUMBER_OR_URL]
 ```
 
 ## Usage
