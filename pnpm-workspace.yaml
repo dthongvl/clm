@@ -1,10 +1,12 @@
 packages:
   - apps/*
   - packages/*
-
-onlyBuiltDependencies:
-  - msw
+allowBuilds:
+  msw: set this to true or false
 
 catalog:
   "@types/bun": "latest"
   "typescript": "~5.9.3"
+
+onlyBuiltDependencies:
+  - msw

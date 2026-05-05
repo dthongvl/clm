@@ -11,10 +11,17 @@
     "cli:build": "bun run --cwd apps/cli build",
     "cli:typecheck": "bun run --cwd apps/cli typecheck"
   },
-  "keywords": ["clm", "code review", "ai", "github", "pr", "cli"],
+  "keywords": [
+    "clm",
+    "code review",
+    "ai",
+    "github",
+    "pr",
+    "cli"
+  ],
   "author": "thongvl",
   "license": "MIT",
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@11.0.3",
   "devDependencies": {
     "turbo": "^2.8.1"
   }
