@@ -2,7 +2,7 @@ packages:
   - apps/*
   - packages/*
 allowBuilds:
-  msw: set this to true or false
+  msw: false
 
 catalog:
   "@types/bun": "latest"

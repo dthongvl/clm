@@ -1,21 +1,36 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react"
 import {
-  FileTree,
-  FileTreeFolder,
-  FileTreeFile,
-  FileTreeName,
-  FileTreeIcon,
-} from "@/components/ai-elements/file-tree"
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react"
+import { FileTree, useFileTree } from "@pierre/trees/react"
 import {
-  buildPRFileTree,
-  getDefaultExpandedFolders,
-  type PRFileTreeNode,
-} from "@/lib/pr-file-tree"
+  themeToTreeStyles,
+  type FileTreeRowDecoration,
+  type GitStatus,
+  type GitStatusEntry,
+} from "@pierre/trees"
+import type { CSSProperties } from "react"
 import type { DiffFileData } from "@/types/diff"
+import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { FilePlusIcon, FileMinusIcon, FileEditIcon, FileSymlinkIcon, SearchIcon, XIcon } from "lucide-react"
+
+const getMediaQuery = () =>
+  typeof window !== "undefined"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null
+
+const subscribeSystemTheme = (cb: () => void) => {
+  const mq = getMediaQuery()
+  if (!mq) return () => {}
+  mq.addEventListener("change", cb)
+  return () => mq.removeEventListener("change", cb)
+}
+
+const getSystemThemeSnapshot = (): "dark" | "light" =>
+  getMediaQuery()?.matches ? "dark" : "light"
 
 export interface PRFileTreeProps {
   files: DiffFileData[]
@@ -24,59 +39,18 @@ export interface PRFileTreeProps {
   className?: string
 }
 
-function getFileIcon(status: DiffFileData["status"]) {
+function statusToGit(status: DiffFileData["status"]): GitStatus {
   switch (status) {
     case "added":
-      return <FilePlusIcon className="size-4 text-green-500" />
+      return "added"
     case "deleted":
-      return <FileMinusIcon className="size-4 text-red-500" />
+      return "deleted"
     case "renamed":
-      return <FileSymlinkIcon className="size-4 text-yellow-500" />
+      return "renamed"
     case "modified":
     default:
-      return <FileEditIcon className="size-4 text-blue-500" />
+      return "modified"
   }
-}
-
-function FileTreeNodeRenderer({
-  node,
-  onSelectFile,
-}: {
-  node: PRFileTreeNode
-  onSelectFile: (path: string) => void
-}) {
-  if (node.type === "folder") {
-    return (
-      <FileTreeFolder path={node.path} name={node.name}>
-        {node.children.map((child) => (
-          <FileTreeNodeRenderer
-            key={child.path}
-            node={child}
-            onSelectFile={onSelectFile}
-          />
-        ))}
-      </FileTreeFolder>
-    )
-  }
-
-  const { file } = node
-
-  return (
-    <FileTreeFile path={node.path} name={node.name} className="flex-nowrap">
-      {/* Spacer for alignment with folder chevrons */}
-      <span className="size-4 shrink-0" />
-      <FileTreeIcon>{getFileIcon(file.status)}</FileTreeIcon>
-      <FileTreeName className="flex-1 overflow-visible text-clip whitespace-nowrap">{node.name}</FileTreeName>
-      <span className="ml-auto flex shrink-0 gap-1 text-xs text-muted-foreground">
-        {file.additions > 0 && (
-          <span className="text-green-600">+{file.additions}</span>
-        )}
-        {file.deletions > 0 && (
-          <span className="text-red-600">-{file.deletions}</span>
-        )}
-      </span>
-    </FileTreeFile>
-  )
 }
 
 export function PRFileTree({
@@ -85,71 +59,96 @@ export function PRFileTree({
   onSelectFile,
   className,
 }: PRFileTreeProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const deferredSearchQuery = useDeferredValue(searchQuery)
-
-  const filteredFiles = useMemo(() => {
-    if (!deferredSearchQuery.trim()) return files
-    const query = deferredSearchQuery.toLowerCase()
-    return files.filter((file) => file.path.toLowerCase().includes(query))
-  }, [files, deferredSearchQuery])
-
-  const tree = useMemo(() => buildPRFileTree(filteredFiles), [filteredFiles])
-  const defaultExpanded = useMemo(
-    () => getDefaultExpandedFolders(tree),
-    [tree]
+  const { theme } = useTheme()
+  const systemTheme = useSyncExternalStore(
+    subscribeSystemTheme,
+    getSystemThemeSnapshot,
+    getSystemThemeSnapshot
   )
-  const [expanded, setExpanded] = useState(defaultExpanded)
+  const resolvedTheme = theme === "system" ? systemTheme : theme
+  const themeStyles = useMemo(
+    () => themeToTreeStyles({ type: resolvedTheme }) as CSSProperties,
+    [resolvedTheme]
+  )
 
-  // Update expanded state when tree changes (e.g., after filtering)
+  const paths = useMemo(() => files.map((f) => f.path), [files])
+  const gitStatus = useMemo<GitStatusEntry[]>(
+    () =>
+      files.map((f) => ({
+        path: f.path,
+        status: statusToGit(f.status),
+      })),
+    [files]
+  )
+
+  const fileByPath = useMemo(() => {
+    const map = new Map<string, DiffFileData>()
+    for (const f of files) map.set(f.path, f)
+    return map
+  }, [files])
+
+  // Refs so callbacks captured by the model at construction time always read
+  // the latest props (`useFileTree` builds the model exactly once).
+  const fileByPathRef = useRef(fileByPath)
+  const onSelectFileRef = useRef(onSelectFile)
+  useLayoutEffect(() => {
+    fileByPathRef.current = fileByPath
+    onSelectFileRef.current = onSelectFile
+  })
+
+  const { model } = useFileTree({
+    paths,
+    gitStatus,
+    flattenEmptyDirectories: true,
+    initialExpansion: "open",
+    initialSelectedPaths: selectedPath ? [selectedPath] : undefined,
+    search: true,
+    fileTreeSearchMode: "hide-non-matches",
+    density: "compact",
+    onSelectionChange: (selected) => {
+      if (selected.length === 0) return
+      const path = selected[selected.length - 1]
+      if (fileByPathRef.current.has(path)) {
+        onSelectFileRef.current(path)
+      }
+    },
+    renderRowDecoration: ({ item }): FileTreeRowDecoration | null => {
+      if (item.kind !== "file") return null
+      const file = fileByPathRef.current.get(item.path)
+      if (!file) return null
+      const parts: string[] = []
+      if (file.additions > 0) parts.push(`+${file.additions}`)
+      if (file.deletions > 0) parts.push(`-${file.deletions}`)
+      if (parts.length === 0) return null
+      return { text: parts.join(" ") }
+    },
+  })
+
+  // Skip the first run since the model is constructed with these inputs.
+  const isFirstRun = useRef(true)
   useEffect(() => {
-    setExpanded(defaultExpanded)
-  }, [defaultExpanded])
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      return
+    }
+    model.resetPaths(paths)
+    model.setGitStatus(gitStatus)
+  }, [model, paths, gitStatus])
+
+  // Sync external selection changes (e.g., URL-driven) into the tree.
+  useEffect(() => {
+    if (!selectedPath) return
+    const item = model.getItem(selectedPath)
+    if (item && !item.isSelected()) {
+      item.select()
+    }
+  }, [model, selectedPath])
 
   return (
-    <div className={cn("flex h-full flex-col", className)}>
-      <div className="relative shrink-0 border-b p-2">
-        <SearchIcon className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Filter files..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-8 pl-8 pr-8 text-sm"
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery("")}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <XIcon className="size-4" />
-          </button>
-        )}
-      </div>
-      <ScrollArea className="min-h-0 flex-1">
-        <FileTree
-          className="border-0 rounded-none w-max min-w-full"
-          selectedPath={selectedPath}
-          onSelect={onSelectFile}
-          expanded={expanded}
-          onExpandedChange={setExpanded}
-        >
-          {tree.length === 0 ? (
-            <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-              No files match "{searchQuery}"
-            </div>
-          ) : (
-            tree.map((node) => (
-              <FileTreeNodeRenderer
-                key={node.path}
-                node={node}
-                onSelectFile={onSelectFile}
-              />
-            ))
-          )}
-        </FileTree>
-      </ScrollArea>
-    </div>
+    <FileTree
+      model={model}
+      className={cn("h-full", className)}
+      style={themeStyles}
+    />
   )
 }
