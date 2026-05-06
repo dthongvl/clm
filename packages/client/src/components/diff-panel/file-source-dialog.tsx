@@ -51,6 +51,7 @@ function FileSourceDialog({
             <File
               file={{ name: filePath, contents: content }}
               options={{
+                theme: { dark: "pierre-dark", light: "pierre-light" },
                 themeType: resolvedTheme,
                 overflow: "scroll",
                 disableFileHeader: true,

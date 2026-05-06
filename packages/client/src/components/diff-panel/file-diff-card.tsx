@@ -107,10 +107,10 @@ export const FileDiffCard = memo(function FileDiffCard({
     expandUnchanged: false,
     expansionLineCount: 20,
     lineDiffType: "word" as const,
-    hunkSeparators: "line-info" as const,
-    headerRenderMode: "custom" as const,
+    hunkSeparators: "line-info-basic" as const,
     collapsed: isCollapsed,
-    enableHoverUtility: !hasOpenCommentForm,
+    enableGutterUtility: !hasOpenCommentForm,
+    theme: { dark: "pierre-dark", light: "pierre-light" } as const,
     themeType: resolvedTheme,
     onLineClick: onLineClick
       ? (lineProps: { lineNumber: number; annotationSide: "additions" | "deletions" }) => {
@@ -162,7 +162,7 @@ export const FileDiffCard = memo(function FileDiffCard({
             onViewSource={handleViewSource}
           />
         )}
-        renderHoverUtility={(getHoveredLine) => (
+        renderGutterUtility={(getHoveredLine) => (
           <Button
             size="icon-xs"
             variant="default"

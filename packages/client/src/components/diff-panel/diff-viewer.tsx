@@ -131,7 +131,7 @@ export type AnnotationMetadata =
 
 /**
  * Pre-indexes annotations, drafts, and AI review items by file path.
- * Returns a lookup function: (filePath) => annotations[].
+ * Returns a Map so each file's annotation array is a stable reference.
  */
 function useAnnotationIndex(
   comments: ReviewComment[],
@@ -174,14 +174,25 @@ function useAnnotationIndex(
       aiByFile.set(normalizedPath, arr)
     }
 
-    return (filePath: string): DiffLineAnnotation<AnnotationMetadata>[] => {
-      const normalizedPath = filePath.replace(/^\/+/, "")
-      return [
-        ...(commentsByFile.get(filePath) ?? []),
-        ...(draftsByFile.get(filePath) ?? []),
+    const result = new Map<string, DiffLineAnnotation<AnnotationMetadata>[]>()
+    const allPaths = new Set([
+      ...commentsByFile.keys(),
+      ...draftsByFile.keys(),
+      ...aiByFile.keys(),
+    ])
+    for (const path of allPaths) {
+      const normalizedPath = path.replace(/^\/+/, "")
+      const combined = [
+        ...(commentsByFile.get(path) ?? []),
+        ...(draftsByFile.get(path) ?? []),
         ...(aiByFile.get(normalizedPath) ?? []),
       ]
+      if (combined.length > 0) {
+        result.set(path, combined)
+      }
     }
+
+    return result
   }, [comments, drafts, aiReviewItems])
 }
 
@@ -502,7 +513,7 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
             <FileDiffCard
               key={file.path}
               file={file}
-              lineAnnotations={getAnnotationsForFile(file.path)}
+              lineAnnotations={getAnnotationsForFile.get(file.path) ?? []}
               isCollapsed={collapsedFiles.has(file.path)}
               isViewed={viewedFiles.has(file.path)}
               isSyncingViewed={syncingViewedFiles?.has(file.path)}
