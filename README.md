@@ -107,10 +107,7 @@ Press `Ctrl+C` to stop all processes.
 │                          │                │
 │  AI features:            │                │
 │  ├── /api/ai/review  ────┼────────────────┘
-│  ├── /api/ai/grouping ───┼────────────────►  OpenCode API
-│  ├── /api/ai/patterns ───┼────────────────►  (LLM access)
-│  ├── /api/ai/related  ───┼────────────────►
-│  └── /api/ai/chat     ───┼────────────────►
+│  └── /api/ai/grouping ───┼────────────────►  OpenCode API
 │                          │
 └──────────┬───────────────┘
            │
@@ -148,17 +145,6 @@ Press `Ctrl+C` to stop all processes.
 - Helps understand large PRs by breaking them into reviewable chunks
 - Each group includes a summary describing the purpose of the changes
 
-### Pattern Verification
-
-- Detects cross-file patterns (e.g., added an API route but missing tests)
-- Verifies consistency of changes across the codebase
-- Surfaces locations where updates may be incomplete
-
-### Related Files Discovery
-
-- AI identifies files not in the diff that may be affected by the changes
-- Helps catch missing updates in related code
-
 ### Comments & Reviews
 
 - Post inline comments on specific lines directly to GitHub
@@ -174,7 +160,7 @@ Press `Ctrl+C` to stop all processes.
 
 ### Settings & Configuration
 
-- Per-action model selection (grouping, AI review, pattern verification, related files)
+- Per-action model selection (grouping, AI review)
 - Settings persisted to `~/.config/clm/settings.toml`
 - Default model: `google/gemini-3-flash-preview`
 

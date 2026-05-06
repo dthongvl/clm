@@ -10,8 +10,6 @@ export type AIReviewCategory =
   | 'performance'
   | 'testing';
 
-export type AIReviewRunMode = 'combined' | 'separate';
-
 /** Which side of the diff the comment is on */
 export type CommentSide = 'additions' | 'deletions';
 

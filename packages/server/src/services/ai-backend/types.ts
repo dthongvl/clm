@@ -3,7 +3,7 @@
  *
  * Provider-agnostic contract for AI backends used by clm's review services.
  * All backends (OpenCode, Pi, ...) implement this interface so the four
- * review services (ai-review, grouping, related-files, pattern-verification)
+ * review services (ai-review, grouping)
  * never branch on provider.
  */
 

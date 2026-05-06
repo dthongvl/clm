@@ -10,8 +10,6 @@ import commentRoutes from './routes/comments.js';
 import aiReviewRoutes from './routes/ai-review.js';
 import prInfoRoutes from './routes/pr-info.js';
 import groupingRoutes from './routes/grouping.js';
-import relatedFilesRoutes from './routes/related-files.js';
-import patternVerificationRoutes from './routes/pattern-verification.js';
 import refreshRoutes from './routes/refresh.js';
 import settingsRoutes from './routes/settings.js';
 import modelsRoutes from './routes/models.js';
@@ -46,9 +44,6 @@ app.use('*', cors({
 // API routes — AI actions
 app.route('/api/ai/review', aiReviewRoutes);
 app.route('/api/ai/grouping', groupingRoutes);
-app.route('/api/ai/related-files', relatedFilesRoutes);
-app.route('/api/ai/pattern-verification', patternVerificationRoutes);
-
 // API routes — Git/GitHub operations
 app.route('/api/git/diff', diffRoutes);
 app.route('/api/git/comments', commentRoutes);
@@ -128,6 +123,6 @@ const actualPort = server.port;
 // Output port in parseable format for CLI to capture
 console.log(`__CLM_PORT__:${actualPort}`);
 
-logger.serverStart(actualPort);
+logger.serverStart(actualPort ?? 0);
 
 export { server, actualPort as port };

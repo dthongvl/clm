@@ -86,8 +86,6 @@ export type AIReviewCategory =
   | "performance"
   | "testing";
 
-export type AIReviewRunMode = "combined" | "separate";
-
 export interface AIReviewItem {
   id: string;
   filePath: string;
@@ -100,36 +98,6 @@ export interface AIReviewItem {
 
 export interface AIReviewPRResult {
   items: AIReviewItem[];
-  summary: string;
-}
-
-export interface RelatedFile {
-  filePath: string;
-  explanation: string;
-}
-
-export interface RelatedFilesResult {
-  files: RelatedFile[];
-}
-
-export interface PatternLocation {
-  filePath: string;
-  lineNumber: number;
-  status: 'updated' | 'missing' | 'suspicious';
-  snippet?: string;
-}
-
-export interface PatternVerification {
-  id: string;
-  pattern: string;
-  description: string;
-  status: 'verified' | 'incomplete' | 'warning';
-  details: string;
-  locations: PatternLocation[];
-}
-
-export interface PatternVerificationResult {
-  verifications: PatternVerification[];
   summary: string;
 }
 

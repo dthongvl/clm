@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 
-type TabValue = "grouping" | "ai-review" | "related-files"
+type TabValue = "grouping" | "ai-review"
 
 interface SidePanelProps extends React.ComponentProps<"aside"> {
   defaultTab?: TabValue
@@ -46,7 +46,6 @@ function SidePanel({
         <TabsList variant="line">
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>
-          <TabsTrigger value="related-files">Related Files</TabsTrigger>
         </TabsList>
         {children}
       </Tabs>
@@ -90,30 +89,12 @@ function SidePanelAIReviewContent({
   )
 }
 
-function SidePanelRelatedFilesContent({
-  className,
-  children,
-  ...props
-}: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
-  return (
-    <TabsContent
-      {...props}
-      value="related-files"
-      className={cn("flex-1 overflow-hidden", className)}
-    >
-      <ScrollArea className="h-full">
-        <div className="p-4">{children}</div>
-      </ScrollArea>
-    </TabsContent>
-  )
-}
-
-export { SidePanel, SidePanelGroupingContent, SidePanelAIReviewContent, SidePanelRelatedFilesContent }
+export { SidePanel, SidePanelGroupingContent, SidePanelAIReviewContent }
 export { SidePanelContainer } from "./side-panel-container"
 export { IntelligentGrouping } from "./intelligent-grouping"
 export { AIReviewSummary } from "./ai-review-summary"
 export { ChangeGroupCard } from "./change-group-card"
 export { ReviewItemCard } from "./review-item-card"
-export { RelatedFiles } from "./related-files"
+
 export { ActionTriggerWithContext } from "./action-trigger-with-context"
 export type { ActionTriggerWithContextProps } from "./action-trigger-with-context"

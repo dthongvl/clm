@@ -8,9 +8,9 @@ import { logger } from '../lib/logger.js';
 const CONFIG_DIR = join(homedir(), '.config', 'clm');
 const CONFIG_FILE = join(CONFIG_DIR, 'settings.toml');
 
-export type ActionKey = 'grouping' | 'ai-review' | 'pattern-verification' | 'related-files';
+export type ActionKey = 'grouping' | 'ai-review';
 
-export const ACTION_KEYS: ActionKey[] = ['grouping', 'ai-review', 'pattern-verification', 'related-files'];
+export const ACTION_KEYS: ActionKey[] = ['grouping', 'ai-review'];
 
 const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
 
@@ -22,8 +22,6 @@ const actionSettingsSchema = z.object({
 const settingsSchema = z.object({
   grouping: actionSettingsSchema.optional(),
   'ai-review': actionSettingsSchema.optional(),
-  'pattern-verification': actionSettingsSchema.optional(),
-  'related-files': actionSettingsSchema.optional(),
 }).strict();
 
 export type ActionSettings = z.infer<typeof actionSettingsSchema>;
@@ -36,8 +34,6 @@ function getDefaults(): Settings {
   return {
     grouping: { model: DEFAULT_MODEL },
     'ai-review': { model: DEFAULT_MODEL },
-    'pattern-verification': { model: DEFAULT_MODEL },
-    'related-files': { model: DEFAULT_MODEL },
   };
 }
 

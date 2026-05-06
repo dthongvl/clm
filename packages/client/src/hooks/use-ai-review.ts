@@ -3,7 +3,6 @@ import { generateGrouping, generateAIReview } from '@/api/ai';
 import { transformAIReviewItems, transformChangeGroups } from '@/lib/transforms';
 import type { AIReviewItem } from '@/types/review';
 import type { ChangeGroup } from '@/types/grouping';
-import type { AIReviewOptions } from '@/components/side-panel/action-trigger-with-context';
 
 interface ReviewCache {
   items: AIReviewItem[];
@@ -36,12 +35,7 @@ export function useAIReview() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: (params: { additionalContext?: string; options?: AIReviewOptions }) =>
-      generateAIReview({
-        additionalContext: params.additionalContext,
-        reviewCategories: params.options?.reviewCategories,
-        runMode: params.options?.runMode,
-      }),
+    mutationFn: (additionalContext?: string) => generateAIReview({ additionalContext }),
     mutationKey: ['ai-review'],
     onSuccess: (data) => {
       queryClient.setQueryData(['ai-review'], {
@@ -59,9 +53,9 @@ export function useAIReview() {
     },
   });
 
-  const triggerReview = async (additionalContext?: string, options?: AIReviewOptions): Promise<boolean> => {
+  const triggerReview = async (additionalContext?: string): Promise<boolean> => {
     try {
-      await reviewMutation.mutateAsync({ additionalContext, options });
+      await reviewMutation.mutateAsync(additionalContext);
       return true;
     } catch {
       return false;

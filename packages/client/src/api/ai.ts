@@ -1,6 +1,6 @@
 import { fetchApi } from './client';
-import type { AIReviewCategory, AIReviewRunMode } from '@/types/review';
-import type { PatternVerificationResult } from '@/types/verification';
+import type { AIReviewCategory } from '@/types/review';
+
 
 export interface ServerChangeGroup {
   id: string;
@@ -34,8 +34,6 @@ interface GroupingResponse {
 
 interface AIReviewRequestBody {
   additionalContext?: string;
-  reviewCategories?: AIReviewCategory[];
-  runMode?: AIReviewRunMode;
 }
 
 function buildAIActionBody(additionalContext?: string) {
@@ -57,26 +55,4 @@ export async function generateAIReview(body: AIReviewRequestBody = {}): Promise<
   });
 }
 
-export interface ServerRelatedFile {
-  filePath: string;
-  explanation: string;
-}
 
-interface RelatedFilesResponse {
-  files: ServerRelatedFile[];
-}
-
-export async function findRelatedFiles(additionalContext?: string): Promise<ServerRelatedFile[]> {
-  const response = await fetchApi<RelatedFilesResponse>('/ai/related-files', {
-    method: 'POST',
-    body: JSON.stringify(buildAIActionBody(additionalContext)),
-  });
-  return response.files;
-}
-
-export async function verifyPatterns(additionalContext?: string): Promise<PatternVerificationResult> {
-  return fetchApi<PatternVerificationResult>('/ai/pattern-verification', {
-    method: 'POST',
-    body: JSON.stringify(buildAIActionBody(additionalContext)),
-  });
-}
