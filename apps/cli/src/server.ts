@@ -17,7 +17,7 @@ export async function startServer(env: ServerEnv): Promise<ServerResult> {
     env: {
       ...process.env,
       PR_NUMBER: env.prNumber,
-      OPENCODE_URL: env.opencodeUrl,
+      ...(env.opencodeUrl ? { OPENCODE_URL: env.opencodeUrl } : {}),
       REPO: env.repo,
       BASE_REF: `origin/${env.baseRef}`,
       HEAD_REF: `origin/${env.headRef}`,

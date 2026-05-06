@@ -116,16 +116,21 @@ async function main() {
         process.exit(1);
       }
 
-      // Start opencode first
-      let opencodeLauncher: OpencodeLauncher;
-      try {
-        opencodeLauncher = new OpencodeLauncher();
-        setOpencodeLauncher(opencodeLauncher);
-        const opencodeInfo = await opencodeLauncher.start();
-        logger.success(`OpenCode server started on ${opencodeInfo.baseUrl}`);
-      } catch (error) {
-        logger.error('Failed to start OpenCode', (error as Error).message);
-        process.exit(1);
+      // Start opencode first — skipped when using a different AI backend
+      const aiBackend = (process.env.AI_BACKEND || 'pi').toLowerCase();
+      let opencodeLauncher: OpencodeLauncher | null = null;
+      if (aiBackend === 'opencode') {
+        try {
+          opencodeLauncher = new OpencodeLauncher();
+          setOpencodeLauncher(opencodeLauncher);
+          const opencodeInfo = await opencodeLauncher.start();
+          logger.success(`OpenCode server started on ${opencodeInfo.baseUrl}`);
+        } catch (error) {
+          logger.error('Failed to start OpenCode', (error as Error).message);
+          process.exit(1);
+        }
+      } else {
+        logger.success(`Using AI backend: ${aiBackend} (OpenCode launcher skipped)`);
       }
 
       // Start the server
@@ -133,7 +138,7 @@ async function main() {
       try {
         const serverResult = await startServer({
           prNumber,
-          opencodeUrl: opencodeLauncher.baseUrl,
+          ...(opencodeLauncher ? { opencodeUrl: opencodeLauncher.baseUrl } : {}),
           repo,
           baseRef: prInfo.baseBranch,
           headRef: prInfo.headBranch,

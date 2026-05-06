@@ -1,6 +1,6 @@
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
-import { opencodeClient } from './opencode-client.js';
+import { getAiBackend } from './ai-backend/index.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 import { wrapError } from '../lib/errors.js';
@@ -17,7 +17,7 @@ export async function generateGrouping(prLink: string, additionalContext?: strin
   try {
     const model = await getModelForAction('grouping');
     const variant = await getVariantForAction('grouping');
-    const response = await opencodeClient.prompt(prompt, { model, variant });
+    const response = await getAiBackend().prompt(prompt, { model, variant });
     return parseGroupingOutput(response);
   } catch (error) {
     logger.error('Grouping generation failed', error);

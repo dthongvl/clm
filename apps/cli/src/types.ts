@@ -19,7 +19,8 @@ export interface ParsedPRInput {
 
 export interface ServerEnv {
   prNumber: string;
-  opencodeUrl: string;
+  /** Only set when the OpenCode backend is in use. */
+  opencodeUrl?: string;
   repo: string;
   baseRef: string;
   headRef: string;

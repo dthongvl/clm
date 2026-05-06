@@ -1,12 +1,12 @@
 import { streamSSE } from 'hono/streaming';
-import { opencodeClient } from '../services/opencode-client.js';
+import { getAiBackend } from '../services/ai-backend/index.js';
 import { logger } from '../lib/logger.js';
 import type { Context } from 'hono';
 
 export function streamOpencodeResponse(c: Context, message: string) {
   return streamSSE(c, async (stream) => {
     try {
-      for await (const event of opencodeClient.promptStream(message)) {
+      for await (const event of getAiBackend().promptStream(message)) {
         if (event.type === 'text' && event.content) {
           await stream.writeSSE({
             event: 'message',

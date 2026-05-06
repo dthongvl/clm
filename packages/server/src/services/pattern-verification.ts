@@ -1,6 +1,6 @@
 import type { PatternVerification, PatternVerificationResult, PatternLocation } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
-import { opencodeClient } from './opencode-client.js';
+import { getAiBackend } from './ai-backend/index.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 import { wrapError } from '../lib/errors.js';
@@ -17,7 +17,7 @@ export async function verifyPatterns(prLink: string, additionalContext?: string)
   try {
     const model = await getModelForAction('pattern-verification');
     const variant = await getVariantForAction('pattern-verification');
-    const response = await opencodeClient.prompt(prompt, { model, variant });
+    const response = await getAiBackend().prompt(prompt, { model, variant });
     return parseVerificationOutput(response);
   } catch (error) {
     logger.error('Pattern verification failed', error);
