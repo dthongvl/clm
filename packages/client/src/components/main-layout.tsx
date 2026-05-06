@@ -3,18 +3,12 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { useSidebarState } from "@/hooks/use-sidebar-state"
 import {
-  SidebarProvider,
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import {
-  SidebarRightProvider,
-  SidebarRight,
-  SidebarRightContent,
-  SidebarRightTrigger,
-} from "@/components/ui/sidebar-right"
+  ResizablePanelProvider,
+  ResizablePanel,
+  ResizablePanelContent,
+  ResizablePanelHeader,
+  ResizablePanelTrigger,
+} from "@/components/ui/resizable-panel"
 
 export type MainLayoutProps = React.ComponentProps<"div"> & {
   header: React.ReactNode
@@ -34,35 +28,43 @@ export function MainLayout({
   const { leftOpen, rightOpen, setLeftOpen, setRightOpen } = useSidebarState()
 
   return (
-    <SidebarProvider
+    <ResizablePanelProvider
+      side="left"
       defaultOpen={leftOpen}
       open={leftOpen}
       onOpenChange={setLeftOpen}
     >
-      <SidebarRightProvider
-        defaultOpen={rightOpen}
-        open={rightOpen}
-        onOpenChange={setRightOpen}
+      <div
+        data-slot="main-layout"
+        className={cn("flex h-full w-full flex-col", className)}
+        {...props}
       >
-        <div
-          data-slot="main-layout"
-          className={cn("flex h-full w-full flex-col", className)}
-          {...props}
-        >
-          {header}
-          <div className="flex min-h-0 flex-1">
-            {!leftOpen && (
-              <div className="flex items-start border-r pt-2 px-1">
-                <SidebarTrigger />
-              </div>
-            )}
-            <Sidebar side="left" variant="sidebar" collapsible="offcanvas">
-              <SidebarHeader className="flex-row items-center justify-end">
-                <SidebarTrigger />
-              </SidebarHeader>
-              <SidebarContent>{leftPanel}</SidebarContent>
-            </Sidebar>
+        {header}
+        <div className="flex min-h-0 flex-1">
+          {!leftOpen && (
+            <div className="flex items-start border-r pt-2 px-1">
+              <ResizablePanelTrigger />
+            </div>
+          )}
+          <ResizablePanel
+            side="left"
+            defaultWidth={280}
+            minWidth={180}
+            maxWidth={400}
+            widthStorageKey="left-sidebar-width"
+          >
+            <ResizablePanelHeader className="flex-row items-center justify-end">
+              <ResizablePanelTrigger />
+            </ResizablePanelHeader>
+            <ResizablePanelContent>{leftPanel}</ResizablePanelContent>
+          </ResizablePanel>
 
+          <ResizablePanelProvider
+            side="right"
+            defaultOpen={rightOpen}
+            open={rightOpen}
+            onOpenChange={setRightOpen}
+          >
             <main
               id="main-content"
               role="main"
@@ -71,20 +73,26 @@ export function MainLayout({
               {centerPanel}
             </main>
 
-            <SidebarRight>
-              <SidebarHeader className="flex-row items-center">
-                <SidebarRightTrigger />
-              </SidebarHeader>
-              <SidebarRightContent>{rightPanel}</SidebarRightContent>
-            </SidebarRight>
+            <ResizablePanel
+              side="right"
+              defaultWidth={420}
+              minWidth={280}
+              maxWidth={600}
+              widthStorageKey="right-sidebar-width"
+            >
+              <ResizablePanelHeader className="flex-row items-center">
+                <ResizablePanelTrigger />
+              </ResizablePanelHeader>
+              <ResizablePanelContent>{rightPanel}</ResizablePanelContent>
+            </ResizablePanel>
             {!rightOpen && (
               <div className="flex items-start border-l pt-2 px-1">
-                <SidebarRightTrigger />
+                <ResizablePanelTrigger />
               </div>
             )}
-          </div>
+          </ResizablePanelProvider>
         </div>
-      </SidebarRightProvider>
-    </SidebarProvider>
+      </div>
+    </ResizablePanelProvider>
   )
 }

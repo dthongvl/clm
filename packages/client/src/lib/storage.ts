@@ -56,4 +56,6 @@ export const StorageKeys = {
   DIFF_VIEW_MODE: "diff-view-mode",
   LEFT_SIDEBAR_OPEN: "left-sidebar-open",
   RIGHT_SIDEBAR_OPEN: "right-sidebar-open",
+  LEFT_SIDEBAR_WIDTH: "left-sidebar-width",
+  RIGHT_SIDEBAR_WIDTH: "right-sidebar-width",
 } as const
