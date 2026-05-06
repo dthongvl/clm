@@ -1,8 +1,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { usePersistedState } from "@/hooks"
-import { StorageKeys } from "@/lib/storage"
+import { useSidebarState } from "@/hooks/use-sidebar-state"
 import {
   SidebarProvider,
   Sidebar,
@@ -32,14 +31,7 @@ export function MainLayout({
   className,
   ...props
 }: MainLayoutProps) {
-  const [leftOpen, setLeftOpen] = usePersistedState(
-    StorageKeys.LEFT_SIDEBAR_OPEN,
-    true
-  )
-  const [rightOpen, setRightOpen] = usePersistedState(
-    StorageKeys.RIGHT_SIDEBAR_OPEN,
-    true
-  )
+  const { leftOpen, rightOpen, setLeftOpen, setRightOpen } = useSidebarState()
 
   return (
     <SidebarProvider

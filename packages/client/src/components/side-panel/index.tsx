@@ -109,6 +109,7 @@ function SidePanelRelatedFilesContent({
 }
 
 export { SidePanel, SidePanelGroupingContent, SidePanelAIReviewContent, SidePanelRelatedFilesContent }
+export { SidePanelContainer } from "./side-panel-container"
 export { IntelligentGrouping } from "./intelligent-grouping"
 export { AIReviewSummary } from "./ai-review-summary"
 export { ChangeGroupCard } from "./change-group-card"

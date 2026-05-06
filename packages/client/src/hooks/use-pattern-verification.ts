@@ -1,34 +1,41 @@
-import { useState, useCallback } from 'react';
-import type { PatternVerificationResult } from '@/types/verification';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { verifyPatterns } from '@/api/ai';
+import type { PatternVerificationResult } from '@/types/verification';
 
-interface UsePatternVerificationReturn {
-  result: PatternVerificationResult | null;
-  isLoading: boolean;
-  error: Error | null;
-  verify: (additionalContext?: string) => Promise<boolean>;
-}
+export function usePatternVerification() {
+  const queryClient = useQueryClient();
 
-export function usePatternVerification(): UsePatternVerificationReturn {
-  const [result, setResult] = useState<PatternVerificationResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  // useQuery subscribes to ['pattern-verification'] cache
+  const { data: result } = useQuery({
+    queryKey: ['pattern-verification' as const],
+    queryFn: () => {
+      const cached = queryClient.getQueryData<PatternVerificationResult>(['pattern-verification']);
+      return cached ?? null;
+    },
+    staleTime: Infinity,
+  });
 
-  const verify = useCallback(async (additionalContext?: string): Promise<boolean> => {
-    setIsLoading(true);
-    setError(null);
+  const mutation = useMutation({
+    mutationFn: (additionalContext?: string) => verifyPatterns(additionalContext),
+    mutationKey: ['pattern-verification'],
+    onSuccess: (data) => {
+      queryClient.setQueryData(['pattern-verification'], data);
+    },
+  });
 
+  const verify = async (additionalContext?: string): Promise<boolean> => {
     try {
-      const data = await verifyPatterns(additionalContext);
-      setResult(data);
+      await mutation.mutateAsync(additionalContext);
       return true;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } catch {
       return false;
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
+  };
 
-  return { result, isLoading, error, verify };
+  return {
+    result: result ?? null,
+    isLoading: mutation.isPending,
+    error: mutation.error ?? null,
+    verify,
+  };
 }

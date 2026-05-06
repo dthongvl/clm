@@ -1,4 +1,5 @@
 export { useAIReview } from './use-ai-review';
+export { useAnnotations } from './use-annotations';
 export { usePersistedState } from './use-persisted-state';
 export { usePR, useStatus } from './use-pr';
 export { useDiff } from './use-diff';

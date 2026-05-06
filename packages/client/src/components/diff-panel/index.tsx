@@ -7,9 +7,18 @@ import { FileSourceDialog } from "./file-source-dialog"
 
 export const DiffPanel = { Root, Viewer, CollapsibleFileHeader, PRFileTree }
 export { DiffViewer, FileSourceDialog }
+
+// Container components
+export { DiffPanelProvider } from "./diff-panel-provider"
+export { DiffPanelFileTree } from "./diff-panel-file-tree"
+export { DiffPanelViewerContainer } from "./diff-panel-viewer-container"
+export { DiffPanelContext, useDiffPanelContext } from "./diff-panel-context"
+
+// Types
 export type { DiffPanelRootProps } from "./root"
 export type { DiffViewerProps, DiffViewerProps as DiffPanelViewerProps, DraftAnnotation, DiffViewerRef } from "./diff-viewer"
 export type { DiffFileData } from "@/types/diff"
 export type { CollapsibleFileHeaderProps } from "./collapsible-file-header"
 export type { PRFileTreeProps } from "./pr-file-tree"
 export type { FileSourceDialogProps } from "./file-source-dialog"
+export type { DiffPanelContextValue } from "./diff-panel-context"
