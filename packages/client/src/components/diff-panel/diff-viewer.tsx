@@ -7,8 +7,8 @@ import {
   type DiffLineAnnotation,
   type AnnotationSide,
 } from "@pierre/diffs/react"
+import { Virtualizer } from "@pierre/diffs/react"
 import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { ArrowUpIcon } from "lucide-react"
 import { useScrollToTop } from "@/hooks"
@@ -496,8 +496,8 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
       className={cn("relative min-h-0 flex-1 overflow-hidden bg-background", className)}
       {...props}
     >
-      <ScrollArea className="h-full">
-        <div className="flex flex-col gap-4 p-4 pb-24" role="list" aria-label="File diffs">
+      <Virtualizer className="h-full overflow-auto" contentClassName="p-4 pb-24">
+        <div className="flex flex-col gap-4" role="list" aria-label="File diffs">
           {files.map((file) => (
             <FileDiffCard
               key={file.path}
@@ -527,13 +527,13 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
               onViewHeadFile={handleViewHeadFile}
             />
           ))}
+        </div>
 
         {/* Footer spacer */}
         <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
           <span>🎉 You've reached the end — happy reviewing!</span>
         </div>
-      </div>
-      </ScrollArea>
+      </Virtualizer>
 
       {/* Scroll to top button */}
       <Button

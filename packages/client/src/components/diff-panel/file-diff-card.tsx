@@ -4,6 +4,7 @@ import {
   type DiffLineAnnotation,
   type FileContents,
   type AnnotationSide,
+  type VirtualFileMetrics,
 } from "@pierre/diffs/react"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -15,6 +16,15 @@ import type { AnnotationMetadata } from "./diff-viewer"
 
 function toFileContents(path: string, content: string): FileContents {
   return { name: path, contents: content }
+}
+
+/** Metrics tuned to our Tailwind layout for accurate virtualizer estimates. */
+const FILE_DIFF_METRICS: VirtualFileMetrics = {
+  lineHeight: 20,
+  hunkLineCount: 20,
+  diffHeaderHeight: 44,
+  hunkSeparatorHeight: 32,
+  fileGap: 16,
 }
 
 interface FileDiffCardProps {
@@ -122,74 +132,69 @@ export const FileDiffCard = memo(function FileDiffCard({
     onViewHeadFile?.({ filePath: file.path, content: file.newContent })
   }, [onViewHeadFile, file.path, file.newContent])
 
-  // Disable content-visibility optimization when there are annotations to prevent layout jumping
-  // when annotations are added/removed (e.g., submitting a comment then clicking + to add another)
-  const hasAnnotations = lineAnnotations.length > 0
-
   return (
     <div
       role="listitem"
       data-file-path={file.path}
       data-state={isCollapsed ? "collapsed" : "expanded"}
       data-viewed={isViewed}
-      className="overflow-clip rounded-lg border border-border"
-      style={{ contentVisibility: "auto", containIntrinsicBlockSize: hasAnnotations ? "auto 800px" : "auto 500px" }}
     >
-      <CollapsibleFileHeader
-        filePath={file.path}
-        status={file.status}
-        additions={file.additions}
-        deletions={file.deletions}
-        isCollapsed={isCollapsed}
-        isViewed={isViewed}
-        isSyncingViewed={isSyncingViewed}
-        onToggleCollapse={handleToggleCollapse}
-        onToggleViewed={handleToggleViewed}
-        canViewSource={file.status !== "deleted"}
-        onViewSource={handleViewSource}
+      <MultiFileDiff<AnnotationMetadata>
+        oldFile={oldFile}
+        newFile={newFile}
+        options={options}
+        metrics={FILE_DIFF_METRICS}
+        lineAnnotations={lineAnnotations}
+        className="overflow-clip rounded-lg border border-border"
+        renderCustomHeader={() => (
+          <CollapsibleFileHeader
+            filePath={file.path}
+            status={file.status}
+            additions={file.additions}
+            deletions={file.deletions}
+            isCollapsed={isCollapsed}
+            isViewed={isViewed}
+            isSyncingViewed={isSyncingViewed}
+            onToggleCollapse={handleToggleCollapse}
+            onToggleViewed={handleToggleViewed}
+            canViewSource={file.status !== "deleted"}
+            onViewSource={handleViewSource}
+          />
+        )}
+        renderHoverUtility={(getHoveredLine) => (
+          <Button
+            size="icon-xs"
+            variant="default"
+            className="cursor-pointer bg-primary hover:bg-primary/90"
+            aria-label="Add comment to this line"
+            onClick={(event) => {
+              const hoveredLine = getHoveredLine()
+              if (hoveredLine == null) return
+              event.stopPropagation()
+              onAddDraft(file.path, hoveredLine.side, hoveredLine.lineNumber)
+            }}
+          >
+            <HugeiconsIcon icon={Add01Icon} className="size-3" aria-hidden="true" />
+          </Button>
+        )}
+        renderAnnotation={(annotation) => (
+          <AnnotationRenderer
+            annotation={annotation}
+            submittingDrafts={submittingDrafts}
+            submittingReplies={submittingReplies}
+            onSubmitDraft={onSubmitDraft}
+            onCancelDraft={onCancelDraft}
+            onSubmitReply={onSubmitReply}
+            onEditDraft={onEditDraft}
+            onDeleteDraft={onDeleteDraft}
+            onEditReply={onEditReply}
+            onDeleteReply={onDeleteReply}
+            isDraftActionLoading={isDraftActionLoading}
+            onConvertAIToDraft={onConvertAIToDraft}
+            convertingAIItemIds={convertingAIItemIds}
+          />
+        )}
       />
-
-      {!isCollapsed && (
-        <MultiFileDiff<AnnotationMetadata>
-          oldFile={oldFile}
-          newFile={newFile}
-          options={options}
-          lineAnnotations={lineAnnotations}
-          renderHoverUtility={(getHoveredLine) => (
-            <Button
-              size="icon-xs"
-              variant="default"
-              className="cursor-pointer bg-primary hover:bg-primary/90"
-              aria-label="Add comment to this line"
-              onClick={(event) => {
-                const hoveredLine = getHoveredLine()
-                if (hoveredLine == null) return
-                event.stopPropagation()
-                onAddDraft(file.path, hoveredLine.side, hoveredLine.lineNumber)
-              }}
-            >
-              <HugeiconsIcon icon={Add01Icon} className="size-3" aria-hidden="true" />
-            </Button>
-          )}
-          renderAnnotation={(annotation) => (
-            <AnnotationRenderer
-              annotation={annotation}
-              submittingDrafts={submittingDrafts}
-              submittingReplies={submittingReplies}
-              onSubmitDraft={onSubmitDraft}
-              onCancelDraft={onCancelDraft}
-              onSubmitReply={onSubmitReply}
-              onEditDraft={onEditDraft}
-              onDeleteDraft={onDeleteDraft}
-              onEditReply={onEditReply}
-              onDeleteReply={onDeleteReply}
-              isDraftActionLoading={isDraftActionLoading}
-              onConvertAIToDraft={onConvertAIToDraft}
-              convertingAIItemIds={convertingAIItemIds}
-            />
-          )}
-        />
-      )}
     </div>
   )
 })
