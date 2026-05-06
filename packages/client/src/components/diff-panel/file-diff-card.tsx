@@ -108,7 +108,8 @@ export const FileDiffCard = memo(function FileDiffCard({
     expansionLineCount: 20,
     lineDiffType: "word" as const,
     hunkSeparators: "line-info" as const,
-    disableFileHeader: true,
+    headerRenderMode: "custom" as const,
+    collapsed: isCollapsed,
     enableHoverUtility: !hasOpenCommentForm,
     themeType: resolvedTheme,
     onLineClick: onLineClick
@@ -116,7 +117,7 @@ export const FileDiffCard = memo(function FileDiffCard({
           onLineClick(file.path, lineProps.lineNumber, lineProps.annotationSide)
         }
       : undefined,
-  }), [hasOpenCommentForm, resolvedTheme, onLineClick, file.path])
+  }), [isCollapsed, hasOpenCommentForm, resolvedTheme, onLineClick, file.path])
 
   const handleToggleCollapse = useCallback(
     () => onToggleCollapse(file.path),
