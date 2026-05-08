@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -10,40 +10,70 @@ import {
   Tick02Icon,
   File01Icon,
 } from "@hugeicons/core-free-icons"
+import type { FileDiffMetadata } from "@pierre/diffs"
+
+/** Map Pierre's ChangeTypes to our display status. */
+function mapChangeType(type: FileDiffMetadata["type"]):
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed" {
+  switch (type) {
+    case "new":
+      return "added"
+    case "deleted":
+      return "deleted"
+    case "change":
+      return "modified"
+    case "rename-pure":
+    case "rename-changed":
+      return "renamed"
+    default:
+      return "modified"
+  }
+}
 
 export interface CollapsibleFileHeaderProps {
-  filePath: string
-  status: "added" | "modified" | "deleted" | "renamed"
-  additions: number
-  deletions: number
+  fileDiff: FileDiffMetadata
   isCollapsed: boolean
   isViewed: boolean
   /** Whether viewed state is currently syncing with server */
   isSyncingViewed?: boolean
   onToggleCollapse: () => void
   onToggleViewed: () => void
-  /** Whether the view source action is available */
-  canViewSource?: boolean
   /** Callback when the view source button is clicked */
   onViewSource?: () => void
   className?: string
 }
 
 function CollapsibleFileHeader({
-  filePath,
-  status,
-  additions,
-  deletions,
+  fileDiff,
   isCollapsed,
   isViewed,
   isSyncingViewed,
   onToggleCollapse,
   onToggleViewed,
-  canViewSource = true,
   onViewSource,
   className,
 }: CollapsibleFileHeaderProps) {
   const [copied, setCopied] = useState(false)
+
+  const { additions, deletions, status, filePath } = useMemo(() => {
+    let additions = 0
+    let deletions = 0
+    for (const hunk of fileDiff.hunks) {
+      additions += hunk.additionLines
+      deletions += hunk.deletionLines
+    }
+    return {
+      additions,
+      deletions,
+      status: mapChangeType(fileDiff.type),
+      filePath: fileDiff.name,
+    }
+  }, [fileDiff])
+
+  const canViewSource = fileDiff.type !== "deleted"
 
   const handleCopyFileName = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -62,6 +92,8 @@ function CollapsibleFileHeader({
   return (
     <div
       data-slot="collapsible-file-header"
+      data-diffs-header="custom"
+      data-change-type={fileDiff.type}
       className={cn(
         "sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-muted/50 px-3 py-2 backdrop-blur-sm",
         className
@@ -90,9 +122,18 @@ function CollapsibleFileHeader({
         >
           <span
             className="truncate text-sm font-medium text-foreground"
+            style={{ direction: "rtl", textAlign: "left" }}
             title={filePath}
           >
-            {filePath}
+            {fileDiff.prevName != null ? (
+              <>
+                <span className="opacity-70">{fileDiff.prevName}</span>
+                <span className="mx-1 opacity-50">→</span>
+                {filePath}
+              </>
+            ) : (
+              filePath
+            )}
           </span>
         </button>
 
@@ -144,12 +185,12 @@ function CollapsibleFileHeader({
 
         {/* Diff stats */}
         <div className="flex items-center gap-1.5 text-xs font-medium">
-          {additions > 0 && (
-            <span className="text-green-500">+{additions}</span>
-          )}
-          {deletions > 0 && (
+          {deletions > 0 || additions === 0 ? (
             <span className="text-red-500">-{deletions}</span>
-          )}
+          ) : null}
+          {additions > 0 || deletions === 0 ? (
+            <span className="text-green-500">+{additions}</span>
+          ) : null}
         </div>
 
         {/* Viewed checkbox */}

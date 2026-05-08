@@ -6,7 +6,7 @@ import { Markdown } from "@/components/ui/markdown"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
-import { Card } from "@/components/ui/card"
+
 import { Textarea } from "@/components/ui/textarea"
 import {
   Popover,
@@ -357,14 +357,14 @@ function InlineCommentThread({
   }
 
   return (
-    <Card
+    <div
       data-slot="comment-annotation"
       data-annotation-line={lineNumber}
-      size="sm"
-      className="overflow-hidden border-l-2 border-l-primary py-0 text-sm"
+      className="m-5 max-w-[95%] whitespace-normal sm:max-w-[90%]"
       role="region"
       aria-label={`Comment thread started by ${comment.author.name}`}
     >
+      <div className="overflow-hidden rounded-lg border bg-card p-5 text-sm shadow-sm">
       {isEditing ? (
         <div className="p-3">
           <Textarea
@@ -505,7 +505,8 @@ function InlineCommentThread({
           </>
         )}
       </div>
-    </Card>
+      </div>
+    </div>
   )
 }
 

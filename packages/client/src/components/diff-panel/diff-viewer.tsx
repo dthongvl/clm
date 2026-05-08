@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef, useSyncExternalStore } from "react"
+import { useState, useCallback, useMemo, useRef, useSyncExternalStore } from "react"
 import {
   forwardRef,
   useImperativeHandle,
@@ -17,22 +17,10 @@ import { useTheme } from "@/components/theme-provider"
 import type { DiffFileData } from "@/types/diff"
 import { FileDiffCard } from "./file-diff-card"
 import { FileSourceDialog } from "./file-source-dialog"
+import { useDraftAnnotations, type DraftAnnotation } from "./use-draft-annotations"
+import { useFileViewState } from "./use-file-view-state"
 
 export type { DiffFileData } from "@/types/diff"
-
-/**
- * Draft annotation for showing comment form.
- */
-export interface DraftAnnotation {
-  /** Unique identifier for the draft */
-  id: string
-  /** The file path the draft belongs to */
-  filePath: string
-  /** Which side of the diff the draft is on */
-  side: AnnotationSide
-  /** The line number of the draft */
-  lineNumber: number
-}
 
 /**
  * Props for the DiffViewer component.
@@ -268,46 +256,27 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
   const containerRef = useRef<HTMLDivElement>(null)
   const { showScrollTop, scrollToTop } = useScrollToTop(containerRef)
 
-  // Track collapsed state for each file — start with viewed files collapsed
-  const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(
-    () => new Set(controlledViewedFiles ?? defaultViewedFiles ?? [])
-  )
+  // File viewed/collapsed state (controlled/uncontrolled)
+  const {
+    viewedFiles,
+    collapsedFiles,
+    setCollapsedFiles,
+    handleToggleCollapse,
+    handleToggleViewed,
+  } = useFileViewState({
+    controlledViewedFiles,
+    defaultViewedFiles,
+    onFileViewedChange,
+  })
 
-  // Internal viewed files state (used when not controlled)
-  const [internalViewedFiles, setInternalViewedFiles] = useState<Set<string>>(
-    () => defaultViewedFiles ?? new Set()
-  )
-
-  // Use controlled state if provided, otherwise use internal state
-  const isControlled = controlledViewedFiles !== undefined
-  const viewedFiles = isControlled ? controlledViewedFiles : internalViewedFiles
-
-  // Collapse files that become viewed in controlled mode
-  const prevViewedRef = useRef<Set<string>>(viewedFiles)
-  useEffect(() => {
-    const prev = prevViewedRef.current
-    if (viewedFiles !== prev) {
-      const newlyViewed = [...viewedFiles].filter((f) => !prev.has(f))
-      if (newlyViewed.length > 0) {
-        setCollapsedFiles((c) => {
-          const next = new Set(c)
-          for (const f of newlyViewed) next.add(f)
-          return next
-        })
-      }
-      prevViewedRef.current = viewedFiles
-    }
-  }, [viewedFiles])
-
-  // Track draft annotations (open comment forms)
-  const [draftAnnotations, setDraftAnnotations] = useState<DraftAnnotation[]>(
-    []
-  )
-
-  // Track submitting state for new comments
-  const [submittingDrafts, setSubmittingDrafts] = useState<Set<string>>(
-    new Set()
-  )
+  // Draft annotations (in-progress comment forms)
+  const {
+    draftAnnotations,
+    submittingDrafts,
+    addDraft,
+    cancelDraft,
+    submitDraft,
+  } = useDraftAnnotations({ onCommentSubmit })
 
   // Track submitting state for replies
   const [submittingReplies, setSubmittingReplies] = useState<Set<string>>(
@@ -329,124 +298,7 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
         return prev
       })
     },
-  }), [])
-
-  const handleToggleCollapse = useCallback((filePath: string) => {
-    setCollapsedFiles((prev) => {
-      const next = new Set(prev)
-      if (next.has(filePath)) {
-        next.delete(filePath)
-      } else {
-        next.add(filePath)
-      }
-      return next
-    })
-  }, [])
-
-  const handleToggleViewed = useCallback(
-    (filePath: string) => {
-      const newViewedState = !viewedFiles.has(filePath)
-
-      // Update internal state if not controlled
-      if (!isControlled) {
-        setInternalViewedFiles((prev) => {
-          const next = new Set(prev)
-          if (newViewedState) {
-            next.add(filePath)
-          } else {
-            next.delete(filePath)
-          }
-          return next
-        })
-      }
-
-      // Auto-collapse when marking as viewed
-      if (newViewedState) {
-        setCollapsedFiles((prev) => {
-          const next = new Set(prev)
-          next.add(filePath)
-          return next
-        })
-      }
-
-      // Notify parent if callback provided
-      onFileViewedChange?.(filePath, newViewedState)
-    },
-    [viewedFiles, isControlled, onFileViewedChange]
-  )
-
-  // Add a draft annotation (open comment form)
-  const addDraftAnnotation = useCallback(
-    (filePath: string, side: AnnotationSide, lineNumber: number) => {
-      const id = `draft-${filePath}-${side}-${lineNumber}`
-
-      // Check if already exists
-      setDraftAnnotations((prev) => {
-        const exists = prev.some(
-          (d) =>
-            d.filePath === filePath &&
-            d.side === side &&
-            d.lineNumber === lineNumber
-        )
-        if (exists) return prev
-
-        return [...prev, { id, filePath, side, lineNumber }]
-      })
-    },
-    []
-  )
-
-  // Cancel a draft annotation
-  const cancelDraftAnnotation = useCallback(
-    (filePath: string, side: AnnotationSide, lineNumber: number) => {
-      setDraftAnnotations((prev) =>
-        prev.filter(
-          (d) =>
-            !(
-              d.filePath === filePath &&
-              d.side === side &&
-              d.lineNumber === lineNumber
-            )
-        )
-      )
-    },
-    []
-  )
-
-  // Submit a draft annotation
-  const submitDraftAnnotation = useCallback(
-    async (
-      filePath: string,
-      side: AnnotationSide,
-      lineNumber: number,
-      content: string
-    ) => {
-      const draftId = `draft-${filePath}-${side}-${lineNumber}`
-
-      if (!onCommentSubmit) {
-        // If no submit handler, just remove the draft
-        cancelDraftAnnotation(filePath, side, lineNumber)
-        return
-      }
-
-      setSubmittingDrafts((prev) => new Set(prev).add(draftId))
-
-      try {
-        await onCommentSubmit(filePath, lineNumber, side, content)
-        // Remove draft after successful submission
-        cancelDraftAnnotation(filePath, side, lineNumber)
-      } catch (error) {
-        console.error("Failed to submit comment:", error)
-      } finally {
-        setSubmittingDrafts((prev) => {
-          const next = new Set(prev)
-          next.delete(draftId)
-          return next
-        })
-      }
-    },
-    [onCommentSubmit, cancelDraftAnnotation]
-  )
+  }), [setCollapsedFiles])
 
   // Submit a reply to an existing comment
   const submitReply = useCallback(
@@ -523,9 +375,9 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
               submittingReplies={submittingReplies}
               onToggleCollapse={handleToggleCollapse}
               onToggleViewed={handleToggleViewed}
-              onAddDraft={addDraftAnnotation}
-              onSubmitDraft={submitDraftAnnotation}
-              onCancelDraft={cancelDraftAnnotation}
+              onAddDraft={addDraft}
+              onSubmitDraft={submitDraft}
+              onCancelDraft={cancelDraft}
               onSubmitReply={onReplySubmit ? submitReply : undefined}
               onEditDraft={onEditDraft}
               onDeleteDraft={onDeleteDraft}
@@ -572,6 +424,8 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
     </div>
   )
 })
+
+export type { DraftAnnotation }
 
 // Export with named export matching the file name
 export { DiffViewer }

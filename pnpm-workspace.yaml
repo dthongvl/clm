@@ -2,10 +2,10 @@ packages:
   - apps/*
   - packages/*
 allowBuilds:
-  '@google/genai': set this to true or false
-  koffi: set this to true or false
+  '@google/genai': false
+  koffi: false
   msw: false
-  protobufjs: set this to true or false
+  protobufjs: false
 
 catalog:
   "@types/bun": "latest"

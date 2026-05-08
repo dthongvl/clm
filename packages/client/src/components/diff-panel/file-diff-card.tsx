@@ -6,9 +6,7 @@ import {
   type AnnotationSide,
   type VirtualFileMetrics,
 } from "@pierre/diffs/react"
-import { Button } from "@/components/ui/button"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Add01Icon } from "@hugeicons/core-free-icons"
+import type { SelectedLineRange } from "@pierre/diffs"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
 import { AnnotationRenderer } from "./annotation-renderer"
 import type { DiffFileData } from "@/types/diff"
@@ -102,6 +100,17 @@ export const FileDiffCard = memo(function FileDiffCard({
     [file.path, file.newContent]
   )
 
+  const handleLineSelectionEnd = useCallback(
+    (range: SelectedLineRange | null) => {
+      if (range == null) return
+      const derivedSide = range.endSide ?? range.side
+      const side: AnnotationSide =
+        derivedSide === "deletions" ? "deletions" : "additions"
+      onAddDraft(file.path, side, Math.max(range.end, range.start))
+    },
+    [file.path, onAddDraft]
+  )
+
   const options = useMemo(() => ({
     diffStyle: "split" as const,
     expandUnchanged: false,
@@ -110,6 +119,8 @@ export const FileDiffCard = memo(function FileDiffCard({
     hunkSeparators: "line-info-basic" as const,
     collapsed: isCollapsed,
     enableGutterUtility: !hasOpenCommentForm,
+    enableLineSelection: !hasOpenCommentForm,
+    onLineSelectionEnd: handleLineSelectionEnd,
     theme: { dark: "pierre-dark", light: "pierre-light" } as const,
     themeType: resolvedTheme,
     onLineClick: onLineClick
@@ -117,7 +128,7 @@ export const FileDiffCard = memo(function FileDiffCard({
           onLineClick(file.path, lineProps.lineNumber, lineProps.annotationSide)
         }
       : undefined,
-  }), [isCollapsed, hasOpenCommentForm, resolvedTheme, onLineClick, file.path])
+  }), [isCollapsed, hasOpenCommentForm, resolvedTheme, onLineClick, file.path, handleLineSelectionEnd])
 
   const handleToggleCollapse = useCallback(
     () => onToggleCollapse(file.path),
@@ -147,36 +158,16 @@ export const FileDiffCard = memo(function FileDiffCard({
         metrics={FILE_DIFF_METRICS}
         lineAnnotations={lineAnnotations}
         className="overflow-clip rounded-lg border border-border"
-        renderCustomHeader={() => (
+        renderCustomHeader={(fileDiff) => (
           <CollapsibleFileHeader
-            filePath={file.path}
-            status={file.status}
-            additions={file.additions}
-            deletions={file.deletions}
+            fileDiff={fileDiff}
             isCollapsed={isCollapsed}
             isViewed={isViewed}
             isSyncingViewed={isSyncingViewed}
             onToggleCollapse={handleToggleCollapse}
             onToggleViewed={handleToggleViewed}
-            canViewSource={file.status !== "deleted"}
             onViewSource={handleViewSource}
           />
-        )}
-        renderGutterUtility={(getHoveredLine) => (
-          <Button
-            size="icon-xs"
-            variant="default"
-            className="cursor-pointer bg-primary hover:bg-primary/90"
-            aria-label="Add comment to this line"
-            onClick={(event) => {
-              const hoveredLine = getHoveredLine()
-              if (hoveredLine == null) return
-              event.stopPropagation()
-              onAddDraft(file.path, hoveredLine.side, hoveredLine.lineNumber)
-            }}
-          >
-            <HugeiconsIcon icon={Add01Icon} className="size-3" aria-hidden="true" />
-          </Button>
         )}
         renderAnnotation={(annotation) => (
           <AnnotationRenderer

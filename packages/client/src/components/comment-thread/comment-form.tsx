@@ -3,9 +3,8 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card } from "@/components/ui/card"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Loading03Icon, SparklesIcon } from "@hugeicons/core-free-icons"
+import { Loading03Icon, SparklesIcon, UserIcon } from "@hugeicons/core-free-icons"
 
 /**
  * Props for the CommentForm component.
@@ -50,7 +49,7 @@ export interface CommentFormProps
   /**
    * Form variant affecting styling
    * - "default": Basic form without wrapper
-   * - "inline": Card wrapper with shadow (for inline diff comments)
+   * - "inline": Clean card-style wrapper with avatar (for inline diff comments)
    * @default "default"
    */
   variant?: "default" | "inline"
@@ -281,21 +280,152 @@ function CommentForm({
       <div
         data-slot="inline-comment-form"
         className="w-full overflow-hidden"
+        style={{ display: "flex", flexDirection: "row", gap: 1 }}
         role="form"
         aria-label="Add a comment"
       >
-        <div className="m-4 max-w-[95%] sm:max-w-[70%]">
-          <Card size="sm" className="border-l-2 border-l-primary py-0">
-            <form
-              data-slot="comment-form"
-              aria-busy={isDisabled}
-              onSubmit={handleSubmit}
-              className="p-3"
-              {...props}
-            >
-              {formContent}
-            </form>
-          </Card>
+        <div className="w-full">
+          <div className="m-5 max-w-[95%] whitespace-normal sm:max-w-[90%]">
+            <div className="bg-card rounded-lg border p-5 shadow-sm">
+              <div className="flex gap-2">
+                <div className="relative -mt-0.5 flex-shrink-0">
+                  <div className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <HugeiconsIcon
+                      icon={UserIcon}
+                      className="size-3.5"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <form
+                    data-slot="comment-form"
+                    aria-busy={isDisabled}
+                    onSubmit={handleSubmit}
+                    {...props}
+                  >
+                    <Textarea
+                      ref={textareaRef}
+                      data-slot="comment-input"
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={placeholder}
+                      disabled={isDisabled}
+                      aria-label="Comment text"
+                      aria-describedby={
+                        showKeyboardHints ? "comment-form-hint" : undefined
+                      }
+                      rows={3}
+                      className="min-h-[60px] w-full resize-none rounded-md border bg-background p-2 text-sm text-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                    />
+                    <div
+                      data-slot="comment-form-actions"
+                      className="mt-3 flex items-center gap-2"
+                    >
+                      <Button
+                        type="submit"
+                        size={size}
+                        disabled={!content.trim() || isDisabled}
+                        aria-label="Submit comment"
+                        aria-busy={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <HugeiconsIcon
+                              icon={Loading03Icon}
+                              className={cn(
+                                size === "sm" ? "size-3" : "size-4",
+                                "animate-spin"
+                              )}
+                              aria-hidden="true"
+                            />
+                            <span>Submitting...</span>
+                          </>
+                        ) : (
+                          "Comment"
+                        )}
+                      </Button>
+                      {onAskAI && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size={size}
+                          onClick={handleAskAI}
+                          disabled={isDisabled}
+                          aria-label="Ask AI for suggestions"
+                        >
+                          {isAILoading ? (
+                            <>
+                              <HugeiconsIcon
+                                icon={Loading03Icon}
+                                className={cn(
+                                  size === "sm" ? "size-3" : "size-4",
+                                  "animate-spin"
+                                )}
+                                aria-hidden="true"
+                              />
+                              <span>Thinking...</span>
+                            </>
+                          ) : (
+                            <>
+                              <HugeiconsIcon
+                                icon={SparklesIcon}
+                                className={cn(
+                                  size === "sm" ? "size-3" : "size-4"
+                                )}
+                                data-icon="inline-start"
+                                aria-hidden="true"
+                              />
+                              <span>Ask AI</span>
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      <div className="flex-1" />
+                      {onCancel && (
+                        <button
+                          type="button"
+                          onClick={onCancel}
+                          disabled={isDisabled}
+                          className="text-muted-foreground hover:text-foreground cursor-pointer px-3 py-1 text-sm transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                    {showKeyboardHints && (
+                      <p
+                        id="comment-form-hint"
+                        className="mt-3 text-xs text-muted-foreground"
+                      >
+                        <kbd className="border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                          ⌘+Enter
+                        </kbd>
+                        <span className="ml-1 mr-3">submit</span>
+                        {onAskAI && (
+                          <>
+                            <kbd className="border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                              ⌘+Shift+Enter
+                            </kbd>
+                            <span className="ml-1 mr-3">ask AI</span>
+                          </>
+                        )}
+                        {onCancel && (
+                          <>
+                            <kbd className="border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                              Esc
+                            </kbd>
+                            <span className="ml-1">cancel</span>
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
