@@ -2,7 +2,9 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/bun';
 import { fileURLToPath } from 'node:url';
-import { logger, createLoggerMiddleware } from './lib/logger.js';
+import { configure, getConsoleSink, getAnsiColorFormatter } from '@logtape/logtape';
+import { honoLogger } from '@logtape/hono';
+import { logger } from './lib/logger.js';
 import { AppError, createErrorResponse } from './lib/errors.js';
 import { initAppContext, getAppContext } from './lib/app-context.js';
 import diffRoutes from './routes/diff.js';
@@ -18,10 +20,38 @@ import viewedFilesRoutes from './routes/viewed-files.js';
 
 initAppContext();
 
+// Configure LogTape for structured request logging with ANSI colors
+const ansiFormatter = getAnsiColorFormatter({
+  timestamp: 'time',
+  timestampStyle: 'dim',
+  levelStyle: 'bold',
+  levelColors: {
+    trace: null,
+    debug: 'cyan',
+    info: 'green',
+    warning: 'yellow',
+    error: 'red',
+    fatal: 'magenta',
+  },
+  categoryStyle: 'dim',
+});
+
+await configure({
+  sinks: { console: getConsoleSink({ formatter: ansiFormatter }) },
+  loggers: [
+    { category: ['hono'], sinks: ['console'], lowestLevel: 'info' },
+    { category: ['clm'], sinks: ['console'], lowestLevel: 'debug' },
+    { category: ['logtape', 'meta'], lowestLevel: 'warning' },
+  ],
+});
+
 const app = new Hono();
 
-// Middleware - custom beautiful logger
-app.use('*', createLoggerMiddleware());
+// Middleware - LogTape structured request logger
+app.use('*', honoLogger({
+  format: 'dev',
+  skip: (c) => /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|avif|otf)$/i.test(c.req.path),
+}));
 
 // CORS configuration - restrict to known origins
 const allowedOrigins = process.env.CORS_ORIGINS
