@@ -9,7 +9,7 @@ import {
   ActionTriggerWithContext,
 } from '@/components/side-panel'
 import { ActionSettingsPopover } from '@/components/side-panel/action-settings-popover'
-import { AIProgressPanel } from '@/components/side-panel/ai-progress-panel'
+import { AIProgressPanel } from '@/components/side-panel'
 import { useDiffPanelContext } from '@/components/diff-panel/diff-panel-context'
 import { useAIReview, useModels, useSettings, usePRContext } from '@/hooks'
 import {

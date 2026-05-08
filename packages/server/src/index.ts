@@ -146,6 +146,7 @@ const requestedPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 0;
 const server = Bun.serve({
   port: requestedPort,
   fetch: app.fetch,
+  idleTimeout: 60, // Increase idleTimeout to handle long-lived streaming connections
 });
 
 const actualPort = server.port;

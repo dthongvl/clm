@@ -98,3 +98,5 @@ export { ReviewItemCard } from "./review-item-card"
 
 export { ActionTriggerWithContext } from "./action-trigger-with-context"
 export type { ActionTriggerWithContextProps } from "./action-trigger-with-context"
+export { AIProgressPanel } from "./ai-progress-panel"
+export type { AIProgressPanelProps } from "./ai-progress-panel"
