@@ -25,7 +25,7 @@ const EMPTY_REVIEW: ReviewCache = { items: [], summary: '' };
  * trigger button through `useStreamingReview` instead of the blocking JSON
  * mutation. Lives here so we can A/B in dev without env-var plumbing.
  */
-export const STREAMING_REVIEW_ENABLED = false;
+export const STREAMING_REVIEW_ENABLED = true;
 
 export function useAIReview() {
   const queryClient = useQueryClient();

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   SidePanel,
@@ -9,8 +9,13 @@ import {
   ActionTriggerWithContext,
 } from '@/components/side-panel'
 import { ActionSettingsPopover } from '@/components/side-panel/action-settings-popover'
+import { AIProgressPanel } from '@/components/side-panel/ai-progress-panel'
 import { useDiffPanelContext } from '@/components/diff-panel/diff-panel-context'
 import { useAIReview, useModels, useSettings, usePRContext } from '@/hooks'
+import {
+  STREAMING_REVIEW_ENABLED,
+  useStreamingReview,
+} from '@/hooks/use-ai-review'
 import { ErrorBoundary, ErrorFallback } from '@/components/error-boundary'
 import { AiGenerativeIcon } from '@hugeicons/core-free-icons'
 
@@ -32,6 +37,17 @@ export function SidePanelContainer() {
     triggerReview,
     isLoading: isReviewLoading,
   } = useAIReview()
+
+  const streamingReview = useStreamingReview()
+  const isStreamingActive = streamingReview.status === 'streaming'
+
+  const runReview = useCallback(
+    (additionalContext?: string) =>
+      STREAMING_REVIEW_ENABLED
+        ? streamingReview.start(additionalContext)
+        : triggerReview(additionalContext),
+    [streamingReview, triggerReview],
+  )
 
   const { data: models = [], error: modelsError } = useModels()
   const { settings, updateActionModel, error: settingsError } = useSettings()
@@ -85,9 +101,9 @@ export function SidePanelContainer() {
               label="Generate AI Review"
               loadingLabel="Generating AI Review..."
               ariaLabel="Generate AI review"
-              isLoading={isReviewLoading}
+              isLoading={isReviewLoading || isStreamingActive}
               icon={AiGenerativeIcon}
-              onRun={triggerReview}
+              onRun={runReview}
             />
             <ActionSettingsPopover
               actionKey="ai-review"
@@ -97,6 +113,18 @@ export function SidePanelContainer() {
               onModelChange={(model, variant) => updateActionModel("ai-review", model, variant)}
             />
           </div>
+          {STREAMING_REVIEW_ENABLED && streamingReview.status !== 'idle' && (
+            <div className="mb-4">
+              <AIProgressPanel
+                status={streamingReview.status}
+                phase={streamingReview.phase}
+                thinking={streamingReview.thinking}
+                toolCalls={streamingReview.toolCalls}
+                error={streamingReview.error}
+                onCancel={streamingReview.cancel}
+              />
+            </div>
+          )}
           <p className="mb-4 text-xs text-muted-foreground">
             AI analyzes the diff and surfaces potential issues by severity — click any issue to jump directly to the relevant line.
           </p>

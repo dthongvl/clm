@@ -42,7 +42,7 @@ function SidePanel({
       className={cn("flex min-h-0 flex-col overflow-hidden", className)}
       {...props}
     >
-      <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-1 flex-col">
+      <Tabs value={tab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col">
         <TabsList variant="line">
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>
@@ -62,7 +62,7 @@ function SidePanelGroupingContent({
     <TabsContent
       {...props}
       value="grouping"
-      className={cn("flex-1 overflow-hidden", className)}
+      className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
       <ScrollArea className="h-full">
         <div className="p-4">{children}</div>
@@ -80,7 +80,7 @@ function SidePanelAIReviewContent({
     <TabsContent
       {...props}
       value="ai-review"
-      className={cn("flex-1 overflow-hidden", className)}
+      className={cn("min-h-0 flex-1 overflow-hidden", className)}
     >
       <ScrollArea className="h-full">
         <div className="p-4">{children}</div>
