@@ -1,6 +1,6 @@
 import type { AIReviewItem, AIReviewPRResult, AIReviewCategory } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
-import { getAiBackend } from './ai-backend/index.js';
+import { getAiBackend, type StreamEvent } from './ai-backend/index.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 import { wrapError } from '../lib/errors.js';
@@ -9,6 +9,18 @@ import { buildReviewPrompt } from './ai-review-prompt.js';
 export interface GeneratePRReviewOptions {
   additionalContext?: string;
 }
+
+/** Service-layer terminal event carrying the parsed structured review. */
+export interface ReviewResultEvent {
+  type: 'result';
+  result: AIReviewPRResult;
+}
+
+/**
+ * Events emitted by {@link generatePRReviewStream}: every backend `StreamEvent`
+ * passes through, plus a terminal `result` event with the parsed JSON review.
+ */
+export type ReviewStreamEvent = StreamEvent | ReviewResultEvent;
 
 /**
  * Generate AI code review for a PR using opencode server
@@ -31,6 +43,76 @@ export async function generatePRReview(prLink: string, options: GeneratePRReview
     logger.error('AI review generation failed', error);
     throw wrapError(error, 'AI_ERROR', 'Failed to generate AI review', { prLink });
   }
+}
+
+/**
+ * Streaming variant of {@link generatePRReview}.
+ *
+ * Forwards every event from `AiBackend.promptStream` (status / thinking /
+ * tool_use / tool_result / text deltas) and accumulates assistant text into a
+ * buffer. On the backend's terminal `done`, parses the buffer and yields a
+ * `result` event with the structured review followed by a `done`. On the
+ * backend's `error`, yields the error and stops without yielding a result.
+ *
+ * The backend's terminal `done` is *not* re-yielded — consumers see exactly
+ * one terminal event (`result` then `done`, or `error`).
+ */
+export async function* generatePRReviewStream(
+  prLink: string,
+  options: GeneratePRReviewOptions = {},
+): AsyncGenerator<ReviewStreamEvent> {
+  const { additionalContext } = options;
+
+  let prompt: string;
+  let model: string | undefined;
+  let variant: string | undefined;
+  try {
+    prompt = buildReviewPrompt({ prLink, additionalContext });
+    model = await getModelForAction('ai-review');
+    variant = await getVariantForAction('ai-review');
+  } catch (error) {
+    logger.error('AI review setup failed', error);
+    yield {
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+    return;
+  }
+
+  let buffer = '';
+  try {
+    for await (const event of getAiBackend().promptStream(prompt, { model, variant })) {
+      if (event.type === 'text' && typeof event.content === 'string') {
+        buffer += event.content;
+        yield event;
+        continue;
+      }
+
+      if (event.type === 'done') {
+        // Swallow the backend's done — we emit our own terminal sequence below.
+        break;
+      }
+
+      if (event.type === 'error') {
+        // Surface and stop; do not synthesize a result on error.
+        yield event;
+        return;
+      }
+
+      yield event;
+    }
+  } catch (error) {
+    logger.error('AI review stream failed', error);
+    yield {
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+    return;
+  }
+
+  const result = parseReviewOutput(buffer);
+  yield { type: 'result', result };
+  yield { type: 'done' };
 }
 
 interface JsonReviewItem {

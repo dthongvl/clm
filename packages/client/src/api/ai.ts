@@ -55,4 +55,22 @@ export async function generateAIReview(body: AIReviewRequestBody = {}): Promise<
   });
 }
 
-
+export {
+  streamAiReview,
+  streamAiGrouping,
+  type StreamEvent,
+  type StreamStatusEvent,
+  type StreamStatusPhase,
+  type StreamThinkingEvent,
+  type StreamToolUseEvent,
+  type StreamToolResultEvent,
+  type StreamTextEvent,
+  type StreamTokenUsageEvent,
+  type StreamDoneEvent,
+  type StreamErrorEvent,
+  type ReviewStreamEvent,
+  type ReviewResultEvent,
+  type GroupingStreamEvent,
+  type GroupingResultEvent,
+  type StreamRequestBody,
+} from './ai-stream';

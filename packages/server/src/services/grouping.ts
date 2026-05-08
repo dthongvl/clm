@@ -1,9 +1,21 @@
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
-import { getAiBackend } from './ai-backend/index.js';
+import { getAiBackend, type StreamEvent } from './ai-backend/index.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
 import { wrapError } from '../lib/errors.js';
+
+/** Service-layer terminal event carrying the parsed grouping result. */
+export interface GroupingResultEvent {
+  type: 'result';
+  result: GroupingResult;
+}
+
+/**
+ * Events emitted by {@link generateGroupingStream}: every backend `StreamEvent`
+ * passes through, plus a terminal `result` event with the parsed groups.
+ */
+export type GroupingStreamEvent = StreamEvent | GroupingResultEvent;
 
 /**
  * Generate intelligent grouping for a PR using opencode server
@@ -23,6 +35,72 @@ export async function generateGrouping(prLink: string, additionalContext?: strin
     logger.error('Grouping generation failed', error);
     throw wrapError(error, 'AI_ERROR', 'Failed to generate grouping', { prLink });
   }
+}
+
+/**
+ * Streaming variant of {@link generateGrouping}.
+ *
+ * Forwards every event from `AiBackend.promptStream` and accumulates assistant
+ * text into a buffer. On the backend's terminal `done`, parses the buffer and
+ * yields a `result` event with the structured grouping followed by `done`. On
+ * the backend's `error`, yields the error and stops without yielding a result.
+ *
+ * The backend's terminal `done` is *not* re-yielded — consumers see exactly
+ * one terminal event (`result` then `done`, or `error`).
+ */
+export async function* generateGroupingStream(
+  prLink: string,
+  additionalContext?: string,
+): AsyncGenerator<GroupingStreamEvent> {
+  let prompt: string;
+  let model: string | undefined;
+  let variant: string | undefined;
+  try {
+    prompt = buildGroupingPrompt(prLink, additionalContext);
+    model = await getModelForAction('grouping');
+    variant = await getVariantForAction('grouping');
+  } catch (error) {
+    logger.error('Grouping setup failed', error);
+    yield {
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+    return;
+  }
+
+  let buffer = '';
+  try {
+    for await (const event of getAiBackend().promptStream(prompt, { model, variant })) {
+      if (event.type === 'text' && typeof event.content === 'string') {
+        buffer += event.content;
+        yield event;
+        continue;
+      }
+
+      if (event.type === 'done') {
+        // Swallow the backend's done — we emit our own terminal sequence below.
+        break;
+      }
+
+      if (event.type === 'error') {
+        yield event;
+        return;
+      }
+
+      yield event;
+    }
+  } catch (error) {
+    logger.error('Grouping stream failed', error);
+    yield {
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+    return;
+  }
+
+  const result = parseGroupingOutput(buffer);
+  yield { type: 'result', result };
+  yield { type: 'done' };
 }
 
 function buildGroupingPrompt(prLink: string, additionalContext?: string): string {

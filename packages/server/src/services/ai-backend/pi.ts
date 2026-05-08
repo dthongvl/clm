@@ -24,14 +24,31 @@ type PiModelRegistry = {
   find(provider: string, id: string): PiModel | undefined;
   getAll(): PiModel[];
 };
+/**
+ * Loose mirror of `AgentSessionEvent` from `@mariozechner/pi-agent-core`. We carry only
+ * the fields we read so the SDK's full type tree doesn't leak into our build.
+ */
 type PiAgentSessionEvent = {
   type: string;
+  // message_start | message_update | message_end
   message?: {
     role?: string;
     content?: string | Array<{ type: string; text?: string }>;
     stopReason?: string;
     errorMessage?: string;
   };
+  // message_update — nested AssistantMessageEvent from @mariozechner/pi-ai
+  assistantMessageEvent?: {
+    type: string;
+    delta?: string;
+    error?: { errorMessage?: string };
+  };
+  // tool_execution_start | tool_execution_update | tool_execution_end
+  toolCallId?: string;
+  toolName?: string;
+  args?: unknown;
+  result?: unknown;
+  isError?: boolean;
 };
 type PiAgentSession = {
   agent: { state: { systemPrompt?: string } };
@@ -39,6 +56,24 @@ type PiAgentSession = {
   subscribe(handler: (event: PiAgentSessionEvent) => void): () => void;
   dispose(): void;
 };
+
+/** Max characters retained for tool input/output previews on the wire. */
+const TOOL_PREVIEW_MAX = 500;
+
+function truncatePreview(value: unknown, maxLen = TOOL_PREVIEW_MAX): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  let str: string;
+  if (typeof value === 'string') {
+    str = value;
+  } else {
+    try {
+      str = JSON.stringify(value);
+    } catch {
+      str = String(value);
+    }
+  }
+  return str.length <= maxLen ? str : str.slice(0, maxLen) + '…';
+}
 
 interface PiSdkModule {
   createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiAgentSession }>;
@@ -185,14 +220,147 @@ export class PiBackend implements AiBackend {
   }
 
   async *promptStream(message: string, options: PromptOptions = {}): AsyncGenerator<StreamEvent> {
-    // Pi SDK emits at message-level rather than token-level; a single yield
-    // before `done` matches the granularity of the underlying events.
+    const { sdk, auth, registry } = await loadPiSdk();
+    const cwd = process.cwd();
+
+    const tools = [
+      sdk.createReadToolDefinition(cwd),
+      sdk.createBashToolDefinition(cwd),
+      sdk.createGrepToolDefinition(cwd),
+      sdk.createFindToolDefinition(cwd),
+      sdk.createLsToolDefinition(cwd),
+    ] as Array<{ name: string }>;
+
+    const model = resolveModel(registry, options.model);
+    if (options.model && !model) {
+      logger.warn(`PiBackend: could not resolve model "${options.model}", falling back to SDK default`);
+    }
+
+    const { session } = await sdk.createAgentSession({
+      cwd,
+      authStorage: auth,
+      modelRegistry: registry,
+      ...(model ? { model } : {}),
+      customTools: tools,
+      tools: tools.map((t) => t.name),
+      sessionManager: sdk.SessionManager.inMemory(),
+    });
+
+    // ── Bridge: subscribe-callback push → async-generator pull ─────────────
+    const queue: StreamEvent[] = [];
+    let waker: (() => void) | null = null;
+    let finished = false;
+    /** Tracked for tail-emit at agent_end so consumers see at most one terminal `error`. */
+    let pendingError: string | null = null;
+
+    const wake = () => {
+      const r = waker;
+      waker = null;
+      r?.();
+    };
+    const push = (e: StreamEvent) => {
+      queue.push(e);
+      wake();
+    };
+    const finish = () => {
+      finished = true;
+      wake();
+    };
+
+    const unsub = session.subscribe((event) => {
+      switch (event.type) {
+        case 'agent_start':
+          push({ type: 'status', phase: 'starting' });
+          break;
+
+        case 'message_start':
+          // First assistant message → useful "the model is now reasoning" signal.
+          if (event.message?.role === 'assistant') {
+            push({ type: 'status', phase: 'analyzing' });
+          }
+          break;
+
+        case 'message_update': {
+          const ame = event.assistantMessageEvent;
+          if (!ame) break;
+          if (ame.type === 'text_delta' && typeof ame.delta === 'string' && ame.delta.length > 0) {
+            push({ type: 'text', content: ame.delta, delta: true });
+          } else if (ame.type === 'thinking_delta' && typeof ame.delta === 'string' && ame.delta.length > 0) {
+            push({ type: 'thinking', content: ame.delta, delta: true });
+          } else if (ame.type === 'error') {
+            pendingError = ame.error?.errorMessage || pendingError || 'Pi assistant message error';
+          }
+          break;
+        }
+
+        case 'message_end':
+          if (
+            event.message?.role === 'assistant' &&
+            event.message?.stopReason === 'error' &&
+            event.message?.errorMessage
+          ) {
+            pendingError = event.message.errorMessage;
+          }
+          break;
+
+        case 'tool_execution_start':
+          if (event.toolCallId && event.toolName) {
+            push({
+              type: 'tool_use',
+              toolName: event.toolName,
+              callId: event.toolCallId,
+              input: truncatePreview(event.args),
+            });
+          }
+          break;
+
+        case 'tool_execution_end':
+          if (event.toolCallId) {
+            push({
+              type: 'tool_result',
+              callId: event.toolCallId,
+              ok: !event.isError,
+              preview: truncatePreview(event.result),
+            });
+          }
+          break;
+
+        case 'agent_end':
+          if (pendingError) {
+            push({ type: 'error', error: pendingError });
+          } else {
+            push({ type: 'done' });
+          }
+          finish();
+          break;
+      }
+    });
+
+    // Kick off the run; the agent_end event will resolve our loop. If `prompt()`
+    // itself rejects (network/SDK fault before agent_end), surface it as a terminal
+    // `error` and finish the queue.
+    session.prompt(message).catch((err) => {
+      logger.error('PiBackend.promptStream: session.prompt rejected', err);
+      push({ type: 'error', error: err instanceof Error ? err.message : String(err) });
+      finish();
+    });
+
     try {
-      const text = await this.prompt(message, options);
-      if (text) yield { type: 'text', content: text };
-      yield { type: 'done' };
-    } catch (error) {
-      yield { type: 'error', error: error instanceof Error ? error.message : String(error) };
+      while (true) {
+        if (queue.length === 0) {
+          if (finished) break;
+          await new Promise<void>((r) => {
+            waker = r;
+          });
+          continue;
+        }
+        const ev = queue.shift()!;
+        yield ev;
+        if (ev.type === 'done' || ev.type === 'error') break;
+      }
+    } finally {
+      unsub();
+      session.dispose();
     }
   }
 

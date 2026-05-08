@@ -14,11 +14,88 @@ export interface PromptOptions {
   variant?: string;
 }
 
-export interface StreamEvent {
-  type: 'text' | 'done' | 'error';
-  content?: string;
-  error?: string;
+/**
+ * Phases reported via {@link StreamStatusEvent}.
+ *
+ * - `starting`     – generator has started; no work yet
+ * - `fetching_pr`  – pulling PR metadata / diff
+ * - `analyzing`    – model is reasoning over the PR
+ * - `finalizing`   – assembling / parsing the final structured result
+ */
+export type StreamStatusPhase = 'starting' | 'fetching_pr' | 'analyzing' | 'finalizing';
+
+/** Coarse-grained progress signal for UI status banners. */
+export interface StreamStatusEvent {
+  type: 'status';
+  phase: StreamStatusPhase;
+  message?: string;
 }
+
+/** Reasoning / scratchpad text from the model. Set `delta: true` for incremental chunks. */
+export interface StreamThinkingEvent {
+  type: 'thinking';
+  content: string;
+  delta?: boolean;
+}
+
+/** Agent invoked a tool. `callId` correlates with the matching {@link StreamToolResultEvent}. */
+export interface StreamToolUseEvent {
+  type: 'tool_use';
+  toolName: string;
+  callId: string;
+  /** May be truncated by the backend to keep SSE payloads small. */
+  input?: unknown;
+}
+
+/** Result of a previous tool call, identified by `callId`. */
+export interface StreamToolResultEvent {
+  type: 'tool_result';
+  callId: string;
+  ok: boolean;
+  /** Truncated preview of the tool output (≤500 chars by convention). */
+  preview?: string;
+}
+
+/** Visible assistant text. Set `delta: true` for incremental chunks. */
+export interface StreamTextEvent {
+  type: 'text';
+  content: string;
+  delta?: boolean;
+}
+
+/** Token accounting; emitted at most once per stream, near the end. */
+export interface StreamTokenUsageEvent {
+  type: 'token_usage';
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+/** Stream completed successfully. Always the last event when no error occurred. */
+export interface StreamDoneEvent {
+  type: 'done';
+}
+
+/** Stream terminated with an error. Always the last event when an error occurred. */
+export interface StreamErrorEvent {
+  type: 'error';
+  error: string;
+}
+
+/**
+ * Discriminated union of every event a backend may emit through {@link AiBackend.promptStream}.
+ *
+ * The union is additive: existing producers that only yield `text`, `done`, or `error`
+ * remain valid, and existing consumers that switch on `event.type` keep narrowing correctly.
+ */
+export type StreamEvent =
+  | StreamStatusEvent
+  | StreamThinkingEvent
+  | StreamToolUseEvent
+  | StreamToolResultEvent
+  | StreamTextEvent
+  | StreamTokenUsageEvent
+  | StreamDoneEvent
+  | StreamErrorEvent;
 
 export interface ModelOption {
   id: string;
