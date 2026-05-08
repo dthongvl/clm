@@ -121,7 +121,7 @@ export const FileDiffCard = memo(function FileDiffCard({
     enableGutterUtility: !hasOpenCommentForm,
     enableLineSelection: !hasOpenCommentForm,
     onLineSelectionEnd: handleLineSelectionEnd,
-    theme: { dark: "pierre-dark", light: "pierre-light" } as const,
+    theme: { dark: "github-dark", light: "github-light" } as const,
     themeType: resolvedTheme,
     onLineClick: onLineClick
       ? (lineProps: { lineNumber: number; annotationSide: "additions" | "deletions" }) => {

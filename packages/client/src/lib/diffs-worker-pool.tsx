@@ -45,7 +45,7 @@ export function DiffsWorkerPoolProvider({ children }: DiffsWorkerPoolProviderPro
   const highlighterOptions = useMemo(
     () => ({
       // Pre-load both themes so toggling light/dark stays on the worker.
-      theme: { dark: "pierre-dark", light: "pierre-light" } as const,
+      theme: { dark: "github-dark", light: "github-light" } as const,
       // Match the per-card setting in `file-diff-card.tsx` so the worker
       // produces results compatible with how cards render.
       lineDiffType: "word" as const,
