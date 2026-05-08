@@ -108,6 +108,30 @@ export interface StreamToolCall {
   preview?: string;
 }
 
+/**
+ * Chronologically ordered timeline entry. Thinking deltas collapse into a
+ * single thinking block until a tool call (or stream end) closes it; each
+ * tool_use produces its own row that updates in place when the matching
+ * tool_result arrives. This mirrors how Claude Code surfaces "what the agent
+ * is doing right now" in its TurnCard, but stays purpose-built for our
+ * one-shot review/grouping streams.
+ */
+export type StreamActivity =
+  | {
+      kind: 'thinking';
+      id: string;
+      content: string;
+      status: 'running' | 'completed';
+    }
+  | {
+      kind: 'tool';
+      id: string; // mirrors callId
+      toolName: string;
+      input?: unknown;
+      status: 'pending' | 'ok' | 'failed';
+      preview?: string;
+    };
+
 export type StreamingStatus = 'idle' | 'streaming' | 'done' | 'error' | 'cancelled';
 
 interface StreamingReviewState {
@@ -116,6 +140,7 @@ interface StreamingReviewState {
   thinking: string;
   text: string;
   toolCalls: StreamToolCall[];
+  activities: StreamActivity[];
   error: string | null;
 }
 
@@ -125,6 +150,7 @@ const INITIAL_STREAMING_STATE: StreamingReviewState = {
   thinking: '',
   text: '',
   toolCalls: [],
+  activities: [],
   error: null,
 };
 
@@ -156,6 +182,66 @@ function applyToolResult(
     call.callId === event.callId
       ? { ...call, status: event.ok ? 'ok' : 'failed', preview: event.preview }
       : call,
+  );
+}
+
+/** Mark every running thinking block as completed — used on tool_use and stream end. */
+function closeRunningThinking(activities: StreamActivity[]): StreamActivity[] {
+  let mutated = false;
+  const next = activities.map((a) => {
+    if (a.kind === 'thinking' && a.status === 'running') {
+      mutated = true;
+      return { ...a, status: 'completed' as const };
+    }
+    return a;
+  });
+  return mutated ? next : activities;
+}
+
+function appendThinkingActivity(
+  prev: StreamActivity[],
+  content: string,
+  delta: boolean | undefined,
+): StreamActivity[] {
+  const last = prev[prev.length - 1];
+  // Merge delta into the trailing running thinking block; otherwise start a new one.
+  if (last?.kind === 'thinking' && last.status === 'running') {
+    const nextContent = delta ? last.content + content : content;
+    return [...prev.slice(0, -1), { ...last, content: nextContent }];
+  }
+  return [
+    ...prev,
+    { kind: 'thinking', id: `think-${prev.length}-${Date.now()}`, content, status: 'running' },
+  ];
+}
+
+function appendToolActivity(
+  prev: StreamActivity[],
+  event: { callId: string; toolName: string; input?: unknown },
+): StreamActivity[] {
+  if (prev.some((a) => a.kind === 'tool' && a.id === event.callId)) return prev;
+  // A new tool call ends any running thinking block — they're sequential on the agent loop.
+  const closed = closeRunningThinking(prev);
+  return [
+    ...closed,
+    {
+      kind: 'tool',
+      id: event.callId,
+      toolName: event.toolName,
+      input: event.input,
+      status: 'pending',
+    },
+  ];
+}
+
+function applyToolResultActivity(
+  prev: StreamActivity[],
+  event: { callId: string; ok: boolean; preview?: string },
+): StreamActivity[] {
+  return prev.map((a) =>
+    a.kind === 'tool' && a.id === event.callId
+      ? { ...a, status: event.ok ? 'ok' : 'failed', preview: event.preview }
+      : a,
   );
 }
 
@@ -229,6 +315,7 @@ export function useStreamingReview() {
     thinking: state.thinking,
     text: state.text,
     toolCalls: state.toolCalls,
+    activities: state.activities,
     error: state.error,
     start,
     cancel,
@@ -244,13 +331,25 @@ function reduceReviewEvent(
     case 'status':
       return { ...prev, phase: event.phase };
     case 'thinking':
-      return { ...prev, thinking: appendThinking(prev.thinking, event.content, event.delta) };
+      return {
+        ...prev,
+        thinking: appendThinking(prev.thinking, event.content, event.delta),
+        activities: appendThinkingActivity(prev.activities, event.content, event.delta),
+      };
     case 'text':
       return { ...prev, text: appendText(prev.text, event.content, event.delta) };
     case 'tool_use':
-      return { ...prev, toolCalls: upsertToolUse(prev.toolCalls, event) };
+      return {
+        ...prev,
+        toolCalls: upsertToolUse(prev.toolCalls, event),
+        activities: appendToolActivity(prev.activities, event),
+      };
     case 'tool_result':
-      return { ...prev, toolCalls: applyToolResult(prev.toolCalls, event) };
+      return {
+        ...prev,
+        toolCalls: applyToolResult(prev.toolCalls, event),
+        activities: applyToolResultActivity(prev.activities, event),
+      };
     case 'result':
       queryClient.setQueryData(['ai-review'], {
         items: transformAIReviewItems(event.result.items),
@@ -258,9 +357,14 @@ function reduceReviewEvent(
       });
       return prev;
     case 'done':
-      return { ...prev, status: 'done' };
+      return { ...prev, status: 'done', activities: closeRunningThinking(prev.activities) };
     case 'error':
-      return { ...prev, status: 'error', error: event.error };
+      return {
+        ...prev,
+        status: 'error',
+        error: event.error,
+        activities: closeRunningThinking(prev.activities),
+      };
     case 'token_usage':
       return prev;
     default:
@@ -274,6 +378,7 @@ interface StreamingGroupingState {
   thinking: string;
   text: string;
   toolCalls: StreamToolCall[];
+  activities: StreamActivity[];
   error: string | null;
 }
 
@@ -283,6 +388,7 @@ const INITIAL_STREAMING_GROUPING_STATE: StreamingGroupingState = {
   thinking: '',
   text: '',
   toolCalls: [],
+  activities: [],
   error: null,
 };
 
@@ -352,6 +458,7 @@ export function useStreamingGrouping() {
     thinking: state.thinking,
     text: state.text,
     toolCalls: state.toolCalls,
+    activities: state.activities,
     error: state.error,
     start,
     cancel,
@@ -367,20 +474,37 @@ function reduceGroupingEvent(
     case 'status':
       return { ...prev, phase: event.phase };
     case 'thinking':
-      return { ...prev, thinking: appendThinking(prev.thinking, event.content, event.delta) };
+      return {
+        ...prev,
+        thinking: appendThinking(prev.thinking, event.content, event.delta),
+        activities: appendThinkingActivity(prev.activities, event.content, event.delta),
+      };
     case 'text':
       return { ...prev, text: appendText(prev.text, event.content, event.delta) };
     case 'tool_use':
-      return { ...prev, toolCalls: upsertToolUse(prev.toolCalls, event) };
+      return {
+        ...prev,
+        toolCalls: upsertToolUse(prev.toolCalls, event),
+        activities: appendToolActivity(prev.activities, event),
+      };
     case 'tool_result':
-      return { ...prev, toolCalls: applyToolResult(prev.toolCalls, event) };
+      return {
+        ...prev,
+        toolCalls: applyToolResult(prev.toolCalls, event),
+        activities: applyToolResultActivity(prev.activities, event),
+      };
     case 'result':
       queryClient.setQueryData(['ai-grouping'], transformChangeGroups(event.result.groups));
       return prev;
     case 'done':
-      return { ...prev, status: 'done' };
+      return { ...prev, status: 'done', activities: closeRunningThinking(prev.activities) };
     case 'error':
-      return { ...prev, status: 'error', error: event.error };
+      return {
+        ...prev,
+        status: 'error',
+        error: event.error,
+        activities: closeRunningThinking(prev.activities),
+      };
     case 'token_usage':
       return prev;
     default:

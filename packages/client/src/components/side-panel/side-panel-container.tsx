@@ -118,8 +118,7 @@ export function SidePanelContainer() {
               <AIProgressPanel
                 status={streamingReview.status}
                 phase={streamingReview.phase}
-                thinking={streamingReview.thinking}
-                toolCalls={streamingReview.toolCalls}
+                activities={streamingReview.activities}
                 error={streamingReview.error}
                 onCancel={streamingReview.cancel}
               />
