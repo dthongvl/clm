@@ -12,6 +12,8 @@ export interface DiffPanelContextValue {
   selectedFilePath: string | undefined
   scrollToFile: (filePath: string) => void
   scrollToAnnotation: (filePath: string, lineNumber: number) => void
+  /** Focus a group of files — scrolls to the first; remaining files stay reachable via the file tree. */
+  focusFileGroup: (filePaths: string[]) => void
   handleFileTreeSelect: (filePath: string) => void
 
   /** Viewed files */

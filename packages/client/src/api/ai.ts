@@ -26,9 +26,33 @@ export interface AIReviewPRResponse {
   summary: string;
 }
 
+export interface ServerReviewGuideStep {
+  id: string;
+  title: string;
+  fileGroup: string[];
+  rationale: string;
+  lookFor: string;
+}
+
+export interface ServerReviewGuideJudgmentThread {
+  id: string;
+  filePath: string;
+  lineNumber: number;
+  side: 'additions' | 'deletions';
+  content: string;
+  anchorReason: string;
+}
+
+export interface ServerReviewGuide {
+  overview: string;
+  steps: ServerReviewGuideStep[];
+  judgmentThreads: ServerReviewGuideJudgmentThread[];
+}
+
 export {
   streamAiReview,
   streamAiGrouping,
+  streamAiReviewGuide,
   type StreamEvent,
   type StreamStatusEvent,
   type StreamStatusPhase,
@@ -43,5 +67,7 @@ export {
   type ReviewResultEvent,
   type GroupingStreamEvent,
   type GroupingResultEvent,
+  type ReviewGuideStreamEvent,
+  type ReviewGuideResultEvent,
   type StreamRequestBody,
 } from './ai-stream';

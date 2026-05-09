@@ -59,6 +59,12 @@ export interface InlineCommentThreadProps {
   onEditReply?: (commentId: string, content: string) => Promise<void>
   /** Callback when a reply comment is deleted */
   onDeleteReply?: (commentId: string) => Promise<void>
+  /**
+   * Optional provenance label for AI-emitted threads. When set on an AI-authored
+   * thread, replaces the generic "AI" badge with a labeled provenance badge
+   * (e.g. "AI · needs your judgment"). Persists after resolution.
+   */
+  aiSourceLabel?: string
 }
 
 /**
@@ -104,11 +110,13 @@ function CommentItem({
   isReply = false,
   onEdit,
   onDelete,
+  aiSourceLabel,
 }: {
   comment: ReviewComment
   isReply?: boolean
   onEdit?: (commentId: string, content: string) => Promise<void>
   onDelete?: (commentId: string) => Promise<void>
+  aiSourceLabel?: string
 }) {
   const [isDeletePopoverOpen, setIsDeletePopoverOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -158,9 +166,19 @@ function CommentItem({
               {comment.author.name}
             </span>
             {isAI && (
-              <Badge variant="secondary" className="h-4 px-1.5 text-[10px]" aria-label="AI generated">
-                AI
-              </Badge>
+              aiSourceLabel ? (
+                <Badge
+                  variant="outline"
+                  className="h-4 gap-1 px-1.5 text-[10px] text-primary border-primary/30 bg-primary/5"
+                  aria-label={aiSourceLabel}
+                >
+                  {aiSourceLabel}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="h-4 px-1.5 text-[10px]" aria-label="AI generated">
+                  AI
+                </Badge>
+              )
             )}
             {comment.severity && (
               <SeverityBadge severity={comment.severity}>
@@ -328,6 +346,7 @@ function InlineCommentThread({
   isConvertingToDraft,
   onEditReply,
   onDeleteReply,
+  aiSourceLabel,
 }: InlineCommentThreadProps) {
   const [isReplyFormOpen, setIsReplyFormOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -393,7 +412,7 @@ function InlineCommentThread({
           </div>
         </div>
       ) : (
-        <CommentItem comment={comment} />
+        <CommentItem comment={comment} aiSourceLabel={aiSourceLabel} />
       )}
 
       {hasReplies && (

@@ -1,4 +1,4 @@
-export type ActionKey = "grouping" | "ai-review"
+export type ActionKey = "grouping" | "ai-review" | "review-guide"
 
 export interface ActionSettings {
   model?: string
@@ -8,6 +8,7 @@ export interface ActionSettings {
 export interface Settings {
   grouping?: ActionSettings
   "ai-review"?: ActionSettings
+  "review-guide"?: ActionSettings
 }
 
 export interface ModelOption {

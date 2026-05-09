@@ -11,3 +11,14 @@ export { useModels } from './use-models';
 export { useSettings } from './use-settings';
 export { useViewedFiles } from './use-viewed-files';
 export { useScrollToTop } from './use-scroll-to-top';
+export {
+  useStreamingReviewGuide,
+  useReviewGuideState,
+  useOffRoute,
+  REVIEW_GUIDE_QUERY_KEY,
+} from './use-review-guide';
+export type {
+  UseReviewGuideStateValue,
+  UseOffRouteValue,
+  RegenerationPreview,
+} from './use-review-guide';

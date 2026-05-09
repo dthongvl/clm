@@ -7,7 +7,8 @@ import type { ChangeGroup } from '@/types/grouping';
 import type { ServerPRInfo } from '@/api/pr';
 import type { ServerFileDiff } from '@/api/diff';
 import type { ServerPRComment } from '@/api/comments';
-import type { ServerAIReviewItem, ServerChangeGroup } from '@/api/ai';
+import type { ServerAIReviewItem, ServerChangeGroup, ServerReviewGuide } from '@/api/ai';
+import type { JudgmentThread, ReviewGuide } from '@/types/review-guide';
 
 /**
  * Transform server PR info to client PR info format
@@ -172,4 +173,43 @@ export function transformChangeGroup(group: ServerChangeGroup): ChangeGroup {
  */
 export function transformChangeGroups(groups: ServerChangeGroup[]): ChangeGroup[] {
   return groups.map(transformChangeGroup);
+}
+
+/**
+ * Split a server review guide into the static guide content (overview + steps)
+ * and the initial judgment-thread state. Threads gain client-only lifecycle
+ * fields (`pinned`, `resolved`, `replies`, `createdAt`, `source`) initialized
+ * to defaults; subsequent reviewer interactions mutate them in place.
+ */
+export function transformReviewGuide(server: ServerReviewGuide): {
+  guide: ReviewGuide;
+  threads: JudgmentThread[];
+} {
+  const guide: ReviewGuide = {
+    overview: server.overview,
+    steps: server.steps.map((step) => ({
+      id: step.id,
+      title: step.title,
+      fileGroup: step.fileGroup,
+      rationale: step.rationale,
+      lookFor: step.lookFor,
+    })),
+  };
+
+  const now = new Date();
+  const threads: JudgmentThread[] = server.judgmentThreads.map((thread) => ({
+    id: thread.id,
+    filePath: thread.filePath,
+    lineNumber: thread.lineNumber,
+    side: thread.side,
+    content: thread.content,
+    anchorReason: thread.anchorReason,
+    source: 'ai-judgment',
+    pinned: false,
+    resolved: false,
+    replies: [],
+    createdAt: now,
+  }));
+
+  return { guide, threads };
 }

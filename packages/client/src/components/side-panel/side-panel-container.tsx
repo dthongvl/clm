@@ -4,9 +4,11 @@ import {
   SidePanel,
   SidePanelGroupingContent,
   SidePanelAIReviewContent,
+  SidePanelReviewGuideContent,
   IntelligentGrouping,
   AIReviewSummary,
   ActionTriggerWithContext,
+  ReviewGuide,
 } from '@/components/side-panel'
 import { ActionSettingsPopover } from '@/components/side-panel/action-settings-popover'
 import { AIProgressPanel } from '@/components/side-panel'
@@ -20,8 +22,9 @@ import { ErrorBoundary, ErrorFallback } from '@/components/error-boundary'
 import { AiGenerativeIcon } from '@hugeicons/core-free-icons'
 
 /**
- * Container for the right side panel — owns all AI action hooks
- * (grouping, AI review).
+ * Container for the right side panel — owns the grouping and AI review action
+ * hooks. The Review Guide tab encapsulates its own streaming + state hooks
+ * inside `ReviewGuide.Root`.
  *
  * Consumes DiffPanelContext for scroll-to-file/annotation cross-communication.
  */
@@ -146,6 +149,9 @@ export function SidePanelContainer() {
             }}
           />
         </SidePanelAIReviewContent>
+        <SidePanelReviewGuideContent>
+          <ReviewGuide.Root />
+        </SidePanelReviewGuideContent>
       </SidePanel>
     </ErrorBoundary>
   )

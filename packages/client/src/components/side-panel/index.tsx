@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 
-type TabValue = "grouping" | "ai-review"
+type TabValue = "grouping" | "ai-review" | "review-guide"
 
 interface SidePanelProps extends React.ComponentProps<"aside"> {
   defaultTab?: TabValue
@@ -46,6 +46,7 @@ function SidePanel({
         <TabsList variant="line">
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>
+          <TabsTrigger value="review-guide">Review Guide</TabsTrigger>
         </TabsList>
         {children}
       </Tabs>
@@ -89,7 +90,31 @@ function SidePanelAIReviewContent({
   )
 }
 
-export { SidePanel, SidePanelGroupingContent, SidePanelAIReviewContent }
+function SidePanelReviewGuideContent({
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
+  return (
+    <TabsContent
+      {...props}
+      value="review-guide"
+      className={cn("min-h-0 flex-1 overflow-hidden", className)}
+    >
+      <ScrollArea className="h-full">
+        <div className="p-4">{children}</div>
+      </ScrollArea>
+    </TabsContent>
+  )
+}
+
+export {
+  SidePanel,
+  SidePanelGroupingContent,
+  SidePanelAIReviewContent,
+  SidePanelReviewGuideContent,
+}
+export { ReviewGuide } from "./review-guide"
 export { SidePanelContainer } from "./side-panel-container"
 export { IntelligentGrouping } from "./intelligent-grouping"
 export { AIReviewSummary } from "./ai-review-summary"

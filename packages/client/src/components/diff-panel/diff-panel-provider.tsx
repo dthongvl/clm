@@ -26,6 +26,11 @@ export function DiffPanelProvider({ children }: DiffPanelProviderProps) {
     handleFileTreeSelect,
   } = useDiffNavigation()
 
+  const focusFileGroup = (filePaths: string[]) => {
+    if (filePaths.length === 0) return
+    scrollToFile(filePaths[0])
+  }
+
   return (
     <DiffPanelContext.Provider
       value={{
@@ -37,6 +42,7 @@ export function DiffPanelProvider({ children }: DiffPanelProviderProps) {
         selectedFilePath,
         scrollToFile,
         scrollToAnnotation,
+        focusFileGroup,
         handleFileTreeSelect,
         viewedFiles,
         syncingViewedFiles,

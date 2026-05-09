@@ -1,5 +1,5 @@
 import { API_BASE, type ApiError } from './client';
-import type { AIReviewPRResponse, ServerChangeGroup } from './ai';
+import type { AIReviewPRResponse, ServerChangeGroup, ServerReviewGuide } from './ai';
 
 /**
  * Mirror of the server's `StreamEvent` discriminated union (see
@@ -77,6 +77,13 @@ export interface GroupingResultEvent {
 }
 
 export type GroupingStreamEvent = StreamEvent | GroupingResultEvent;
+
+export interface ReviewGuideResultEvent {
+  type: 'result';
+  result: ServerReviewGuide;
+}
+
+export type ReviewGuideStreamEvent = StreamEvent | ReviewGuideResultEvent;
 
 export interface StreamRequestBody {
   additionalContext?: string;
@@ -214,6 +221,20 @@ export async function* streamAiGrouping(
 ): AsyncGenerator<GroupingStreamEvent> {
   const response = await openStream('/ai/grouping/stream', body, options);
   for await (const event of readSSE<GroupingStreamEvent>(response)) {
+    yield event;
+    if (event.type === 'done' || event.type === 'error') return;
+  }
+}
+
+/**
+ * Open the AI review guide SSE stream and yield typed events as they arrive.
+ */
+export async function* streamAiReviewGuide(
+  body: StreamRequestBody = {},
+  options: StreamOptions = {},
+): AsyncGenerator<ReviewGuideStreamEvent> {
+  const response = await openStream('/ai/review-guide/stream', body, options);
+  for await (const event of readSSE<ReviewGuideStreamEvent>(response)) {
     yield event;
     if (event.type === 'done' || event.type === 'error') return;
   }

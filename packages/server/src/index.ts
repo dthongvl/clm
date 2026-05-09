@@ -12,6 +12,7 @@ import commentRoutes from './routes/comments.js';
 import aiReviewRoutes from './routes/ai-review.js';
 import prInfoRoutes from './routes/pr-info.js';
 import groupingRoutes from './routes/grouping.js';
+import reviewGuideRoutes from './routes/review-guide.js';
 import refreshRoutes from './routes/refresh.js';
 import settingsRoutes from './routes/settings.js';
 import modelsRoutes from './routes/models.js';
@@ -74,6 +75,7 @@ app.use('*', cors({
 // API routes — AI actions
 app.route('/api/ai/review', aiReviewRoutes);
 app.route('/api/ai/grouping', groupingRoutes);
+app.route('/api/ai/review-guide', reviewGuideRoutes);
 // API routes — Git/GitHub operations
 app.route('/api/git/diff', diffRoutes);
 app.route('/api/git/comments', commentRoutes);
