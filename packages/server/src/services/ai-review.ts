@@ -3,7 +3,6 @@ import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { getAiBackend, type StreamEvent } from './ai-backend/index.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
-import { wrapError } from '../lib/errors.js';
 import { buildReviewPrompt } from './ai-review-prompt.js';
 
 export interface GeneratePRReviewOptions {
@@ -23,30 +22,7 @@ export interface ReviewResultEvent {
 export type ReviewStreamEvent = StreamEvent | ReviewResultEvent;
 
 /**
- * Generate AI code review for a PR using opencode server
- * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
- * @param options - Review options
- * @returns AIReviewPRResult containing the parsed review items
- */
-export async function generatePRReview(prLink: string, options: GeneratePRReviewOptions = {}): Promise<AIReviewPRResult> {
-  const { additionalContext } = options;
-
-  try {
-    const prompt = buildReviewPrompt({ prLink, additionalContext });
-
-    const model = await getModelForAction('ai-review');
-    const variant = await getVariantForAction('ai-review');
-    const response = await getAiBackend().prompt(prompt, { model, variant });
-
-    return parseReviewOutput(response);
-  } catch (error) {
-    logger.error('AI review generation failed', error);
-    throw wrapError(error, 'AI_ERROR', 'Failed to generate AI review', { prLink });
-  }
-}
-
-/**
- * Streaming variant of {@link generatePRReview}.
+ * Streaming AI code review for a PR.
  *
  * Forwards every event from `AiBackend.promptStream` (status / thinking /
  * tool_use / tool_result / text deltas) and accumulates assistant text into a

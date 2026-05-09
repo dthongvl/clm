@@ -3,34 +3,29 @@ import type { ChangeGroup } from "@/types/grouping"
 import { Button } from "@/components/ui/button"
 import { ChangeGroupCard } from "./change-group-card"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { AiGenerativeIcon, AlertCircleIcon } from "@hugeicons/core-free-icons"
-import { ActionSettingsPopover } from "./action-settings-popover"
-import { ActionTriggerWithContext } from "./action-trigger-with-context"
-import type { ModelOption } from "@/types/settings"
+import { AlertCircleIcon } from "@hugeicons/core-free-icons"
 
 export interface IntelligentGroupingProps extends React.ComponentProps<"div"> {
   groups: ChangeGroup[]
   onFileClick?: (filePath: string) => void
-  onGenerateGroups?: (additionalContext?: string) => Promise<boolean>
   isGenerating?: boolean
   error?: Error | null
-  models?: ModelOption[]
-  currentModel?: string
-  currentVariant?: string
-  onModelChange?: (model: string, variant?: string) => void
+  onRetry?: () => void
 }
 
+/**
+ * Results surface for the Grouping tab. Action trigger, description, and
+ * live progress are owned by `SidePanelContainer` so the layout matches
+ * the AI Review tab; this component only renders the resulting groups,
+ * empty/loading/error states.
+ */
 function IntelligentGrouping({
   className,
   groups,
   onFileClick,
-  onGenerateGroups,
   isGenerating = false,
   error,
-  models,
-  currentModel,
-  currentVariant,
-  onModelChange,
+  onRetry,
   ...props
 }: IntelligentGroupingProps) {
   return (
@@ -40,32 +35,6 @@ function IntelligentGrouping({
       className={cn("flex flex-col gap-3", className)}
       {...props}
     >
-      {onGenerateGroups && (
-        <div className="flex gap-2">
-          <ActionTriggerWithContext
-            label={groups.length > 0 ? "Regenerate Groupings" : "Generate AI Groupings"}
-            loadingLabel="Generating..."
-            ariaLabel="Generate AI groupings"
-            isLoading={isGenerating}
-            icon={AiGenerativeIcon}
-            onRun={onGenerateGroups}
-          />
-          {models && onModelChange && (
-            <ActionSettingsPopover
-              actionKey="grouping"
-              models={models}
-              currentModel={currentModel}
-              currentVariant={currentVariant}
-              onModelChange={onModelChange}
-            />
-          )}
-        </div>
-      )}
-
-      <p className="text-xs text-muted-foreground">
-        AI organizes your PR's file changes into logical groups — making large PRs easier to navigate by showing related changes together instead of a flat file list.
-      </p>
-
       {error ? (
         <div className="flex flex-col gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3">
           <div className="flex items-center gap-2 text-destructive">
@@ -75,11 +44,11 @@ function IntelligentGrouping({
           <p className="text-xs text-muted-foreground">
             {error.message}
           </p>
-          {onGenerateGroups && (
+          {onRetry && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onGenerateGroups()}
+              onClick={onRetry}
               disabled={isGenerating}
               className="mt-1"
             >
@@ -87,7 +56,7 @@ function IntelligentGrouping({
             </Button>
           )}
         </div>
-      ) : isGenerating ? (
+      ) : isGenerating && groups.length === 0 ? (
         <div className="flex flex-col gap-2">
           {[1, 2, 3].map((i) => (
             <div
@@ -96,9 +65,6 @@ function IntelligentGrouping({
               aria-hidden="true"
             />
           ))}
-          <p className="text-center text-xs text-muted-foreground" aria-live="polite">
-            AI is analyzing your changes...
-          </p>
         </div>
       ) : groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">

@@ -3,7 +3,6 @@ import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { getAiBackend, type StreamEvent } from './ai-backend/index.js';
 import { getModelForAction, getVariantForAction } from './settings.js';
 import { logger } from '../lib/logger.js';
-import { wrapError } from '../lib/errors.js';
 
 /** Service-layer terminal event carrying the parsed grouping result. */
 export interface GroupingResultEvent {
@@ -18,27 +17,7 @@ export interface GroupingResultEvent {
 export type GroupingStreamEvent = StreamEvent | GroupingResultEvent;
 
 /**
- * Generate intelligent grouping for a PR using opencode server
- * @param prLink - The GitHub PR link (e.g., https://github.com/owner/repo/pull/123)
- * @param additionalContext - Optional user-provided context to guide analysis
- * @returns GroupingResult containing the parsed groups
- */
-export async function generateGrouping(prLink: string, additionalContext?: string): Promise<GroupingResult> {
-  const prompt = buildGroupingPrompt(prLink, additionalContext);
-  
-  try {
-    const model = await getModelForAction('grouping');
-    const variant = await getVariantForAction('grouping');
-    const response = await getAiBackend().prompt(prompt, { model, variant });
-    return parseGroupingOutput(response);
-  } catch (error) {
-    logger.error('Grouping generation failed', error);
-    throw wrapError(error, 'AI_ERROR', 'Failed to generate grouping', { prLink });
-  }
-}
-
-/**
- * Streaming variant of {@link generateGrouping}.
+ * Streaming intelligent grouping for a PR.
  *
  * Forwards every event from `AiBackend.promptStream` and accumulates assistant
  * text into a buffer. On the backend's terminal `done`, parses the buffer and

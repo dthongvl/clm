@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  generateAIReview,
-  generateGrouping,
   streamAiGrouping,
   streamAiReview,
   type GroupingStreamEvent,
@@ -21,16 +19,16 @@ interface ReviewCache {
 const EMPTY_REVIEW: ReviewCache = { items: [], summary: '' };
 
 /**
- * Feature flag for the SSE-streaming review path. Flip to `true` to route the
- * trigger button through `useStreamingReview` instead of the blocking JSON
- * mutation. Lives here so we can A/B in dev without env-var plumbing.
+ * Cache reader for AI review items + grouping results.
+ *
+ * Both surfaces are written exclusively by the streaming hooks below
+ * (`useStreamingReview` / `useStreamingGrouping`); this hook only subscribes
+ * so consumers re-render when those caches update.
  */
-export const STREAMING_REVIEW_ENABLED = true;
-
 export function useAIReview() {
   const queryClient = useQueryClient();
 
-  // useQuery subscribes to ['ai-review'] cache — re-renders when mutations write
+  // useQuery subscribes to ['ai-review'] cache — re-renders when streams write
   const { data: reviewData } = useQuery({
     queryKey: ['ai-review' as const],
     queryFn: () => {
@@ -50,52 +48,10 @@ export function useAIReview() {
     staleTime: Infinity,
   });
 
-  const reviewMutation = useMutation({
-    mutationFn: (additionalContext?: string) => generateAIReview({ additionalContext }),
-    mutationKey: ['ai-review'],
-    onSuccess: (data) => {
-      queryClient.setQueryData(['ai-review'], {
-        items: transformAIReviewItems(data.items),
-        summary: data.summary,
-      });
-    },
-  });
-
-  const groupingMutation = useMutation({
-    mutationFn: (additionalContext?: string) => generateGrouping(additionalContext),
-    mutationKey: ['ai-grouping'],
-    onSuccess: (data) => {
-      queryClient.setQueryData(['ai-grouping'], transformChangeGroups(data));
-    },
-  });
-
-  const triggerReview = async (additionalContext?: string): Promise<boolean> => {
-    try {
-      await reviewMutation.mutateAsync(additionalContext);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const generateGroups = async (additionalContext?: string): Promise<boolean> => {
-    try {
-      await groupingMutation.mutateAsync(additionalContext);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   return {
     items: reviewData?.items ?? [],
     summary: reviewData?.summary ?? '',
     groups: groups ?? [],
-    triggerReview,
-    generateGroups,
-    isLoading: reviewMutation.isPending,
-    isGeneratingGroups: groupingMutation.isPending,
-    error: reviewMutation.error ?? groupingMutation.error ?? null,
   };
 }
 
