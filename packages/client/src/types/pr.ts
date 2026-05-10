@@ -8,4 +8,5 @@ export interface PRInfo {
   baseBranch: string
   headBranch: string
   state: PRState
+  url: string
 }

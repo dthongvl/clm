@@ -1,34 +1,33 @@
 import { MainLayout } from "@/components/main-layout"
-import { DiffPanelProvider, DiffPanelFileTree, DiffPanelViewerContainer } from "@/components/diff-panel"
-import { SidePanelContainer } from "@/components/side-panel/side-panel-container"
+import { DiffPanelProvider } from "@/components/diff-panel"
 import { TopBarContainer } from "@/components/top-bar/top-bar-container"
-import { useAIReview } from "@/hooks"
+import { LeftPanelContainer } from "@/components/left-panel"
+import { CenterPanelContainer } from "@/components/center-panel"
+import { RightPanelContainer } from "@/components/right-panel"
 
 /**
  * Root application component.
  *
  * Composes three feature-level containers behind the MainLayout shell.
  * DiffPanelProvider wraps the layout area so file tree, diff viewer,
- * and side panel all share diff data and navigation context.
+ * and side panels all share diff data and navigation context.
  *
- * useAIReview is lifted here so its TanStack Query cache is shared
- * between SidePanelContainer (displays all items) and
- * DiffPanelViewerContainer (filters via useAnnotations).
+ * Layout:
+ * - Top bar: PR info and actions
+ * - Left sidebar: Review Guide / File Tree tabs
+ * - Center: PR description (top) + diff viewer (bottom)
+ * - Right sidebar: Grouping / AI Review tabs
  */
 export function App() {
-  // Lifted to a shared parent so DiffPanelViewerContainer and
-  // SidePanelContainer both read from the same TanStack Query cache.
-  const { items: aiReviewItems } = useAIReview()
-
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <DiffPanelProvider>
         <MainLayout
           className="h-full"
           header={<TopBarContainer />}
-          leftPanel={<DiffPanelFileTree className="h-full" />}
-          centerPanel={<DiffPanelViewerContainer aiReviewItems={aiReviewItems} />}
-          rightPanel={<SidePanelContainer />}
+          leftPanel={<LeftPanelContainer />}
+          centerPanel={<CenterPanelContainer />}
+          rightPanel={<RightPanelContainer />}
         />
       </DiffPanelProvider>
     </div>

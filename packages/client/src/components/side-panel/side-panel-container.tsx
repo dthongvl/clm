@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   SidePanel,
+  SidePanelDescriptionContent,
   SidePanelGroupingContent,
   SidePanelAIReviewContent,
   SidePanelReviewGuideContent,
@@ -9,11 +10,12 @@ import {
   AIReviewSummary,
   ActionTriggerWithContext,
   ReviewGuide,
+  PRDescription,
 } from '@/components/side-panel'
 import { ActionSettingsPopover } from '@/components/side-panel/action-settings-popover'
 import { AIProgressPanel } from '@/components/side-panel'
 import { useDiffPanelContext } from '@/components/diff-panel/diff-panel-context'
-import { useAIReview, useModels, useSettings, usePRContext } from '@/hooks'
+import { useAIReview, useModels, usePR, useSettings, usePRContext } from '@/hooks'
 import {
   useStreamingGrouping,
   useStreamingReview,
@@ -30,6 +32,8 @@ import { AiGenerativeIcon } from '@hugeicons/core-free-icons'
  */
 export function SidePanelContainer() {
   const { prNumber } = usePRContext()
+
+  const { data: pr, isLoading: isPRLoading, error: prError } = usePR()
 
   const { groups, items: aiReviewItems } = useAIReview()
 
@@ -72,6 +76,13 @@ export function SidePanelContainer() {
       }
     >
       <SidePanel className="h-full">
+        <SidePanelDescriptionContent>
+          <PRDescription
+            pr={pr}
+            isLoading={isPRLoading}
+            error={prError as Error | null}
+          />
+        </SidePanelDescriptionContent>
         <SidePanelGroupingContent>
           <p className="mb-3 text-xs text-muted-foreground">
             AI organizes your PR's file changes into logical groups — making large PRs easier to navigate by showing related changes together instead of a flat file list.

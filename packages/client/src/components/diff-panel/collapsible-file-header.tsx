@@ -88,6 +88,15 @@ function CollapsibleFileHeader({
   }
 
   const fileName = filePath.split("/").pop() || filePath
+  const dirPath = filePath.includes("/")
+    ? filePath.slice(0, filePath.lastIndexOf("/"))
+    : ""
+
+  const prevFileName = fileDiff.prevName?.split("/").pop() || fileDiff.prevName
+  const prevDirPath =
+    fileDiff.prevName != null && fileDiff.prevName.includes("/")
+      ? fileDiff.prevName.slice(0, fileDiff.prevName.lastIndexOf("/"))
+      : ""
 
   return (
     <div
@@ -118,21 +127,40 @@ function CollapsibleFileHeader({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="min-w-0 text-left hover:underline"
+          className="flex min-w-0 text-left hover:underline"
         >
           <span
             className="truncate text-sm font-medium text-foreground"
-            style={{ direction: "rtl", textAlign: "left" }}
             title={filePath}
           >
             {fileDiff.prevName != null ? (
               <>
-                <span className="opacity-70">{fileDiff.prevName}</span>
+                <span className="opacity-70">{prevFileName}</span>
+                {prevDirPath && (
+                  <span className="font-normal opacity-50">
+                    {" "}
+                    {prevDirPath}
+                  </span>
+                )}
                 <span className="mx-1 opacity-50">→</span>
-                {filePath}
+                {fileName}
+                {dirPath && (
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    {dirPath}
+                  </span>
+                )}
               </>
             ) : (
-              filePath
+              <>
+                {fileName}
+                {dirPath && (
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    {dirPath}
+                  </span>
+                )}
+              </>
             )}
           </span>
         </button>

@@ -1,5 +1,7 @@
 import { fetchApi } from './client';
 
+export type ServerPRState = 'open' | 'merged' | 'closed';
+
 export interface ServerPRInfo {
   number: number;
   title: string;
@@ -8,6 +10,8 @@ export interface ServerPRInfo {
   baseBranch: string;
   headBranch: string;
   repo: string;
+  url: string;
+  state: ServerPRState;
 }
 
 export interface RefreshResponse {

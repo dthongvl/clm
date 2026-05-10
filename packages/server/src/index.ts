@@ -18,6 +18,7 @@ import settingsRoutes from './routes/settings.js';
 import modelsRoutes from './routes/models.js';
 import reviewRoutes from './routes/reviews.js';
 import viewedFilesRoutes from './routes/viewed-files.js';
+import proxyImageRoutes from './routes/proxy-image.js';
 
 initAppContext();
 
@@ -82,6 +83,7 @@ app.route('/api/git/comments', commentRoutes);
 app.route('/api/git/pr-info', prInfoRoutes);
 app.route('/api/git/refresh', refreshRoutes);
 app.route('/api/git/viewed-files', viewedFilesRoutes);
+app.route('/api/proxy-image', proxyImageRoutes);
 
 // API routes — App-level
 app.route('/api/reviews', reviewRoutes);

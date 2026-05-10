@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from "react"
+import { memo, useCallback, useMemo, useState } from "react"
 import {
   MultiFileDiff,
   type DiffLineAnnotation,
@@ -100,15 +100,40 @@ export const FileDiffCard = memo(function FileDiffCard({
     [file.path, file.newContent]
   )
 
+  // Controlled selected lines state so we can clear highlights on cancel/submit
+  const [selectedLines, setSelectedLines] = useState<SelectedLineRange | null>(null)
+
   const handleLineSelectionEnd = useCallback(
     (range: SelectedLineRange | null) => {
       if (range == null) return
+      setSelectedLines(range)
       const derivedSide = range.endSide ?? range.side
       const side: AnnotationSide =
         derivedSide === "deletions" ? "deletions" : "additions"
       onAddDraft(file.path, side, Math.max(range.end, range.start))
     },
     [file.path, onAddDraft]
+  )
+
+  const handleCancelDraft = useCallback(
+    (filePath: string, side: AnnotationSide, lineNumber: number) => {
+      setSelectedLines(null)
+      onCancelDraft(filePath, side, lineNumber)
+    },
+    [onCancelDraft]
+  )
+
+  const handleSubmitDraft = useCallback(
+    async (
+      filePath: string,
+      side: AnnotationSide,
+      lineNumber: number,
+      content: string
+    ) => {
+      setSelectedLines(null)
+      await onSubmitDraft(filePath, side, lineNumber, content)
+    },
+    [onSubmitDraft]
   )
 
   const options = useMemo(() => ({
@@ -157,6 +182,7 @@ export const FileDiffCard = memo(function FileDiffCard({
         options={options}
         metrics={FILE_DIFF_METRICS}
         lineAnnotations={lineAnnotations}
+        selectedLines={selectedLines}
         className="overflow-clip rounded-lg border border-border"
         renderCustomHeader={(fileDiff) => (
           <CollapsibleFileHeader
@@ -174,8 +200,8 @@ export const FileDiffCard = memo(function FileDiffCard({
             annotation={annotation}
             submittingDrafts={submittingDrafts}
             submittingReplies={submittingReplies}
-            onSubmitDraft={onSubmitDraft}
-            onCancelDraft={onCancelDraft}
+            onSubmitDraft={handleSubmitDraft}
+            onCancelDraft={handleCancelDraft}
             onSubmitReply={onSubmitReply}
             onEditDraft={onEditDraft}
             onDeleteDraft={onDeleteDraft}

@@ -77,6 +77,7 @@ function AuthorAvatar({ isAI, avatarUrl, name }: { isAI: boolean; avatarUrl?: st
         data-slot="author-avatar"
         src={avatarUrl}
         alt={`${name}'s avatar`}
+        referrerPolicy="no-referrer"
         className="size-6 shrink-0 rounded-full object-cover"
       />
     )

@@ -38,7 +38,7 @@ function AIReviewSummary({
     >
       <div className="flex gap-2" aria-label="Issue counts by severity">
         {SEVERITY_ORDER.map((severity) => (
-          <SeverityBadge key={severity} severity={severity}>
+          <SeverityBadge key={severity} severity={severity} style="outline">
             {counts[severity]} {severity}
           </SeverityBadge>
         ))}

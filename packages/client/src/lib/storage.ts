@@ -53,6 +53,9 @@ export function removeStorageItem(key: string): void {
 
 export const StorageKeys = {
   SIDE_PANEL_TAB: "side-panel-tab",
+  LEFT_PANEL_TAB: "left-panel-tab",
+  RIGHT_PANEL_TAB: "right-panel-tab",
+  CENTER_PANEL_TAB: "center-panel-tab",
   DIFF_VIEW_MODE: "diff-view-mode",
   LEFT_SIDEBAR_OPEN: "left-sidebar-open",
   RIGHT_SIDEBAR_OPEN: "right-sidebar-open",

@@ -118,14 +118,19 @@ export async function checkGhCli(): Promise<boolean> {
 }
 
 export async function getPRInfo(prNumber: number, repo?: string): Promise<PRInfo> {
-  const args = ['pr', 'view', String(prNumber), '--json', 'number,title,author,body,baseRefName,headRefName'];
+  const args = ['pr', 'view', String(prNumber), '--json', 'number,title,author,body,baseRefName,headRefName,url,state'];
   if (repo) {
     args.push('--repo', repo);
   }
-  
+
   const stdout = await runGh(args);
   const data = JSON.parse(stdout);
-  
+
+  // gh returns state as 'OPEN' | 'MERGED' | 'CLOSED'
+  const rawState = typeof data.state === 'string' ? data.state.toLowerCase() : 'open';
+  const state: PRInfo['state'] =
+    rawState === 'merged' || rawState === 'closed' ? rawState : 'open';
+
   return {
     number: data.number,
     title: data.title,
@@ -134,6 +139,8 @@ export async function getPRInfo(prNumber: number, repo?: string): Promise<PRInfo
     baseBranch: data.baseRefName,
     headBranch: data.headRefName,
     repo: repo || '',
+    url: data.url || '',
+    state,
   };
 }
 
@@ -565,6 +572,13 @@ export async function createPendingReviewComment(
     const classified = classifyGhError(error);
     throw new AppError(classified.code, classified.message, { cause: error });
   }
+}
+
+/**
+ * Get the current GitHub CLI authentication token.
+ */
+export async function getGhAuthToken(): Promise<string> {
+  return (await runGh(['auth', 'token'])).trim();
 }
 
 export interface UpdatedReviewComment {

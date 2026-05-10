@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 
-type TabValue = "grouping" | "ai-review" | "review-guide"
+type TabValue = "description" | "grouping" | "ai-review" | "review-guide"
 
 interface SidePanelProps extends React.ComponentProps<"aside"> {
   defaultTab?: TabValue
@@ -13,7 +13,7 @@ interface SidePanelProps extends React.ComponentProps<"aside"> {
 
 function SidePanel({
   className,
-  defaultTab = "grouping",
+  defaultTab = "description",
   persistTab = true,
   children,
   ...props
@@ -44,6 +44,7 @@ function SidePanel({
     >
       <Tabs value={tab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col">
         <TabsList variant="line">
+          <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>
           <TabsTrigger value="review-guide">Review Guide</TabsTrigger>
@@ -51,6 +52,24 @@ function SidePanel({
         {children}
       </Tabs>
     </aside>
+  )
+}
+
+function SidePanelDescriptionContent({
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
+  return (
+    <TabsContent
+      {...props}
+      value="description"
+      className={cn("min-h-0 flex-1 overflow-hidden", className)}
+    >
+      <ScrollArea className="h-full">
+        <div className="p-4">{children}</div>
+      </ScrollArea>
+    </TabsContent>
   )
 }
 
@@ -110,10 +129,14 @@ function SidePanelReviewGuideContent({
 
 export {
   SidePanel,
+  SidePanelDescriptionContent,
   SidePanelGroupingContent,
   SidePanelAIReviewContent,
   SidePanelReviewGuideContent,
 }
+export { PRDescription } from "./pr-description"
+export { PRHeader } from "./pr-header"
+export { PRDescriptionBody } from "./pr-description-body"
 export { ReviewGuide } from "./review-guide"
 export { SidePanelContainer } from "./side-panel-container"
 export { IntelligentGrouping } from "./intelligent-grouping"

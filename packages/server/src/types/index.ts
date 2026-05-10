@@ -1,3 +1,5 @@
+export type PRState = 'open' | 'merged' | 'closed';
+
 export interface PRInfo {
   number: number;
   title: string;
@@ -6,6 +8,8 @@ export interface PRInfo {
   baseBranch: string;
   headBranch: string;
   repo: string;
+  url: string;
+  state: PRState;
 }
 
 export interface FileDiff {

@@ -25,9 +25,8 @@ export function transformPRInfo(serverPR: ServerPRInfo): PRInfo {
     description: serverPR.description,
     baseBranch: serverPR.baseBranch,
     headBranch: serverPR.headBranch,
-    // Server doesn't provide state, default to 'open' for now
-    // In a real implementation, we'd need to add state to the server API
-    state: 'open' as PRState,
+    state: (serverPR.state ?? 'open') as PRState,
+    url: serverPR.url ?? '',
   };
 }
 
