@@ -40,6 +40,7 @@ function findScrollViewport(container: HTMLElement): HTMLElement | null {
  */
 export function useScrollToTop(containerRef: RefObject<HTMLElement | null>) {
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
 
   useEffect(() => {
     const container = containerRef.current
@@ -50,6 +51,7 @@ export function useScrollToTop(containerRef: RefObject<HTMLElement | null>) {
 
     const handleScroll = () => {
       setShowScrollTop(viewport.scrollTop >= SCROLL_THRESHOLD)
+      setIsScrolled(viewport.scrollTop > 4)
     }
 
     viewport.addEventListener("scroll", handleScroll, { passive: true })
@@ -68,5 +70,5 @@ export function useScrollToTop(containerRef: RefObject<HTMLElement | null>) {
     viewport.scrollTo({ top: 0, behavior: "smooth" })
   }, [containerRef])
 
-  return { showScrollTop, scrollToTop }
+  return { showScrollTop, isScrolled, scrollToTop }
 }

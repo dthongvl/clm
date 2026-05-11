@@ -254,7 +254,7 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
 
   // Ref for scroll-to-top functionality
   const containerRef = useRef<HTMLDivElement>(null)
-  const { showScrollTop, scrollToTop } = useScrollToTop(containerRef)
+  const { showScrollTop, isScrolled, scrollToTop } = useScrollToTop(containerRef)
 
   // File viewed/collapsed state (controlled/uncontrolled)
   const {
@@ -398,12 +398,22 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
         </div>
       </Virtualizer>
 
+      {/* Top edge blur overlay — appears when scrolled */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-background/60 backdrop-blur-md transition-opacity duration-200",
+          "[mask-image:linear-gradient(to_bottom,black,black_40%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black,black_40%,transparent)]",
+          isScrolled ? "opacity-100" : "opacity-0"
+        )}
+      />
+
       {/* Scroll to top button */}
       <Button
         variant="outline"
         size="icon"
         className={cn(
-          "absolute bottom-4 right-4 z-10 shadow-md transition-opacity duration-200",
+          "absolute bottom-6 right-6 z-10 shadow-md transition-opacity duration-200",
           showScrollTop ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={scrollToTop}

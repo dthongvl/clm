@@ -27,7 +27,7 @@ export function LeftPanelContainer() {
         onValueChange={handleTabChange}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <TabsList className="w-full">
+        <TabsList className="mx-2 mt-2 w-[calc(100%-1rem)]">
           <TabsTrigger value="review-guide">
             <HugeiconsIcon icon={Route01Icon} />
             Review Guide
