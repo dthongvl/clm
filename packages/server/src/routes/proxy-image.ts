@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getGhAuthToken } from '../services/gh.js';
+import { getGhAuthToken } from '../services/github/index.js';
 import { logger } from '../lib/logger.js';
 
 const app = new Hono();

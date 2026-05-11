@@ -7,6 +7,8 @@ import { honoLogger } from '@logtape/hono';
 import { logger } from './lib/logger.js';
 import { AppError, createErrorResponse } from './lib/errors.js';
 import { initAppContext, getAppContext } from './lib/app-context.js';
+import { loadGhToken } from './lib/github-auth.js';
+import { initOctokit } from './lib/octokit.js';
 import diffRoutes from './routes/diff.js';
 import commentRoutes from './routes/comments.js';
 import aiReviewRoutes from './routes/ai-review.js';
@@ -21,6 +23,8 @@ import viewedFilesRoutes from './routes/viewed-files.js';
 import proxyImageRoutes from './routes/proxy-image.js';
 
 initAppContext();
+await loadGhToken();
+initOctokit();
 
 // Configure LogTape for structured request logging with ANSI colors
 const ansiFormatter = getAnsiColorFormatter({

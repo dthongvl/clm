@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { safeJson } from '../utils/request.js';
 import { getAppContext } from '../lib/app-context.js';
 import { wrapError } from '../lib/errors.js';
-import { getPRFileViewedStates, setPRFileViewedState } from '../services/gh.js';
+import { getPRFileViewedStates, setPRFileViewedState } from '../services/github/index.js';
 import type { ViewedFileState } from '../types/index.js';
 
 const app = new Hono();

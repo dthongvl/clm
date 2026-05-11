@@ -10,7 +10,7 @@ import {
   updatePendingReviewComment,
   deletePendingReviewComment,
   submitPendingReview,
-} from '../services/gh.js';
+} from '../services/github/index.js';
 import { AppError, wrapError } from '../lib/errors.js';
 import type { SubmitReviewEvent, DraftReviewComment } from '../types/index.js';
 

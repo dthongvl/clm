@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getPRInfo } from '../services/gh.js';
+import { getPRInfo } from '../services/github/index.js';
 import { fetchBranches } from '../services/git.js';
 import { setPRContext } from '../services/pr-context.js';
 import { getAppContext } from '../lib/app-context.js';

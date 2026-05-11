@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getPRInfo, checkGhCli, getCurrentRepo } from '../services/gh.js';
+import { getPRInfo, checkGhCli, getCurrentRepo } from '../services/github/index.js';
 import { getAppContext } from '../lib/app-context.js';
 import { wrapError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';

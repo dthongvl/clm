@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { postComment, getPRComments, replyToComment, deleteComment, editComment } from '../services/gh.js';
+import { postComment, getPRComments, replyToComment, deleteComment, editComment } from '../services/github/index.js';
 import { safeJson, isPositiveInt } from '../utils/request.js';
 import { getAppContext } from '../lib/app-context.js';
 import { wrapError } from '../lib/errors.js';
