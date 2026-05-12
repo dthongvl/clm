@@ -23,13 +23,35 @@ export function ActivityTimeline({
   activities: StreamActivity[]
   isStreaming: boolean
 }) {
-  // Default open while streaming so the user sees what's happening; on
-  // termination we re-mount to a closed default for the next run. We don't sync
-  // open ↔ isStreaming via effect — once the user toggles, their choice wins
-  // until the next run.
+  // Default open while streaming so the user sees what's happening. When the
+  // run terminates we auto-collapse to a single summary line so the trace
+  // doesn't dominate the review canvas — the user can still expand it. Once
+  // the user explicitly toggles the panel, their choice wins until the next
+  // run.
   const [open, setOpen] = useState(isStreaming)
+  const [userToggled, setUserToggled] = useState(false)
+  const wasStreamingRef = useRef(isStreaming)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set())
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-collapse on streaming → done transition (unless user toggled).
+  useEffect(() => {
+    const wasStreaming = wasStreamingRef.current
+    wasStreamingRef.current = isStreaming
+    if (wasStreaming && !isStreaming && !userToggled) {
+      setOpen(false)
+    }
+    // Re-arm auto-collapse on a fresh run.
+    if (!wasStreaming && isStreaming) {
+      setUserToggled(false)
+      setOpen(true)
+    }
+  }, [isStreaming, userToggled])
+
+  const handleOpenChange = (next: boolean) => {
+    setUserToggled(true)
+    setOpen(next)
+  }
 
   useEffect(() => {
     if (!open || !isStreaming || !scrollRef.current) return
@@ -46,15 +68,21 @@ export function ActivityTimeline({
   }
 
   const last = activities[activities.length - 1]
-  const preview = last ? activityPreview(last) : ""
   const stepCount = activities.length
+  const toolCount = activities.filter((a) => a.kind === "tool").length
+  const summary = isStreaming
+    ? last
+      ? activityPreview(last)
+      : "Working…"
+    : `Investigated · ${toolCount} tool call${toolCount === 1 ? "" : "s"} · ${stepCount} step${stepCount === 1 ? "" : "s"}`
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={handleOpenChange}>
       <CollapsibleTrigger
         render={
           <button
             type="button"
+            aria-label={open ? "Hide agent trace" : "Show agent trace"}
             className="group/header flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/50"
           />
         }
@@ -68,8 +96,14 @@ export function ActivityTimeline({
         <span className="shrink-0 rounded-[4px] bg-background px-1.5 py-0.5 text-[10px] font-medium tabular-nums shadow-sm shadow-black/5">
           {stepCount}
         </span>
-        <span className="min-w-0 flex-1 truncate text-left">{preview}</span>
-        {isStreaming && <Spinner className="size-3 shrink-0" />}
+        <span className="min-w-0 flex-1 truncate text-left">{summary}</span>
+        {isStreaming ? (
+          <Spinner className="size-3 shrink-0" />
+        ) : (
+          <span className="shrink-0 text-[10px] uppercase tracking-wide opacity-60">
+            {open ? "Hide" : "Show"}
+          </span>
+        )}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div

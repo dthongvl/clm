@@ -14,19 +14,27 @@ export const ACTION_KEYS: ActionKey[] = ['grouping', 'ai-review', 'review-guide'
 
 const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
 
+const thinkingLevelSchema = z.enum(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+
 const actionSettingsSchema = z.object({
   model: z.string().optional(),
   variant: z.string().optional(),
+  thinkingLevel: thinkingLevelSchema.optional(),
 }).strict();
+
+const themeSchema = z.enum(['light', 'dark', 'system']);
 
 const settingsSchema = z.object({
   grouping: actionSettingsSchema.optional(),
   'ai-review': actionSettingsSchema.optional(),
   'review-guide': actionSettingsSchema.optional(),
+  theme: themeSchema.optional(),
 }).strict();
 
 export type ActionSettings = z.infer<typeof actionSettingsSchema>;
+export type Theme = z.infer<typeof themeSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
+export type ThinkingLevel = z.infer<typeof thinkingLevelSchema>;
 
 let settingsCache: { settings: Settings; expiresAt: number } | null = null;
 const SETTINGS_CACHE_TTL_MS = 30_000;
@@ -87,6 +95,10 @@ export async function updateSettings(partial: Partial<Settings>): Promise<Settin
     }
   }
 
+  if (partial.theme !== undefined) {
+    current.theme = partial.theme;
+  }
+
   await mkdir(CONFIG_DIR, { recursive: true });
   await writeFile(CONFIG_FILE, stringify(current as Record<string, unknown>), 'utf-8');
   settingsCache = null;
@@ -103,4 +115,9 @@ export async function getModelForAction(action: ActionKey): Promise<string> {
 export async function getVariantForAction(action: ActionKey): Promise<string | undefined> {
   const settings = await getSettings();
   return settings[action]?.variant;
+}
+
+export async function getThinkingLevelForAction(action: ActionKey): Promise<ThinkingLevel | undefined> {
+  const settings = await getSettings();
+  return settings[action]?.thinkingLevel;
 }

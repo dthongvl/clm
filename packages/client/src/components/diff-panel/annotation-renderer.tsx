@@ -1,9 +1,13 @@
 import { memo } from "react"
 import type { DiffLineAnnotation, AnnotationSide } from "@pierre/diffs/react"
 import type { ReviewComment } from "@/types/review"
+import type { NotebookJudgmentThread } from "@/types/review-guide"
 import { CommentThread } from "@/components/comment-thread"
 import { CommentForm } from "@/components/comment-thread/comment-form"
-import type { AnnotationMetadata } from "./diff-viewer"
+import type {
+  AnnotationMetadata,
+  NotebookJudgmentThreadOps,
+} from "./diff-viewer"
 
 interface AnnotationRendererProps {
   annotation: DiffLineAnnotation<AnnotationMetadata>
@@ -30,6 +34,24 @@ interface AnnotationRendererProps {
   onConvertAIToDraft?: (itemId: string) => Promise<void>
   /** Set of AI item IDs currently being converted */
   convertingAIItemIds?: Set<string>
+  /** Operations for inline notebook judgment threads (pin/resolve/reply). */
+  notebookJudgmentThreadOps?: NotebookJudgmentThreadOps
+}
+
+const AI_NOTEBOOK_AUTHOR = { type: "ai" as const, name: "Notebook" }
+
+function judgmentThreadToComment(thread: NotebookJudgmentThread): ReviewComment {
+  return {
+    id: thread.id,
+    filePath: thread.filePath,
+    lineNumber: thread.lineNumber,
+    side: thread.side,
+    content: thread.content,
+    author: AI_NOTEBOOK_AUTHOR,
+    createdAt: thread.createdAt,
+    replies: thread.replies,
+    resolved: thread.resolved,
+  }
 }
 
 export const AnnotationRenderer = memo(function AnnotationRenderer({
@@ -46,6 +68,7 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
   isDraftActionLoading,
   onConvertAIToDraft,
   convertingAIItemIds,
+  notebookJudgmentThreadOps,
 }: AnnotationRendererProps) {
   const meta = annotation.metadata
   if (!meta) return null
@@ -109,6 +132,40 @@ export const AnnotationRenderer = memo(function AnnotationRenderer({
             : undefined
         }
         isConvertingToDraft={isConverting}
+      />
+    )
+  }
+
+  if (meta.type === "notebook-judgment-thread") {
+    const thread = meta.thread
+    const ops = notebookJudgmentThreadOps
+    const rootComment = judgmentThreadToComment(thread)
+
+    return (
+      <CommentThread.Inline
+        comment={rootComment}
+        lineNumber={annotation.lineNumber}
+        aiSourceLabel="AI · needs your judgment"
+        onReplySubmit={
+          ops
+            ? async (_commentId, content) => {
+                await ops.reply(thread.id, content)
+              }
+            : undefined
+        }
+        threadLifecycle={
+          ops
+            ? {
+                isPinned: thread.pinned,
+                isResolved: thread.resolved,
+                onPin: () => ops.pin(thread.id),
+                onUnpin: () => ops.unpin(thread.id),
+                onResolve: () => ops.resolve(thread.id),
+                onUnresolve: () => ops.unresolve(thread.id),
+                anchorReason: thread.anchorReason,
+              }
+            : undefined
+        }
       />
     )
   }

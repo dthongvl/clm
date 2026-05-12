@@ -1,7 +1,7 @@
 import type { ChangeGroup, GroupingResult } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { getAiBackend, type StreamEvent } from './ai-backend/index.js';
-import { getModelForAction, getVariantForAction } from './settings.js';
+import { getModelForAction, getVariantForAction, getThinkingLevelForAction, type ThinkingLevel } from './settings.js';
 import { logger } from '../lib/logger.js';
 
 /** Service-layer terminal event carrying the parsed grouping result. */
@@ -34,10 +34,12 @@ export async function* generateGroupingStream(
   let prompt: string;
   let model: string | undefined;
   let variant: string | undefined;
+  let thinkingLevel: ThinkingLevel | undefined;
   try {
     prompt = buildGroupingPrompt(prLink, additionalContext);
     model = await getModelForAction('grouping');
     variant = await getVariantForAction('grouping');
+    thinkingLevel = await getThinkingLevelForAction('grouping');
   } catch (error) {
     logger.error('Grouping setup failed', error);
     yield {
@@ -49,7 +51,7 @@ export async function* generateGroupingStream(
 
   let buffer = '';
   try {
-    for await (const event of getAiBackend().promptStream(prompt, { model, variant })) {
+    for await (const event of getAiBackend().promptStream(prompt, { model, variant, thinkingLevel })) {
       if (event.type === 'text' && typeof event.content === 'string') {
         buffer += event.content;
         yield event;

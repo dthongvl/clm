@@ -15,10 +15,24 @@ import { useScrollToTop } from "@/hooks"
 import type { ReviewComment, AIReviewItem } from "@/types/review"
 import { useTheme } from "@/components/theme-provider"
 import type { DiffFileData } from "@/types/diff"
+import type { NotebookJudgmentThread } from "@/types/review-guide"
 import { FileDiffCard } from "./file-diff-card"
 import { FileSourceDialog } from "./file-source-dialog"
 import { useDraftAnnotations, type DraftAnnotation } from "./use-draft-annotations"
 import { useFileViewState } from "./use-file-view-state"
+
+/**
+ * Operations exposed to inline notebook judgment-thread renderers. Provided
+ * by the parent (Notebook root or DiffPanelViewerContainer) so the same
+ * thread can be mutated regardless of which surface rendered it.
+ */
+export interface NotebookJudgmentThreadOps {
+  pin: (threadId: string) => void
+  unpin: (threadId: string) => void
+  resolve: (threadId: string) => void
+  unresolve: (threadId: string) => void
+  reply: (threadId: string, content: string) => Promise<void>
+}
 
 export type { DiffFileData } from "@/types/diff"
 
@@ -89,6 +103,14 @@ export type DiffViewerProps = React.ComponentProps<"div"> & {
   convertingAIItemIds?: Set<string>
   /** Set of file paths currently syncing viewed state with server */
   syncingViewedFiles?: Set<string>
+  /**
+   * Notebook judgment threads to render inline alongside comments/drafts via
+   * the shared annotation chrome. When provided, `notebookJudgmentThreadOps`
+   * MUST also be provided so pin/resolve/reply work.
+   */
+  notebookJudgmentThreads?: NotebookJudgmentThread[]
+  /** Operation handlers for notebook judgment threads. */
+  notebookJudgmentThreadOps?: NotebookJudgmentThreadOps
 }
 
 /**
@@ -111,11 +133,12 @@ const subscribeSystemTheme = (cb: () => void) => {
 }
 const getSystemThemeSnapshot = (): "dark" | "light" => getMediaQuery()?.matches ? "dark" : "light"
 
-/** Metadata for annotations - can be a comment, draft form, or AI review item */
+/** Metadata for annotations - can be a comment, draft form, AI review item, or notebook judgment thread */
 export type AnnotationMetadata =
   | { type: "comment"; comment: ReviewComment }
   | { type: "draft"; draft: DraftAnnotation }
   | { type: "ai-review"; item: AIReviewItem }
+  | { type: "notebook-judgment-thread"; thread: NotebookJudgmentThread }
 
 /**
  * Pre-indexes annotations, drafts, and AI review items by file path.
@@ -125,6 +148,7 @@ function useAnnotationIndex(
   comments: ReviewComment[],
   drafts: DraftAnnotation[],
   aiReviewItems: AIReviewItem[],
+  judgmentThreads: NotebookJudgmentThread[],
 ) {
   return useMemo(() => {
     const commentsByFile = new Map<string, DiffLineAnnotation<AnnotationMetadata>[]>()
@@ -162,11 +186,25 @@ function useAnnotationIndex(
       aiByFile.set(normalizedPath, arr)
     }
 
+    // Notebook judgment threads use normalized paths so they merge with AI review items
+    const threadsByFile = new Map<string, DiffLineAnnotation<AnnotationMetadata>[]>()
+    for (const thread of judgmentThreads) {
+      const normalizedPath = thread.filePath.replace(/^\/+/, "")
+      const arr = threadsByFile.get(normalizedPath) ?? []
+      arr.push({
+        side: thread.side,
+        lineNumber: thread.lineNumber,
+        metadata: { type: "notebook-judgment-thread" as const, thread },
+      })
+      threadsByFile.set(normalizedPath, arr)
+    }
+
     const result = new Map<string, DiffLineAnnotation<AnnotationMetadata>[]>()
     const allPaths = new Set([
       ...commentsByFile.keys(),
       ...draftsByFile.keys(),
       ...aiByFile.keys(),
+      ...threadsByFile.keys(),
     ])
     for (const path of allPaths) {
       const normalizedPath = path.replace(/^\/+/, "")
@@ -174,6 +212,7 @@ function useAnnotationIndex(
         ...(commentsByFile.get(path) ?? []),
         ...(draftsByFile.get(path) ?? []),
         ...(aiByFile.get(normalizedPath) ?? []),
+        ...(threadsByFile.get(normalizedPath) ?? []),
       ]
       if (combined.length > 0) {
         result.set(path, combined)
@@ -181,7 +220,7 @@ function useAnnotationIndex(
     }
 
     return result
-  }, [comments, drafts, aiReviewItems])
+  }, [comments, drafts, aiReviewItems, judgmentThreads])
 }
 
 /**
@@ -243,6 +282,8 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
   onConvertAIToDraft,
   convertingAIItemIds,
   syncingViewedFiles,
+  notebookJudgmentThreads = [],
+  notebookJudgmentThreadOps,
   ...props
 }, ref) {
   // Get current theme from theme provider
@@ -283,7 +324,12 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
     new Set()
   )
 
-  const getAnnotationsForFile = useAnnotationIndex(annotations, draftAnnotations, aiReviewItems)
+  const getAnnotationsForFile = useAnnotationIndex(
+    annotations,
+    draftAnnotations,
+    aiReviewItems,
+    notebookJudgmentThreads,
+  )
 
   // Expose imperative methods via ref
   useImperativeHandle(ref, () => ({
@@ -388,6 +434,7 @@ const DiffViewer = forwardRef<DiffViewerRef, DiffViewerProps>(function DiffViewe
               onConvertAIToDraft={onConvertAIToDraft}
               convertingAIItemIds={convertingAIItemIds}
               onViewHeadFile={handleViewHeadFile}
+              notebookJudgmentThreadOps={notebookJudgmentThreadOps}
             />
           ))}
         </div>

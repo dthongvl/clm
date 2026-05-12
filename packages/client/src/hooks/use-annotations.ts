@@ -3,8 +3,11 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { useComments } from './use-comments'
 import { useDraftComments } from './use-draft-comments'
+import { useReviewGuideState } from './use-review-guide'
 import { replyToComment, deleteCommentById, editCommentById } from '@/api/comments'
 import type { ReviewComment, AIReviewItem } from '@/types/review'
+import type { NotebookJudgmentThread } from '@/types/review-guide'
+import type { NotebookJudgmentThreadOps } from '@/components/diff-panel/diff-viewer'
 
 interface UseAnnotationsOptions {
   /** Full list of AI review items (unfiltered). Only needed for AI conversion. */
@@ -17,6 +20,12 @@ interface UseAnnotationsReturn {
 
   /** AI review items filtered to exclude converted ones */
   visibleAIReviewItems: AIReviewItem[]
+
+  /** Notebook judgment threads from the `['review-guide']` cache. */
+  notebookJudgmentThreads: NotebookJudgmentThread[]
+
+  /** Notebook thread operations (pin/resolve/reply). */
+  notebookJudgmentThreadOps: NotebookJudgmentThreadOps
 
   /** Draft count for the submit button */
   draftCount: number
@@ -49,12 +58,15 @@ interface UseAnnotationsReturn {
 }
 
 /**
- * Unified annotation module — composes comments, draft comments, and
- * AI-to-draft conversion behind a single interface.
+ * Unified annotation module — composes comments, draft comments,
+ * AI-to-draft conversion, and notebook judgment threads behind a single
+ * interface. Both File Changes and Notebook diff cells consume this hook so
+ * line-anchored state stays consistent across surfaces.
  *
  * What sits behind the seam:
  * - Merging human comments with draft comments into one annotation list
  * - AI item conversion state machine (loading → converted tracking)
+ * - Notebook judgment-thread cache reads + lifecycle operations
  * - Toast notifications for all operations
  * - TanStack Query cache invalidation
  */
@@ -72,6 +84,7 @@ export function useAnnotations({ aiReviewItems = [] }: UseAnnotationsOptions = {
     submitDraftReview,
     draftCount,
   } = useDraftComments()
+  const notebook = useReviewGuideState()
 
   // --- Local state ---
   const [isActionLoading, setIsActionLoading] = useState(false)
@@ -215,9 +228,43 @@ export function useAnnotations({ aiReviewItems = [] }: UseAnnotationsOptions = {
     [submitDraftReview, queryClient],
   )
 
+  // --- Notebook judgment thread operations ---
+  const notebookJudgmentThreadOps = useMemo<NotebookJudgmentThreadOps>(
+    () => ({
+      pin: notebook.pinThread,
+      unpin: notebook.unpinThread,
+      resolve: notebook.resolveThread,
+      unresolve: notebook.unresolveThread,
+      reply: async (threadId, content) => {
+        const reply: ReviewComment = {
+          id: `${threadId}-reply-${Date.now()}`,
+          filePath: '',
+          lineNumber: 0,
+          side: 'additions',
+          content,
+          author: { type: 'human', name: 'You' },
+          createdAt: new Date(),
+          replies: [],
+        }
+        // Re-anchor reply to the host thread's file/line so any future
+        // surfacing of this reply outside the parent thread keeps anchor data.
+        const host = notebook.threads.find((t) => t.id === threadId)
+        if (host) {
+          reply.filePath = host.filePath
+          reply.lineNumber = host.lineNumber
+          reply.side = host.side
+        }
+        notebook.replyToThread(threadId, reply)
+      },
+    }),
+    [notebook],
+  )
+
   return {
     annotations,
     visibleAIReviewItems,
+    notebookJudgmentThreads: notebook.threads,
+    notebookJudgmentThreadOps,
     draftCount,
     isActionLoading,
     convertingAIItemIds,

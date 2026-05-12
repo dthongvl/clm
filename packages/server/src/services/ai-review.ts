@@ -1,7 +1,7 @@
 import type { AIReviewItem, AIReviewPRResult, AIReviewCategory } from '../types/index.js';
 import { extractJsonBlock, parseJsonSafe } from '../utils/json-extract.js';
 import { getAiBackend, type StreamEvent } from './ai-backend/index.js';
-import { getModelForAction, getVariantForAction } from './settings.js';
+import { getModelForAction, getVariantForAction, getThinkingLevelForAction, type ThinkingLevel } from './settings.js';
 import { logger } from '../lib/logger.js';
 import { buildReviewPrompt } from './ai-review-prompt.js';
 
@@ -42,10 +42,12 @@ export async function* generatePRReviewStream(
   let prompt: string;
   let model: string | undefined;
   let variant: string | undefined;
+  let thinkingLevel: ThinkingLevel | undefined;
   try {
     prompt = buildReviewPrompt({ prLink, additionalContext });
     model = await getModelForAction('ai-review');
     variant = await getVariantForAction('ai-review');
+    thinkingLevel = await getThinkingLevelForAction('ai-review');
   } catch (error) {
     logger.error('AI review setup failed', error);
     yield {
@@ -57,7 +59,7 @@ export async function* generatePRReviewStream(
 
   let buffer = '';
   try {
-    for await (const event of getAiBackend().promptStream(prompt, { model, variant })) {
+    for await (const event of getAiBackend().promptStream(prompt, { model, variant, thinkingLevel })) {
       if (event.type === 'text' && typeof event.content === 'string') {
         buffer += event.content;
         yield event;

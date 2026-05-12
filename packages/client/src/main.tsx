@@ -13,7 +13,7 @@ import { DiffsWorkerPoolProvider } from './lib/diffs-worker-pool'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="clm-ui-theme">
+      <ThemeProvider defaultTheme="system" cacheKey="clm-ui-theme">
         <DiffsWorkerPoolProvider>
           <PRContextProvider>
             <TooltipProvider>

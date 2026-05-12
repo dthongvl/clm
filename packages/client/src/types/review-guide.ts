@@ -1,32 +1,83 @@
 import type { CommentSide, ReviewComment } from './review';
+import type { ServerNotebookNoteSeverity } from '@/api/ai';
 
-export interface ReviewGuideStep {
+export type NoteSeverity = ServerNotebookNoteSeverity;
+
+/** Outline-level chapter description (no cells). */
+export interface NotebookChapter {
   id: string;
   title: string;
-  fileGroup: string[];
-  rationale: string;
-  lookFor: string;
+  intent: string;
 }
 
-/** Guide content as produced by the AI (without thread lifecycle state). */
-export interface ReviewGuide {
-  overview: string;
-  steps: ReviewGuideStep[];
+export interface NotebookMarkdownCell {
+  type: 'markdown';
+  id: string;
+  content: string;
+}
+
+export interface NotebookDiffHighlight {
+  side: CommentSide;
+  startLine: number;
+  endLine: number;
+  note?: string;
+}
+
+export interface NotebookDiffCell {
+  type: 'diff';
+  id: string;
+  filePath: string;
+  caption?: string;
+  highlights: NotebookDiffHighlight[];
+}
+
+export interface NotebookNoteCell {
+  type: 'note';
+  id: string;
+  severity: NoteSeverity;
+  content: string;
+}
+
+export interface NotebookChecklistItem {
+  id: string;
+  text: string;
+}
+
+export interface NotebookChecklistCell {
+  type: 'checklist';
+  id: string;
+  items: NotebookChecklistItem[];
+}
+
+export type NotebookCell =
+  | NotebookMarkdownCell
+  | NotebookDiffCell
+  | NotebookNoteCell
+  | NotebookChecklistCell;
+
+/** Lifecycle status for one chapter's content generation. */
+export type ChapterStatus = 'pending' | 'generating' | 'complete' | 'partial' | 'error';
+
+export interface NotebookChapterState {
+  chapter: NotebookChapter;
+  status: ChapterStatus;
+  cells: NotebookCell[];
+  error?: string;
 }
 
 /**
- * Client-side AI judgment thread. Distinct from `ReviewComment` because it
- * carries AI-specific lifecycle (pinning across regeneration, anchorReason,
- * provenance source). Replies reuse `ReviewComment` so the existing inline
- * thread UI renders them unchanged.
+ * Client-side AI judgment thread. Mirrors the server thread plus client-only
+ * lifecycle fields (pin/resolve/replies/createdAt). Anchored inline within a
+ * diff cell via the shared annotation chrome (rendered through the diff
+ * renderer, not as a standalone notebook cell).
  */
-export interface JudgmentThread {
+export interface NotebookJudgmentThread {
   id: string;
+  chapterId: string;
   filePath: string;
-  lineNumber: number;
   side: CommentSide;
+  lineNumber: number;
   content: string;
-  /** AI's stated reason it could not decide without team or product context. */
   anchorReason: string;
   source: 'ai-judgment';
   pinned: boolean;
@@ -35,12 +86,31 @@ export interface JudgmentThread {
   createdAt: Date;
 }
 
+/**
+ * Orphan archive entry — a preserved thread whose anchor (file/line/side) is
+ * no longer present after regeneration. Archive entries never affect
+ * completion in v1.
+ */
+export interface NotebookOrphanThread {
+  thread: NotebookJudgmentThread;
+  /** The chapterId the orphan was last attached to. */
+  originChapterId: string;
+  archivedAt: Date;
+}
+
+/** Per-cell/per-item completion state (client-local). */
+export interface NotebookCompletionState {
+  /** Explicitly-acknowledged note cells (attention/security/performance/risk). */
+  acknowledgedNoteIds: string[];
+  /** Explicitly-ticked checklist items, keyed by cellId+itemId composite. */
+  checkedChecklistItemIds: string[];
+}
+
 /** Cache value at TanStack Query key `['review-guide']`. */
-export interface ReviewGuideState {
-  guide: ReviewGuide | null;
-  /** Stable order; serialize-friendly. */
-  reviewedStepIds: string[];
-  currentStepId: string | null;
-  /** Includes pinned + replies. */
-  threads: JudgmentThread[];
+export interface NotebookState {
+  overview: string;
+  chapters: NotebookChapterState[];
+  threads: NotebookJudgmentThread[];
+  orphans: NotebookOrphanThread[];
+  completion: NotebookCompletionState;
 }

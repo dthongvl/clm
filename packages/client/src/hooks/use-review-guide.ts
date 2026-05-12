@@ -1,57 +1,76 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   streamAiReviewGuide,
+  streamAiNotebookChapter,
+  type ChapterRegenerationRequestBody,
+  type NotebookChapterErrorEvent,
+  type NotebookChapterEvent,
+  type NotebookOutlineEvent,
   type ReviewGuideStreamEvent,
   type StreamStatusPhase,
 } from '@/api/ai';
-import { transformReviewGuide } from '@/lib/transforms';
-import type { JudgmentThread, ReviewGuideState } from '@/types/review-guide';
+import {
+  transformNotebookCells,
+  transformNotebookJudgmentThreads,
+  transformNotebookOutline,
+} from '@/lib/transforms';
+import type {
+  ChapterStatus,
+  NotebookChapter,
+  NotebookChapterState,
+  NotebookCompletionState,
+  NotebookJudgmentThread,
+  NotebookOrphanThread,
+  NotebookState,
+} from '@/types/review-guide';
 import type { ReviewComment } from '@/types/review';
-import { useDiffPanelContext } from '@/components/diff-panel/diff-panel-context';
 
 export const REVIEW_GUIDE_QUERY_KEY = ['review-guide'] as const;
 
-const EMPTY_STATE: ReviewGuideState = {
-  guide: null,
-  reviewedStepIds: [],
-  currentStepId: null,
-  threads: [],
+const EMPTY_COMPLETION: NotebookCompletionState = {
+  acknowledgedNoteIds: [],
+  checkedChecklistItemIds: [],
 };
 
-/**
- * Cache reader for the review guide. Subscribers re-render whenever the
- * streaming hook or a mutator writes to `['review-guide']`.
- */
-function useReviewGuideCache(): ReviewGuideState {
-  const queryClient = useQueryClient();
-  const { data } = useQuery({
-    queryKey: REVIEW_GUIDE_QUERY_KEY,
-    queryFn: () =>
-      queryClient.getQueryData<ReviewGuideState>(REVIEW_GUIDE_QUERY_KEY) ?? EMPTY_STATE,
-    staleTime: Infinity,
-  });
-  return data ?? EMPTY_STATE;
+const EMPTY_STATE: NotebookState = {
+  overview: '',
+  chapters: [],
+  threads: [],
+  orphans: [],
+  completion: EMPTY_COMPLETION,
+};
+
+// --- Cache helpers --------------------------------------------------------
+
+function readState(queryClient: QueryClient): NotebookState {
+  return (
+    queryClient.getQueryData<NotebookState>(REVIEW_GUIDE_QUERY_KEY) ?? EMPTY_STATE
+  );
 }
 
-function readState(queryClient: QueryClient): ReviewGuideState {
-  return queryClient.getQueryData<ReviewGuideState>(REVIEW_GUIDE_QUERY_KEY) ?? EMPTY_STATE;
-}
-
-function writeState(queryClient: QueryClient, next: ReviewGuideState): void {
+function writeState(queryClient: QueryClient, next: NotebookState): void {
   queryClient.setQueryData(REVIEW_GUIDE_QUERY_KEY, next);
 }
 
 function updateState(
   queryClient: QueryClient,
-  updater: (prev: ReviewGuideState) => ReviewGuideState,
+  updater: (prev: NotebookState) => NotebookState,
 ): void {
   writeState(queryClient, updater(readState(queryClient)));
 }
 
-// Streaming activity helpers — kept independent of `use-ai-review` to avoid
-// pulling shared internals across hook boundaries; behavior matches the
-// mirrored hooks there.
+function useNotebookCache(): NotebookState {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: REVIEW_GUIDE_QUERY_KEY,
+    queryFn: () => readState(queryClient),
+    staleTime: Infinity,
+  });
+  return data ?? EMPTY_STATE;
+}
+
+// --- Stream activity types & helpers --------------------------------------
 
 interface StreamToolCall {
   callId: string;
@@ -74,7 +93,7 @@ type StreamActivity =
 
 type StreamingStatus = 'idle' | 'streaming' | 'done' | 'error' | 'cancelled';
 
-interface StreamingReviewGuideState {
+interface StreamingNotebookState {
   status: StreamingStatus;
   phase: StreamStatusPhase | null;
   thinking: string;
@@ -84,7 +103,7 @@ interface StreamingReviewGuideState {
   error: string | null;
 }
 
-const INITIAL_STREAMING_STATE: StreamingReviewGuideState = {
+const INITIAL_STREAMING_STATE: StreamingNotebookState = {
   status: 'idle',
   phase: null,
   thinking: '',
@@ -113,10 +132,10 @@ function applyToolResult(
   prev: StreamToolCall[],
   event: { callId: string; ok: boolean; preview?: string },
 ): StreamToolCall[] {
-  return prev.map((call) =>
-    call.callId === event.callId
-      ? { ...call, status: event.ok ? 'ok' : 'failed', preview: event.preview }
-      : call,
+  return prev.map((c) =>
+    c.callId === event.callId
+      ? { ...c, status: event.ok ? 'ok' : 'failed', preview: event.preview }
+      : c,
   );
 }
 
@@ -177,15 +196,182 @@ function applyToolResultActivity(
   );
 }
 
+// --- Notebook cache reducers ----------------------------------------------
+
 /**
- * SSE-driven Review Guide hook. Mirror of `useStreamingGrouping` from
- * `use-ai-review`. On `result`, writes a fresh `ReviewGuideState` into
- * `['review-guide']` and preserves any threads currently marked `pinned` in
- * the prior cache value (regeneration semantics — origin R15/R18).
+ * Apply a `notebook_outline` event: create chapter shells in `pending` state,
+ * or replace existing shells while preserving lifecycle/completion state for
+ * chapter ids that survive (full regeneration scope).
+ */
+function applyOutlineEvent(
+  queryClient: QueryClient,
+  event: NotebookOutlineEvent,
+  scope: 'full' | 'partial',
+): void {
+  updateState(queryClient, (prev) => {
+    const newOutline: NotebookChapter[] = transformNotebookOutline(event.outline);
+
+    if (scope === 'full') {
+      // Full notebook generation — clear chapters/cells/completion.
+      // Preserve pinned threads (per regeneration policy) — they will either
+      // be re-anchored when their chapter content arrives or archived to the
+      // orphan list during applyChapterEvent reconciliation.
+      const chapters: NotebookChapterState[] = newOutline.map((chapter) => ({
+        chapter,
+        status: 'generating',
+        cells: [],
+      }));
+      const preservedPinned = prev.threads.filter((t) => t.pinned);
+      return {
+        ...prev,
+        overview: event.overview,
+        chapters,
+        completion: EMPTY_COMPLETION,
+        threads: preservedPinned,
+      };
+    }
+
+    // Partial: outline event came mid-stream after some chapters existed —
+    // merge by chapter id, preserving any chapter we already have content for.
+    const previousById = new Map(prev.chapters.map((c) => [c.chapter.id, c]));
+    const chapters: NotebookChapterState[] = newOutline.map((chapter) => {
+      const existing = previousById.get(chapter.id);
+      if (existing) return { ...existing, chapter };
+      return { chapter, status: 'generating', cells: [] };
+    });
+    return { ...prev, overview: event.overview, chapters };
+  });
+}
+
+/**
+ * Apply a `notebook_chapter` event: fill in the cells for the matching
+ * chapter shell, mark it `complete`, and reconcile its judgment threads.
+ *
+ * Reconciliation rules per the plan's regeneration policy:
+ *   - Threads with a prior id that match an incoming thread keep client-only
+ *     state (pinned/resolved/replies).
+ *   - Threads pinned in the prior cache that survive by anchor (filePath +
+ *     side + lineNumber) are kept inline.
+ *   - Threads pinned in the prior cache whose anchor no longer matches any
+ *     incoming thread are moved to the flat orphan archive with their
+ *     originating chapterId and an archivedAt timestamp.
+ *   - Unpinned threads from the prior cache for this chapter are discarded.
+ */
+function applyChapterEvent(queryClient: QueryClient, event: NotebookChapterEvent): void {
+  const cells = transformNotebookCells(event.cells);
+  const incoming = transformNotebookJudgmentThreads(event.judgmentThreads);
+  const now = new Date();
+
+  updateState(queryClient, (prev) => {
+    const chapterIndex = prev.chapters.findIndex(
+      (c) => c.chapter.id === event.chapterId,
+    );
+    let chapters: NotebookChapterState[];
+    if (chapterIndex === -1) {
+      // Chapter not in outline — create a placeholder and append.
+      chapters = [
+        ...prev.chapters,
+        {
+          chapter: { id: event.chapterId, title: 'Unlinked chapter', intent: '' },
+          status: 'partial',
+          cells,
+        },
+      ];
+    } else {
+      chapters = prev.chapters.slice();
+      const existing = chapters[chapterIndex]!;
+      chapters[chapterIndex] = {
+        ...existing,
+        status: 'complete',
+        cells,
+        error: undefined,
+      };
+    }
+
+    // Partition prior threads into "scoped to this chapter" and "other".
+    const otherThreads: NotebookJudgmentThread[] = [];
+    const priorChapterThreads: NotebookJudgmentThread[] = [];
+    for (const thread of prev.threads) {
+      if (thread.chapterId === event.chapterId) priorChapterThreads.push(thread);
+      else otherThreads.push(thread);
+    }
+
+    // Reconcile prior chapter threads with incoming threads:
+    //   match by id first; fall back to anchor (filePath/side/lineNumber).
+    const incomingById = new Map(incoming.map((t) => [t.id, t]));
+    const incomingAnchorKey = (t: NotebookJudgmentThread) =>
+      `${t.filePath}::${t.side}::${t.lineNumber}`;
+    const incomingByAnchor = new Map(
+      incoming.map((t) => [incomingAnchorKey(t), t]),
+    );
+
+    const reconciledChapter: NotebookJudgmentThread[] = [];
+    const consumedIncoming = new Set<string>();
+    const newlyArchived: NotebookOrphanThread[] = [];
+
+    for (const prior of priorChapterThreads) {
+      const byId = incomingById.get(prior.id);
+      const byAnchor = incomingByAnchor.get(incomingAnchorKey(prior));
+      const match = byId ?? byAnchor;
+
+      if (match) {
+        consumedIncoming.add(match.id);
+        reconciledChapter.push({
+          ...match,
+          pinned: prior.pinned,
+          resolved: prior.resolved,
+          replies: prior.replies,
+          createdAt: prior.createdAt,
+        });
+        continue;
+      }
+
+      // No match — discard unpinned threads, archive pinned ones.
+      if (prior.pinned) {
+        newlyArchived.push({
+          thread: prior,
+          originChapterId: event.chapterId,
+          archivedAt: now,
+        });
+      }
+    }
+
+    for (const fresh of incoming) {
+      if (consumedIncoming.has(fresh.id)) continue;
+      reconciledChapter.push(fresh);
+    }
+
+    const threads = [...otherThreads, ...reconciledChapter];
+    const orphans = [...prev.orphans, ...newlyArchived];
+
+    return { ...prev, chapters, threads, orphans };
+  });
+}
+
+function applyChapterErrorEvent(
+  queryClient: QueryClient,
+  event: NotebookChapterErrorEvent,
+): void {
+  updateState(queryClient, (prev) => {
+    const chapters = prev.chapters.map((c) =>
+      c.chapter.id === event.chapterId
+        ? ({ ...c, status: 'error' as ChapterStatus, error: event.error })
+        : c,
+    );
+    return { ...prev, chapters };
+  });
+}
+
+// --- Streaming hook -------------------------------------------------------
+
+/**
+ * SSE-driven Notebook hook. Drives the full-notebook generation stream and a
+ * scoped per-chapter regeneration stream. Both write into the same
+ * `['review-guide']` cache, scoped via the `scope` flag of `start*`.
  */
 export function useStreamingReviewGuide() {
   const queryClient = useQueryClient();
-  const [state, setState] = useState<StreamingReviewGuideState>(INITIAL_STREAMING_STATE);
+  const [state, setState] = useState<StreamingNotebookState>(INITIAL_STREAMING_STATE);
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(
@@ -219,7 +405,7 @@ export function useStreamingReviewGuide() {
         );
         for await (const event of stream) {
           if (controller.signal.aborted) return false;
-          setState((prev) => reduceReviewGuideEvent(prev, event, queryClient));
+          setState((prev) => reduceStreamEvent(prev, event, queryClient, 'full'));
           if (event.type === 'done' || event.type === 'error') {
             controllerRef.current = null;
             return event.type === 'done';
@@ -238,6 +424,52 @@ export function useStreamingReviewGuide() {
     [queryClient],
   );
 
+  const startChapter = useCallback(
+    async (body: ChapterRegenerationRequestBody): Promise<boolean> => {
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      setState({ ...INITIAL_STREAMING_STATE, status: 'streaming' });
+
+      // Mark the target chapter as generating before the stream begins so the
+      // UI can show per-chapter progress.
+      updateState(queryClient, (prev) => ({
+        ...prev,
+        chapters: prev.chapters.map((c) =>
+          c.chapter.id === body.chapterId
+            ? { ...c, status: 'generating', error: undefined }
+            : c,
+        ),
+      }));
+
+      try {
+        const stream = streamAiNotebookChapter(body, { signal: controller.signal });
+        for await (const event of stream) {
+          if (controller.signal.aborted) return false;
+          setState((prev) => reduceStreamEvent(prev, event, queryClient, 'partial'));
+          if (event.type === 'done' || event.type === 'error') {
+            controllerRef.current = null;
+            return event.type === 'done';
+          }
+        }
+        controllerRef.current = null;
+        return true;
+      } catch (error) {
+        if (controller.signal.aborted) return false;
+        const message = error instanceof Error ? error.message : String(error);
+        setState((prev) => ({ ...prev, status: 'error', error: message }));
+        applyChapterErrorEvent(queryClient, {
+          type: 'notebook_chapter_error',
+          chapterId: body.chapterId,
+          error: message,
+        });
+        controllerRef.current = null;
+        return false;
+      }
+    },
+    [queryClient],
+  );
+
   return {
     status: state.status,
     phase: state.phase,
@@ -247,15 +479,17 @@ export function useStreamingReviewGuide() {
     activities: state.activities,
     error: state.error,
     start,
+    startChapter,
     cancel,
   };
 }
 
-function reduceReviewGuideEvent(
-  prev: StreamingReviewGuideState,
+function reduceStreamEvent(
+  prev: StreamingNotebookState,
   event: ReviewGuideStreamEvent,
   queryClient: QueryClient,
-): StreamingReviewGuideState {
+  scope: 'full' | 'partial',
+): StreamingNotebookState {
   switch (event.type) {
     case 'status':
       return { ...prev, phase: event.phase };
@@ -279,26 +513,54 @@ function reduceReviewGuideEvent(
         toolCalls: applyToolResult(prev.toolCalls, event),
         activities: applyToolResultActivity(prev.activities, event),
       };
-    case 'result': {
-      const { guide, threads: newThreads } = transformReviewGuide(event.result);
-      const previousState = readState(queryClient);
-      const preservedPinned = previousState.threads.filter((t) => t.pinned);
-      const preservedIds = new Set(preservedPinned.map((t) => t.id));
-      // Newly emitted threads with an id colliding with a preserved pinned
-      // thread are dropped — the pinned version wins.
-      const dedupedNew = newThreads.filter((t) => !preservedIds.has(t.id));
-      const next: ReviewGuideState = {
-        guide,
-        reviewedStepIds: [],
-        currentStepId: guide.steps[0]?.id ?? null,
-        threads: [...preservedPinned, ...dedupedNew],
-      };
-      writeState(queryClient, next);
+    case 'notebook_outline':
+      applyOutlineEvent(queryClient, event, scope);
       return prev;
-    }
+    case 'notebook_chapter':
+      applyChapterEvent(queryClient, event);
+      return prev;
+    case 'notebook_chapter_error':
+      applyChapterErrorEvent(queryClient, event);
+      return prev;
     case 'done':
+      // After the terminal `done`, mark any chapter still in `generating`
+      // state as `partial` (incomplete data). This satisfies "terminal stream
+      // error after one complete chapter retains that chapter and marks
+      // later chapters partial". Also archive any pinned thread whose
+      // chapterId is no longer in the outline (full-regeneration orphan path).
+      updateState(queryClient, (state) => {
+        const validChapterIds = new Set(state.chapters.map((c) => c.chapter.id));
+        const survivingThreads: NotebookJudgmentThread[] = [];
+        const newOrphans: NotebookOrphanThread[] = [];
+        const archivedAt = new Date();
+        for (const thread of state.threads) {
+          if (validChapterIds.has(thread.chapterId)) {
+            survivingThreads.push(thread);
+          } else if (thread.pinned) {
+            newOrphans.push({
+              thread,
+              originChapterId: thread.chapterId,
+              archivedAt,
+            });
+          }
+        }
+        return {
+          ...state,
+          chapters: state.chapters.map((c) =>
+            c.status === 'generating' ? { ...c, status: 'partial' } : c,
+          ),
+          threads: survivingThreads,
+          orphans: [...state.orphans, ...newOrphans],
+        };
+      });
       return { ...prev, status: 'done', activities: closeRunningThinking(prev.activities) };
     case 'error':
+      updateState(queryClient, (state) => ({
+        ...state,
+        chapters: state.chapters.map((c) =>
+          c.status === 'generating' ? { ...c, status: 'partial' } : c,
+        ),
+      }));
       return {
         ...prev,
         status: 'error',
@@ -312,70 +574,114 @@ function reduceReviewGuideEvent(
   }
 }
 
+// --- Mutator hook ---------------------------------------------------------
+
 export interface RegenerationPreview {
   unresolvedDiscardedCount: number;
-  pinnedPreservedThreads: JudgmentThread[];
+  pinnedPreservedThreads: NotebookJudgmentThread[];
+}
+
+export interface NotebookCompletionDerived {
+  isNoteAcknowledged: (cellId: string) => boolean;
+  isChecklistItemChecked: (key: string) => boolean;
 }
 
 export interface UseReviewGuideStateValue {
-  state: ReviewGuideState;
-  guide: ReviewGuideState['guide'];
-  reviewedStepIds: string[];
-  currentStepId: string | null;
-  threads: JudgmentThread[];
-  markStepReviewed: (stepId: string) => void;
-  unmarkStepReviewed: (stepId: string) => void;
-  setCurrentStep: (stepId: string) => void;
+  state: NotebookState;
+  overview: string;
+  chapters: NotebookChapterState[];
+  threads: NotebookJudgmentThread[];
+  orphans: NotebookOrphanThread[];
+  completion: NotebookCompletionState;
+  derived: NotebookCompletionDerived;
+
+  // Cell completion mutators
+  acknowledgeNote: (cellId: string) => void;
+  unacknowledgeNote: (cellId: string) => void;
+  toggleChecklistItem: (cellId: string, itemId: string) => void;
+
+  // Thread lifecycle mutators
   pinThread: (threadId: string) => void;
   unpinThread: (threadId: string) => void;
   resolveThread: (threadId: string) => void;
   unresolveThread: (threadId: string) => void;
   replyToThread: (threadId: string, reply: ReviewComment) => void;
-  prepareRegeneration: () => RegenerationPreview;
+
+  // Regeneration preparation
+  prepareFullRegeneration: () => RegenerationPreview;
+  prepareChapterRegeneration: (chapterId: string) => RegenerationPreview;
   reset: () => void;
 }
 
+function checklistKey(cellId: string, itemId: string): string {
+  return `${cellId}::${itemId}`;
+}
+
+function addToList<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list : [...list, value];
+}
+
+function removeFromList<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : list;
+}
+
 /**
- * Reads `['review-guide']` and exposes mutators for stepper progress and
- * judgment-thread lifecycle. All mutators write atomically through
- * `queryClient.setQueryData` so subscribers re-render without prop drilling.
+ * Reads `['review-guide']` and exposes Notebook mutators (cell completion,
+ * checklist, ack, diff expand, thread lifecycle, regeneration preparation).
+ * All mutators write atomically through `queryClient.setQueryData`.
  */
 export function useReviewGuideState(): UseReviewGuideStateValue {
   const queryClient = useQueryClient();
-  const state = useReviewGuideCache();
+  const state = useNotebookCache();
 
-  const markStepReviewed = useCallback(
-    (stepId: string) => {
-      updateState(queryClient, (prev) =>
-        prev.reviewedStepIds.includes(stepId)
-          ? prev
-          : { ...prev, reviewedStepIds: [...prev.reviewedStepIds, stepId] },
-      );
-    },
-    [queryClient],
-  );
-
-  const unmarkStepReviewed = useCallback(
-    (stepId: string) => {
+  const acknowledgeNote = useCallback(
+    (cellId: string) => {
       updateState(queryClient, (prev) => ({
         ...prev,
-        reviewedStepIds: prev.reviewedStepIds.filter((id) => id !== stepId),
+        completion: {
+          ...prev.completion,
+          acknowledgedNoteIds: addToList(prev.completion.acknowledgedNoteIds, cellId),
+        },
       }));
     },
     [queryClient],
   );
 
-  const setCurrentStep = useCallback(
-    (stepId: string) => {
-      updateState(queryClient, (prev) =>
-        prev.currentStepId === stepId ? prev : { ...prev, currentStepId: stepId },
-      );
+  const unacknowledgeNote = useCallback(
+    (cellId: string) => {
+      updateState(queryClient, (prev) => ({
+        ...prev,
+        completion: {
+          ...prev.completion,
+          acknowledgedNoteIds: removeFromList(
+            prev.completion.acknowledgedNoteIds,
+            cellId,
+          ),
+        },
+      }));
+    },
+    [queryClient],
+  );
+
+  const toggleChecklistItem = useCallback(
+    (cellId: string, itemId: string) => {
+      const key = checklistKey(cellId, itemId);
+      updateState(queryClient, (prev) => {
+        const list = prev.completion.checkedChecklistItemIds;
+        const next = list.includes(key)
+          ? removeFromList(list, key)
+          : addToList(list, key);
+        return {
+          ...prev,
+          completion: { ...prev.completion, checkedChecklistItemIds: next },
+        };
+      });
     },
     [queryClient],
   );
 
   const updateThread = useCallback(
-    (threadId: string, updater: (thread: JudgmentThread) => JudgmentThread) => {
+    (threadId: string, updater: (t: NotebookJudgmentThread) => NotebookJudgmentThread) => {
       updateState(queryClient, (prev) => ({
         ...prev,
         threads: prev.threads.map((t) => (t.id === threadId ? updater(t) : t)),
@@ -406,7 +712,7 @@ export function useReviewGuideState(): UseReviewGuideStateValue {
     [updateThread],
   );
 
-  const prepareRegeneration = useCallback((): RegenerationPreview => {
+  const prepareFullRegeneration = useCallback((): RegenerationPreview => {
     const current = readState(queryClient);
     const pinnedPreservedThreads = current.threads.filter((t) => t.pinned);
     const unresolvedDiscardedCount = current.threads.filter(
@@ -415,52 +721,49 @@ export function useReviewGuideState(): UseReviewGuideStateValue {
     return { unresolvedDiscardedCount, pinnedPreservedThreads };
   }, [queryClient]);
 
+  const prepareChapterRegeneration = useCallback(
+    (chapterId: string): RegenerationPreview => {
+      const current = readState(queryClient);
+      const scoped = current.threads.filter((t) => t.chapterId === chapterId);
+      const pinnedPreservedThreads = scoped.filter((t) => t.pinned);
+      const unresolvedDiscardedCount = scoped.filter(
+        (t) => !t.pinned && !t.resolved,
+      ).length;
+      return { unresolvedDiscardedCount, pinnedPreservedThreads };
+    },
+    [queryClient],
+  );
+
   const reset = useCallback(() => {
     writeState(queryClient, EMPTY_STATE);
   }, [queryClient]);
 
+  const derived: NotebookCompletionDerived = {
+    isNoteAcknowledged: (id) => state.completion.acknowledgedNoteIds.includes(id),
+    isChecklistItemChecked: (key) =>
+      state.completion.checkedChecklistItemIds.includes(key),
+  };
+
   return {
     state,
-    guide: state.guide,
-    reviewedStepIds: state.reviewedStepIds,
-    currentStepId: state.currentStepId,
+    overview: state.overview,
+    chapters: state.chapters,
     threads: state.threads,
-    markStepReviewed,
-    unmarkStepReviewed,
-    setCurrentStep,
+    orphans: state.orphans,
+    completion: state.completion,
+    derived,
+    acknowledgeNote,
+    unacknowledgeNote,
+    toggleChecklistItem,
     pinThread,
     unpinThread,
     resolveThread,
     unresolveThread,
     replyToThread,
-    prepareRegeneration,
+    prepareFullRegeneration,
+    prepareChapterRegeneration,
     reset,
   };
 }
 
-export interface UseOffRouteValue {
-  isOffRoute: boolean;
-  currentStepGroup: string[] | null;
-}
-
-/**
- * Off-route detection (R10): true when the diff viewer's selected file is not
- * a member of the current step's `fileGroup`. Derived from `useReviewGuideState`
- * + `useDiffPanelContext().selectedFilePath`; no stored mode in `DiffPanelContext`.
- */
-export function useOffRoute(): UseOffRouteValue {
-  const { guide, currentStepId } = useReviewGuideState();
-  const { selectedFilePath } = useDiffPanelContext();
-
-  return useMemo(() => {
-    const currentStep = guide?.steps.find((s) => s.id === currentStepId) ?? null;
-    const currentStepGroup = currentStep?.fileGroup ?? null;
-    if (!currentStepGroup || currentStepGroup.length === 0 || !selectedFilePath) {
-      return { isOffRoute: false, currentStepGroup };
-    }
-    return {
-      isOffRoute: !currentStepGroup.includes(selectedFilePath),
-      currentStepGroup,
-    };
-  }, [guide, currentStepId, selectedFilePath]);
-}
+export { checklistKey };

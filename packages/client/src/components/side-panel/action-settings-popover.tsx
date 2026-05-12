@@ -6,32 +6,41 @@ import {
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
-  ComboboxGroup,
-  ComboboxLabel,
   ComboboxList,
-  ComboboxCollection,
 } from "@/components/ui/combobox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Settings02Icon } from "@hugeicons/core-free-icons"
-import type { ActionKey, ModelOption } from "@/types/settings"
-
-interface ModelGroup {
-  value: string
-  items: ModelOption[]
-}
+import type { ActionKey, ModelOption, ThinkingLevel } from "@/types/settings"
 
 interface VariantOption {
   value: string
   label: string
 }
 
+interface ThinkingLevelOption {
+  value: "" | ThinkingLevel
+  label: string
+}
+
+const THINKING_LEVEL_OPTIONS: ThinkingLevelOption[] = [
+  { value: "", label: "Default (SDK)" },
+  { value: "off", label: "Off" },
+  { value: "minimal", label: "Minimal" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "xhigh", label: "Extra high" },
+]
+
 interface ActionSettingsPopoverProps {
   actionKey: ActionKey
   models: ModelOption[]
   currentModel?: string
   currentVariant?: string
+  currentThinkingLevel?: ThinkingLevel
   onModelChange: (model: string, variant?: string) => void
+  onThinkingLevelChange?: (level: ThinkingLevel | undefined) => void
   isLoading?: boolean
 }
 
@@ -40,22 +49,11 @@ function ActionSettingsPopover({
   models,
   currentModel,
   currentVariant,
+  currentThinkingLevel,
   onModelChange,
+  onThinkingLevelChange,
   isLoading,
 }: ActionSettingsPopoverProps) {
-  const groups = React.useMemo<ModelGroup[]>(() => {
-    const map = new Map<string, ModelOption[]>()
-    for (const model of models) {
-      const list = map.get(model.provider) || []
-      list.push(model)
-      map.set(model.provider, list)
-    }
-    return Array.from(map.entries()).map(([provider, items]) => ({
-      value: provider,
-      items,
-    }))
-  }, [models])
-
   const selectedModel = React.useMemo(
     () => models.find((m) => m.id === currentModel) ?? null,
     [models, currentModel],
@@ -77,6 +75,14 @@ function ActionSettingsPopover({
     [variantOptions, currentVariant],
   )
 
+  const selectedThinkingLevel = React.useMemo(
+    () =>
+      THINKING_LEVEL_OPTIONS.find(
+        (o) => o.value === (currentThinkingLevel ?? ""),
+      ) ?? THINKING_LEVEL_OPTIONS[0],
+    [currentThinkingLevel],
+  )
+
   return (
     <Popover>
       <PopoverTrigger
@@ -96,7 +102,7 @@ function ActionSettingsPopover({
                 Model
               </label>
               <Combobox
-                items={groups}
+                items={models}
                 value={selectedModel}
                 onValueChange={(value) => {
                   if (value) {
@@ -113,20 +119,24 @@ function ActionSettingsPopover({
                   placeholder="Search models..."
                   className="w-full"
                 />
-                <ComboboxContent sideOffset={6}>
+                <ComboboxContent
+                  sideOffset={6}
+                  align="end"
+                  collisionAvoidance={{ side: "flip", align: "flip", fallbackAxisSide: "end" }}
+                  collisionPadding={8}
+                  className="w-auto min-w-[22rem] max-w-[min(28rem,var(--available-width))]"
+                >
                   <ComboboxEmpty>No models found</ComboboxEmpty>
                   <ComboboxList>
-                    {(group: ModelGroup) => (
-                      <ComboboxGroup key={group.value} items={group.items}>
-                        <ComboboxLabel>{group.value}</ComboboxLabel>
-                        <ComboboxCollection>
-                          {(item: ModelOption) => (
-                            <ComboboxItem key={item.id} value={item}>
-                              {item.name}
-                            </ComboboxItem>
-                          )}
-                        </ComboboxCollection>
-                      </ComboboxGroup>
+                    {(item: ModelOption) => (
+                      <ComboboxItem key={item.id} value={item}>
+                        <div className="flex w-full items-center justify-between gap-2 pr-5">
+                          <span className="truncate">{item.name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {item.provider}
+                          </span>
+                        </div>
+                      </ComboboxItem>
                     )}
                   </ComboboxList>
                 </ComboboxContent>
@@ -158,6 +168,40 @@ function ActionSettingsPopover({
                       <ComboboxEmpty>No variants found</ComboboxEmpty>
                       <ComboboxList>
                         {(item: VariantOption) => (
+                          <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                </>
+              )}
+              {onThinkingLevelChange && (
+                <>
+                  <label className="text-xs font-medium text-muted-foreground mt-2">
+                    Thinking effort
+                  </label>
+                  <Combobox
+                    items={THINKING_LEVEL_OPTIONS}
+                    value={selectedThinkingLevel}
+                    onValueChange={(value) => {
+                      const next = value?.value
+                      onThinkingLevelChange(next ? (next as ThinkingLevel) : undefined)
+                    }}
+                    disabled={isLoading}
+                    isItemEqualToValue={(a, b) => a.value === b.value}
+                    itemToStringLabel={(item) => item.label}
+                    itemToStringValue={(item) => item.value}
+                  >
+                    <ComboboxInput
+                      placeholder="Select effort..."
+                      className="w-full"
+                    />
+                    <ComboboxContent sideOffset={6}>
+                      <ComboboxEmpty>No options</ComboboxEmpty>
+                      <ComboboxList>
+                        {(item: ThinkingLevelOption) => (
                           <ComboboxItem key={item.value} value={item}>
                             {item.label}
                           </ComboboxItem>

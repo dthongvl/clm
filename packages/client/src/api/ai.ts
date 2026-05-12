@@ -26,33 +26,87 @@ export interface AIReviewPRResponse {
   summary: string;
 }
 
-export interface ServerReviewGuideStep {
+// --- Notebook wire types ---------------------------------------------------
+
+export interface ServerNotebookChapter {
   id: string;
   title: string;
-  fileGroup: string[];
-  rationale: string;
-  lookFor: string;
+  intent: string;
 }
 
-export interface ServerReviewGuideJudgmentThread {
+export interface ServerNotebookDiffHighlight {
+  side: 'additions' | 'deletions';
+  startLine: number;
+  endLine: number;
+  note?: string;
+}
+
+export interface ServerNotebookMarkdownCell {
+  type: 'markdown';
+  id: string;
+  content: string;
+}
+
+export interface ServerNotebookDiffCell {
+  type: 'diff';
   id: string;
   filePath: string;
-  lineNumber: number;
+  caption?: string;
+  highlights: ServerNotebookDiffHighlight[];
+}
+
+export type ServerNotebookNoteSeverity =
+  | 'info'
+  | 'attention'
+  | 'security'
+  | 'performance'
+  | 'risk';
+
+export interface ServerNotebookNoteCell {
+  type: 'note';
+  id: string;
+  severity: ServerNotebookNoteSeverity;
+  content: string;
+}
+
+export interface ServerNotebookChecklistItem {
+  id: string;
+  text: string;
+}
+
+export interface ServerNotebookChecklistCell {
+  type: 'checklist';
+  id: string;
+  items: ServerNotebookChecklistItem[];
+}
+
+export type ServerNotebookCell =
+  | ServerNotebookMarkdownCell
+  | ServerNotebookDiffCell
+  | ServerNotebookNoteCell
+  | ServerNotebookChecklistCell;
+
+export interface ServerNotebookJudgmentThread {
+  id: string;
+  chapterId: string;
+  filePath: string;
   side: 'additions' | 'deletions';
+  lineNumber: number;
   content: string;
   anchorReason: string;
 }
 
-export interface ServerReviewGuide {
-  overview: string;
-  steps: ServerReviewGuideStep[];
-  judgmentThreads: ServerReviewGuideJudgmentThread[];
+export interface ServerNotebookChapterPayload {
+  chapterId: string;
+  cells: ServerNotebookCell[];
+  judgmentThreads: ServerNotebookJudgmentThread[];
 }
 
 export {
   streamAiReview,
   streamAiGrouping,
   streamAiReviewGuide,
+  streamAiNotebookChapter,
   type StreamEvent,
   type StreamStatusEvent,
   type StreamStatusPhase,
@@ -68,6 +122,9 @@ export {
   type GroupingStreamEvent,
   type GroupingResultEvent,
   type ReviewGuideStreamEvent,
-  type ReviewGuideResultEvent,
+  type NotebookOutlineEvent,
+  type NotebookChapterEvent,
+  type NotebookChapterErrorEvent,
   type StreamRequestBody,
+  type ChapterRegenerationRequestBody,
 } from './ai-stream';

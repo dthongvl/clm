@@ -44,6 +44,8 @@ export function DiffPanelViewerContainer({
     editComment,
     deleteComment,
     convertAIToDraft,
+    notebookJudgmentThreads,
+    notebookJudgmentThreadOps,
   } = useAnnotations({ aiReviewItems })
 
   return (
@@ -89,6 +91,8 @@ export function DiffPanelViewerContainer({
             viewedFiles={viewedFiles}
             onFileViewedChange={setFileViewed}
             syncingViewedFiles={syncingViewedFiles}
+            notebookJudgmentThreads={notebookJudgmentThreads}
+            notebookJudgmentThreadOps={notebookJudgmentThreadOps}
           />
         )}
       </DiffPanel.Root>

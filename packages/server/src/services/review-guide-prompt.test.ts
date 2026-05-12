@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { buildReviewGuidePrompt } from "./review-guide-prompt.js"
+import {
+  buildChapterRegenerationPrompt,
+  buildReviewGuidePrompt,
+} from "./review-guide-prompt.js"
 
 describe("buildReviewGuidePrompt", () => {
   it("includes the PR repo and number", () => {
@@ -10,18 +13,37 @@ describe("buildReviewGuidePrompt", () => {
     expect(prompt).toContain("myorg/myrepo")
   })
 
-  it("describes the structured JSON schema", () => {
+  it("describes the notebook JSON schema with chapters and cells", () => {
     const prompt = buildReviewGuidePrompt({
       prLink: "https://github.com/acme/repo/pull/12",
     })
     expect(prompt).toContain('"overview"')
-    expect(prompt).toContain('"steps"')
-    expect(prompt).toContain('"fileGroup"')
-    expect(prompt).toContain('"rationale"')
-    expect(prompt).toContain('"lookFor"')
+    expect(prompt).toContain('"outline"')
+    expect(prompt).toContain('"chapters"')
+    expect(prompt).toContain('"chapterId"')
+    expect(prompt).toContain('"cells"')
+    expect(prompt).toContain('"highlights"')
     expect(prompt).toContain('"judgmentThreads"')
     expect(prompt).toContain('"anchorReason"')
     expect(prompt).toContain('"side"')
+  })
+
+  it("constrains note severity to the allowed enum", () => {
+    const prompt = buildReviewGuidePrompt({
+      prLink: "https://github.com/acme/repo/pull/12",
+    })
+    expect(prompt).toContain('"info"')
+    expect(prompt).toContain('"attention"')
+    expect(prompt).toContain('"security"')
+    expect(prompt).toContain('"performance"')
+    expect(prompt).toContain('"risk"')
+  })
+
+  it("forbids standalone judgment thread cells", () => {
+    const prompt = buildReviewGuidePrompt({
+      prLink: "https://github.com/acme/repo/pull/12",
+    })
+    expect(prompt).toMatch(/Do NOT emit standalone judgment thread cells/i)
   })
 
   it("encodes the precision-floor language for judgment threads", () => {
@@ -63,5 +85,56 @@ describe("buildReviewGuidePrompt", () => {
     })
     expect(prompt.length).toBeGreaterThan(0)
     expect(prompt).toContain('"overview"')
+  })
+})
+
+describe("buildChapterRegenerationPrompt", () => {
+  it("includes the target chapter id and current title/intent", () => {
+    const prompt = buildChapterRegenerationPrompt({
+      prLink: "https://github.com/acme/repo/pull/12",
+      chapter: { id: "chapter-2", title: "Server contract", intent: "Read DTOs" },
+      outlineContext: [
+        { id: "chapter-1", title: "Overview", intent: "Skim spine" },
+        { id: "chapter-2", title: "Server contract", intent: "Read DTOs" },
+      ],
+    })
+    expect(prompt).toContain("chapter-2")
+    expect(prompt).toContain("Server contract")
+    expect(prompt).toContain("Read DTOs")
+  })
+
+  it("renders the surrounding outline so the AI keeps narrative consistency", () => {
+    const prompt = buildChapterRegenerationPrompt({
+      prLink: "https://github.com/acme/repo/pull/12",
+      chapter: { id: "chapter-2", title: "t", intent: "i" },
+      outlineContext: [
+        { id: "chapter-1", title: "First", intent: "i1" },
+        { id: "chapter-2", title: "t", intent: "i" },
+        { id: "chapter-3", title: "Third", intent: "i3" },
+      ],
+    })
+    expect(prompt).toContain("chapter-1: First")
+    expect(prompt).toContain("chapter-3: Third")
+  })
+
+  it("requires the response to preserve the chapter id verbatim", () => {
+    const prompt = buildChapterRegenerationPrompt({
+      prLink: "https://github.com/acme/repo/pull/12",
+      chapter: { id: "chapter-2", title: "t", intent: "i" },
+      outlineContext: [],
+    })
+    expect(prompt).toMatch(/MUST be preserved verbatim/i)
+    expect(prompt).toMatch(/MUST equal "chapter-2"/i)
+  })
+
+  it("includes the optional reviewer hint when provided", () => {
+    const prompt = buildChapterRegenerationPrompt({
+      prLink: "https://github.com/acme/repo/pull/12",
+      chapter: { id: "chapter-2", title: "t", intent: "i" },
+      outlineContext: [],
+      additionalContext: "Please cover the rate limiter edge case",
+    })
+    expect(prompt).toContain("Please cover the rate limiter edge case")
+    expect(prompt).toContain("regeneration hint")
   })
 })

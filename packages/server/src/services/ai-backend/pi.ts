@@ -118,6 +118,7 @@ function loadCredentialsFromEnv(auth: PiAuthStorage): Set<string> {
   const sources: Array<{ provider: string; envVars: string[] }> = [
     { provider: 'google', envVars: ['GOOGLE_API_KEY', 'GEMINI_API_KEY'] },
     { provider: 'opencode-go', envVars: ['OPENCODE_API_KEY'] },
+    { provider: 'opencode', envVars: ['OPENCODE_API_KEY'] },
   ];
 
   for (const { provider, envVars } of sources) {
@@ -174,6 +175,7 @@ export class PiBackend implements AiBackend {
       authStorage: auth,
       modelRegistry: registry,
       ...(model ? { model } : {}),
+      ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
       customTools: tools,
       // Pi SDK requires a string[] allowlist; passing tool objects silently disables them.
       tools: tools.map((t) => t.name),
@@ -241,6 +243,7 @@ export class PiBackend implements AiBackend {
       authStorage: auth,
       modelRegistry: registry,
       ...(model ? { model } : {}),
+      ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
       customTools: tools,
       tools: tools.map((t) => t.name),
       sessionManager: sdk.SessionManager.inMemory(),

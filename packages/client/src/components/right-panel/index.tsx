@@ -34,7 +34,7 @@ export function RightPanelContainer() {
   const isGroupingStreamingActive = streamingGrouping.status === "streaming"
 
   const { data: models = [], error: modelsError } = useModels()
-  const { settings, updateActionModel, error: settingsError } = useSettings()
+  const { settings, updateActionModel, updateActionThinkingLevel, error: settingsError } = useSettings()
 
   const { scrollToFile, scrollToAnnotation } = useDiffPanelContext()
 
@@ -120,8 +120,12 @@ export function RightPanelContainer() {
                     models={models}
                     currentModel={settings?.grouping?.model}
                     currentVariant={settings?.grouping?.variant}
+                    currentThinkingLevel={settings?.grouping?.thinkingLevel}
                     onModelChange={(model, variant) =>
                       updateActionModel("grouping", model, variant)
+                    }
+                    onThinkingLevelChange={(level) =>
+                      updateActionThinkingLevel("grouping", level)
                     }
                   />
                 </div>
@@ -168,8 +172,12 @@ export function RightPanelContainer() {
                     models={models}
                     currentModel={settings?.["ai-review"]?.model}
                     currentVariant={settings?.["ai-review"]?.variant}
+                    currentThinkingLevel={settings?.["ai-review"]?.thinkingLevel}
                     onModelChange={(model, variant) =>
                       updateActionModel("ai-review", model, variant)
+                    }
+                    onThinkingLevelChange={(level) =>
+                      updateActionThinkingLevel("ai-review", level)
                     }
                   />
                 </div>

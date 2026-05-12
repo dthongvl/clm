@@ -7,11 +7,22 @@
  * never branch on provider.
  */
 
+/**
+ * Reasoning / "thinking" effort tier for models that support it.
+ *
+ * Mirrors `ThinkingLevel` from `@mariozechner/pi-agent-core`. Backends that
+ * don't support reasoning effort silently ignore this field. The Pi backend
+ * automatically clamps the value to the model's capabilities.
+ */
+export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
 export interface PromptOptions {
   /** Provider-qualified model id, e.g. "google/gemini-3-flash-preview". */
   model?: string;
   /** Optional model variant (used by OpenCode; ignored by other backends). */
   variant?: string;
+  /** Reasoning effort tier (used by Pi; ignored by backends without reasoning support). */
+  thinkingLevel?: ThinkingLevel;
 }
 
 /**

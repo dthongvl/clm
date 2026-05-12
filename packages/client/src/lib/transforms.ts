@@ -7,8 +7,18 @@ import type { ChangeGroup } from '@/types/grouping';
 import type { ServerPRInfo } from '@/api/pr';
 import type { ServerFileDiff } from '@/api/diff';
 import type { ServerPRComment } from '@/api/comments';
-import type { ServerAIReviewItem, ServerChangeGroup, ServerReviewGuide } from '@/api/ai';
-import type { JudgmentThread, ReviewGuide } from '@/types/review-guide';
+import type {
+  ServerAIReviewItem,
+  ServerChangeGroup,
+  ServerNotebookCell,
+  ServerNotebookChapter,
+  ServerNotebookJudgmentThread,
+} from '@/api/ai';
+import type {
+  NotebookCell,
+  NotebookChapter,
+  NotebookJudgmentThread,
+} from '@/types/review-guide';
 
 /**
  * Transform server PR info to client PR info format
@@ -175,40 +185,44 @@ export function transformChangeGroups(groups: ServerChangeGroup[]): ChangeGroup[
 }
 
 /**
- * Split a server review guide into the static guide content (overview + steps)
- * and the initial judgment-thread state. Threads gain client-only lifecycle
- * fields (`pinned`, `resolved`, `replies`, `createdAt`, `source`) initialized
- * to defaults; subsequent reviewer interactions mutate them in place.
+ * Transform server notebook chapter outline entries into client outline shape.
+ * Pure structural copy; outline carries no lifecycle state.
  */
-export function transformReviewGuide(server: ServerReviewGuide): {
-  guide: ReviewGuide;
-  threads: JudgmentThread[];
-} {
-  const guide: ReviewGuide = {
-    overview: server.overview,
-    steps: server.steps.map((step) => ({
-      id: step.id,
-      title: step.title,
-      fileGroup: step.fileGroup,
-      rationale: step.rationale,
-      lookFor: step.lookFor,
-    })),
-  };
+export function transformNotebookOutline(
+  outline: ServerNotebookChapter[],
+): NotebookChapter[] {
+  return outline.map((c) => ({ id: c.id, title: c.title, intent: c.intent }));
+}
 
-  const now = new Date();
-  const threads: JudgmentThread[] = server.judgmentThreads.map((thread) => ({
-    id: thread.id,
-    filePath: thread.filePath,
-    lineNumber: thread.lineNumber,
-    side: thread.side,
-    content: thread.content,
-    anchorReason: thread.anchorReason,
+/**
+ * Transform server cells into client cells. Currently shape-identical, but
+ * kept as a transformer to localize future divergence.
+ */
+export function transformNotebookCells(cells: ServerNotebookCell[]): NotebookCell[] {
+  return cells.map((cell) => cell as NotebookCell);
+}
+
+/**
+ * Transform server judgment threads into client judgment threads. Adds
+ * client-only lifecycle fields initialized to defaults; subsequent reviewer
+ * interactions mutate them in the cache.
+ */
+export function transformNotebookJudgmentThreads(
+  threads: ServerNotebookJudgmentThread[],
+  now: Date = new Date(),
+): NotebookJudgmentThread[] {
+  return threads.map((t) => ({
+    id: t.id,
+    chapterId: t.chapterId,
+    filePath: t.filePath,
+    lineNumber: t.lineNumber,
+    side: t.side,
+    content: t.content,
+    anchorReason: t.anchorReason,
     source: 'ai-judgment',
     pinned: false,
     resolved: false,
     replies: [],
     createdAt: now,
   }));
-
-  return { guide, threads };
 }

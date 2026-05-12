@@ -14,11 +14,11 @@ export { useScrollToTop } from './use-scroll-to-top';
 export {
   useStreamingReviewGuide,
   useReviewGuideState,
-  useOffRoute,
   REVIEW_GUIDE_QUERY_KEY,
+  checklistKey,
 } from './use-review-guide';
 export type {
   UseReviewGuideStateValue,
-  UseOffRouteValue,
   RegenerationPreview,
+  NotebookCompletionDerived,
 } from './use-review-guide';

@@ -10,7 +10,7 @@ import type { SelectedLineRange } from "@pierre/diffs"
 import { CollapsibleFileHeader } from "./collapsible-file-header"
 import { AnnotationRenderer } from "./annotation-renderer"
 import type { DiffFileData } from "@/types/diff"
-import type { AnnotationMetadata } from "./diff-viewer"
+import type { AnnotationMetadata, NotebookJudgmentThreadOps } from "./diff-viewer"
 
 function toFileContents(path: string, content: string): FileContents {
   return { name: path, contents: content }
@@ -63,6 +63,7 @@ interface FileDiffCardProps {
   onConvertAIToDraft?: (itemId: string) => Promise<void>
   convertingAIItemIds?: Set<string>
   onViewHeadFile?: (payload: { filePath: string; content: string }) => void
+  notebookJudgmentThreadOps?: NotebookJudgmentThreadOps
 }
 
 export const FileDiffCard = memo(function FileDiffCard({
@@ -90,6 +91,7 @@ export const FileDiffCard = memo(function FileDiffCard({
   onConvertAIToDraft,
   convertingAIItemIds,
   onViewHeadFile,
+  notebookJudgmentThreadOps,
 }: FileDiffCardProps) {
   const oldFile = useMemo(
     () => toFileContents(file.oldPath ?? file.path, file.oldContent),
@@ -210,6 +212,7 @@ export const FileDiffCard = memo(function FileDiffCard({
             isDraftActionLoading={isDraftActionLoading}
             onConvertAIToDraft={onConvertAIToDraft}
             convertingAIItemIds={convertingAIItemIds}
+            notebookJudgmentThreadOps={notebookJudgmentThreadOps}
           />
         )}
       />

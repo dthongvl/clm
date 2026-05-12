@@ -1,16 +1,16 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { CopyButton } from "@/components/ui/copy-button"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowDown01Icon,
   ArrowRight01Icon,
-  Copy01Icon,
-  Tick02Icon,
   File01Icon,
 } from "@hugeicons/core-free-icons"
 import type { FileDiffMetadata } from "@pierre/diffs"
+import { FileTypeIcon } from "./file-type-icon"
 
 /** Map Pierre's ChangeTypes to our display status. */
 function mapChangeType(type: FileDiffMetadata["type"]):
@@ -56,8 +56,6 @@ function CollapsibleFileHeader({
   onViewSource,
   className,
 }: CollapsibleFileHeaderProps) {
-  const [copied, setCopied] = useState(false)
-
   const { additions, deletions, status, filePath } = useMemo(() => {
     let additions = 0
     let deletions = 0
@@ -74,13 +72,6 @@ function CollapsibleFileHeader({
   }, [fileDiff])
 
   const canViewSource = fileDiff.type !== "deleted"
-
-  const handleCopyFileName = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    navigator.clipboard.writeText(filePath)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   const handleViewSource = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -109,25 +100,30 @@ function CollapsibleFileHeader({
       )}
     >
       {/* Left side: collapse toggle, file name, copy button */}
-      <div className="flex min-w-0 items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon-xs"
+      <div className="group/header flex min-w-0 items-center gap-2">
+        <button
+          type="button"
           onClick={onToggleCollapse}
           aria-label={isCollapsed ? "Expand file" : "Collapse file"}
           aria-expanded={!isCollapsed}
-          className="shrink-0"
+          className="relative inline-flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"
         >
+          {/* File-type icon: shown by default, hidden when the header is hovered. */}
+          <FileTypeIcon
+            filePath={filePath}
+            className="size-4 transition-opacity group-hover/header:opacity-0"
+          />
+          {/* Chevron: hidden by default, shown on hover (overlays the icon). */}
           <HugeiconsIcon
             icon={isCollapsed ? ArrowRight01Icon : ArrowDown01Icon}
-            className="size-4 text-muted-foreground transition-transform"
+            className="absolute size-4 text-muted-foreground opacity-0 transition-opacity group-hover/header:opacity-100"
           />
-        </Button>
+        </button>
 
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex min-w-0 text-left hover:underline"
+          className="flex min-w-0 text-left"
         >
           <span
             className="truncate text-sm font-medium text-foreground"
@@ -165,22 +161,11 @@ function CollapsibleFileHeader({
           </span>
         </button>
 
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={handleCopyFileName}
-          aria-label={copied ? "Copied!" : `Copy file name: ${fileName}`}
-          title={copied ? "Copied!" : "Copy file path"}
-          className="shrink-0"
-        >
-          <HugeiconsIcon
-            icon={copied ? Tick02Icon : Copy01Icon}
-            className={cn(
-              "size-3.5",
-              copied ? "text-green-500" : "text-muted-foreground"
-            )}
-          />
-        </Button>
+        <CopyButton
+          value={filePath}
+          size="xs"
+          label={`Copy file name: ${fileName}`}
+        />
       </div>
 
       {/* Right side: diff stats and viewed checkbox */}

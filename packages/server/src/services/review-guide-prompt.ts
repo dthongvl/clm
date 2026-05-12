@@ -3,21 +3,80 @@ export interface BuildReviewGuidePromptOptions {
   additionalContext?: string;
 }
 
+export interface BuildChapterRegenerationPromptOptions {
+  prLink: string;
+  chapter: { id: string; title: string; intent: string };
+  outlineContext: Array<{ id: string; title: string; intent: string }>;
+  additionalContext?: string;
+}
+
+const NOTEBOOK_SCHEMA_DESCRIPTION = `Schema:
+{
+  "overview": "1-3 concrete sentences about the PR spine",
+  "outline": [
+    {"id": "chapter-1", "title": "Short chapter title", "intent": "One-line reading intent"}
+  ],
+  "chapters": [
+    {
+      "chapterId": "chapter-1",
+      "cells": [
+        {"type": "markdown", "id": "cell-1-1", "content": "Prose paragraph rendered as markdown"},
+        {"type": "diff", "id": "cell-1-2", "filePath": "path/to/file.ts", "caption": "What this hunk does", "highlights": [{"side": "additions", "startLine": 12, "endLine": 28, "note": "Optional one-line annotation"}]},
+        {"type": "note", "id": "cell-1-3", "severity": "risk", "content": "Why this matters"},
+        {"type": "checklist", "id": "cell-1-4", "items": [{"id": "item-1", "text": "Verify foo handles bar"}]}
+      ],
+      "judgmentThreads": [
+        {"id": "jt-1", "chapterId": "chapter-1", "filePath": "path/to/file.ts", "side": "additions", "lineNumber": 42, "content": "Question for human reviewer", "anchorReason": "Why AI cannot decide alone"}
+      ]
+    }
+  ]
+}`;
+
+const CELL_TYPE_GUIDANCE = `Cell guidance:
+- Use "markdown" for prose context, summaries, or "what to expect" framing.
+- Use "diff" to point at concrete code; highlights MUST use line numbers from the changed file (new-line numbering for additions, old-line numbering for deletions).
+- Use "note" for callouts. Severity must be exactly one of: "info", "attention", "security", "performance", "risk".
+- Use "checklist" only when reviewer should explicitly tick discrete sub-items.
+- Do NOT emit standalone judgment thread cells; put judgment threads in the "judgmentThreads" field of the chapter that owns the diff cell they anchor to.
+- Order cells within a chapter so prose framing comes before the diff/note/checklist it explains.`;
+
+const JUDGMENT_GUIDANCE = `Judgment threads:
+- Only emit when a question genuinely requires team or product context the AI cannot infer from the codebase.
+- Each thread anchors to a specific line and side; lineNumber must be a valid changed-file line.
+- Density bound: no more than ~1 thread per 200 changed lines. Prefer fewer high-confidence threads.`;
+
+const OUTPUT_CONSTRAINTS = `Output constraints:
+- Return only ONE minified JSON object on a single line. No markdown, no code fences, no extra prose.
+- Chapter ids MUST be of the form "chapter-N" and stay stable across the notebook.
+- Cell ids MUST be unique within a chapter; recommended form is "cell-<chapterIndex>-<cellIndex>".
+- "side" must be exactly "additions" or "deletions".
+- Severity must be exactly one of: "info", "attention", "security", "performance", "risk".
+- If the PR is structurally trivial, emit a single chapter; "judgmentThreads" may be empty.`;
+
+function extractRepoAndPr(prLink: string): { repo: string; prNumber: string } {
+  const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+  return {
+    repo: match ? match[1]! : '',
+    prNumber: match ? match[2]! : '',
+  };
+}
+
 /**
- * Build a Review Guide prompt for the AI backend.
+ * Build a Notebook prompt for the AI backend.
  *
- * The guide synthesizes a PR overview (Step 0), an ordered route of file-group
- * steps with per-step focus notes, and "needs your judgment" threads for cases
- * the AI cannot decide without team or product context.
+ * The notebook is a chaptered narrative for guided deep PR review:
+ * - An overview/outline pass (chapters with stable ids, titles, intents).
+ * - One chapter per logical reading group, each containing markdown, diff,
+ *   note, and checklist cells, plus any judgment threads anchored to its diff.
+ *
+ * The internal action settings key remains `review-guide` for compatibility
+ * with persisted user model preferences.
  */
 export function buildReviewGuidePrompt(options: BuildReviewGuidePromptOptions): string {
   const { prLink, additionalContext } = options;
+  const { repo, prNumber } = extractRepoAndPr(prLink);
 
-  const match = prLink.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
-  const repo = match ? match[1] : '';
-  const prNumber = match ? match[2] : '';
-
-  let prompt = `You are a senior code reviewer producing a guided reading route for GitHub PR #${prNumber} in ${repo}.
+  let prompt = `You are a senior code reviewer producing a Notebook — a chaptered guided reading of GitHub PR #${prNumber} in ${repo}.
 
 Execution context:
 - You are in the repository working directory.
@@ -25,31 +84,26 @@ Execution context:
 - Use gh for PR metadata and changed-file stats.
 - Use local git to inspect full diffs between base and head.
 
-Step 1: Gather PR context.
+Phase 1: Gather PR context.
 - Read title/body, base/head refs, and changed files with additions/deletions.
 - Form an independent understanding of intent before judging implementation.
 
-Step 2: Synthesize a PR Overview ("what this PR is and why").
-- The overview MUST add signal beyond the PR description: cross-file dependencies, change-shape inference, or the "spine" of the change (the central thread that ties files together).
+Phase 2: Synthesize a PR overview that adds signal beyond the description.
+- Cover cross-file dependencies, change-shape inference, or the "spine" of the change.
 - Do NOT paraphrase the PR description. If the description is missing or thin, infer from the diff.
-- Keep it to 2–4 sentences of concrete, non-generic prose.
+- Keep it to 1-3 sentences of concrete, non-generic prose.
 
-Step 3: Plan the reading route.
-- Group related files into ordered steps. Order steps to minimize cognitive load: foundational/shared changes before consumers; high-risk areas surfaced before incidental ones; tests and docs late.
-- For each step provide:
-  - title: short descriptive group title.
-  - fileGroup: repo-relative paths in this group.
-  - rationale: ONE line explaining why this step appears in this position in the route.
-  - lookFor: per-step "what to look at" notes referencing specific symbols, line ranges, or named decisions in the diff. Avoid generic checklist content ("check error handling"); cite concrete identifiers.
+Phase 3: Plan the chapter outline.
+- Group related changes into ordered chapters that minimize cognitive load: foundational/shared changes before consumers; high-risk areas surfaced before incidental ones; tests and docs late.
+- Each chapter has: id (stable, "chapter-N"), title (short), intent (one-line reading goal).
+- A trivial PR may yield a single chapter.
 
-Step 4: Emit "needs your judgment" threads.
-- Only for cases that genuinely require concrete human, team, or product context the AI cannot infer from the codebase alone (e.g., product policy, team conventions not encoded in code, cross-team contracts, intentional regressions).
-- Do NOT emit threads for issues you can already evaluate (correctness, style, obvious bugs — those belong in the AI Review surface, not here).
-- Each thread anchors to a specific line in the diff, with side indicating which side of the diff it lives on.
-- Density bound: emit no more than ~1 judgment thread per 200 lines changed. If in doubt, omit.
+Phase 4: For each chapter, write cells in reading order.
+${CELL_TYPE_GUIDANCE}
 
-Step 5: Return ONLY one minified JSON object (single line) with this exact schema:
-{"overview":"PR overview narrative for Step 0","steps":[{"id":"step-1","title":"Short group title","fileGroup":["path/to/file.ts"],"rationale":"One-line reason for this position","lookFor":"What to look at, citing specific symbols or line ranges"}],"judgmentThreads":[{"id":"jt-1","filePath":"path/to/file.ts","lineNumber":42,"side":"additions","content":"The question or handoff for the human reviewer","anchorReason":"Why the AI couldn't decide this without team or product context"}]}`;
+Phase 5: ${JUDGMENT_GUIDANCE}
+
+${NOTEBOOK_SCHEMA_DESCRIPTION}`;
 
   if (additionalContext) {
     prompt += `
@@ -63,13 +117,64 @@ Do not violate required JSON schema and output constraints.`;
 
   prompt += `
 
-Output constraints:
-- Return only the JSON object; no markdown, no code fences, no extra prose.
-- Output must be valid minified JSON on a single line.
-- side must be exactly "additions" or "deletions".
-- lineNumber must map to the changed file's new-line numbering for "additions" or old-line numbering for "deletions".
-- If the PR is structurally trivial, return a single step in "steps" plus a concise overview; "judgmentThreads" may be empty.
-- Prefer fewer high-confidence judgment threads over many weak prompts; an empty array is acceptable and often correct.`;
+${OUTPUT_CONSTRAINTS}`;
+
+  return prompt;
+}
+
+/**
+ * Build a per-chapter regeneration prompt. The response must preserve the
+ * provided `chapter.id` even if title or intent are revised.
+ */
+export function buildChapterRegenerationPrompt(
+  options: BuildChapterRegenerationPromptOptions,
+): string {
+  const { prLink, chapter, outlineContext, additionalContext } = options;
+  const { repo, prNumber } = extractRepoAndPr(prLink);
+
+  const outlineLines = outlineContext
+    .map((c) => `- ${c.id}: ${c.title} — ${c.intent}`)
+    .join('\n');
+
+  let prompt = `You are regenerating a single chapter of an existing Notebook for GitHub PR #${prNumber} in ${repo}.
+
+Existing notebook outline (do NOT replace; you are only regenerating one chapter):
+${outlineLines}
+
+Target chapter:
+- id: ${chapter.id} (MUST be preserved verbatim in the response)
+- current title: ${chapter.title}
+- current intent: ${chapter.intent}
+
+You may revise the chapter's title, intent, cells, and judgment threads, but the chapterId MUST remain "${chapter.id}".
+
+Cell guidance and constraints follow the same rules as full notebook generation.
+
+${CELL_TYPE_GUIDANCE}
+
+${JUDGMENT_GUIDANCE}
+
+Schema:
+{
+  "chapter": {"id": "${chapter.id}", "title": "...", "intent": "..."},
+  "cells": [ ...same shapes as full notebook generation... ],
+  "judgmentThreads": [ ...same shapes as full notebook generation... ]
+}`;
+
+  if (additionalContext) {
+    prompt += `
+
+User-provided regeneration hint:
+${additionalContext}
+
+Use this hint to guide what changes for this chapter.`;
+  }
+
+  prompt += `
+
+${OUTPUT_CONSTRAINTS}
+- Return only the single chapter JSON object described above.
+- The "chapter.id" field MUST equal "${chapter.id}".`;
 
   return prompt;
 }

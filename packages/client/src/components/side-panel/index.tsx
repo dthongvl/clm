@@ -4,11 +4,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { getStorageItem, setStorageItem, StorageKeys } from "@/lib/storage"
 
-type TabValue = "description" | "grouping" | "ai-review" | "review-guide"
+type TabValue = "description" | "grouping" | "ai-review"
 
 interface SidePanelProps extends React.ComponentProps<"aside"> {
   defaultTab?: TabValue
   persistTab?: boolean
+}
+
+/**
+ * Coerce a persisted side-panel tab value into the supported set. Legacy
+ * values (e.g. "review-guide" from the prior stepper surface) fall back to
+ * "description" since the Notebook now lives in the center panel.
+ */
+function normalizeStoredSideTab(value: string, fallback: TabValue): TabValue {
+  if (value === "description" || value === "grouping" || value === "ai-review") return value
+  return fallback
 }
 
 function SidePanel({
@@ -20,7 +30,8 @@ function SidePanel({
 }: SidePanelProps) {
   const [tab, setTab] = React.useState<TabValue>(() => {
     if (!persistTab) return defaultTab
-    return getStorageItem<TabValue>(StorageKeys.SIDE_PANEL_TAB, defaultTab)
+    const stored = getStorageItem<string>(StorageKeys.SIDE_PANEL_TAB, defaultTab)
+    return normalizeStoredSideTab(stored, defaultTab)
   })
 
   const handleTabChange = React.useCallback(
@@ -47,7 +58,6 @@ function SidePanel({
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="grouping">Grouping</TabsTrigger>
           <TabsTrigger value="ai-review">AI Review</TabsTrigger>
-          <TabsTrigger value="review-guide">Review Guide</TabsTrigger>
         </TabsList>
         {children}
       </Tabs>
@@ -109,35 +119,15 @@ function SidePanelAIReviewContent({
   )
 }
 
-function SidePanelReviewGuideContent({
-  className,
-  children,
-  ...props
-}: Omit<React.ComponentProps<typeof TabsContent>, "value">) {
-  return (
-    <TabsContent
-      {...props}
-      value="review-guide"
-      className={cn("min-h-0 flex-1 overflow-hidden", className)}
-    >
-      <ScrollArea className="h-full">
-        <div className="p-4">{children}</div>
-      </ScrollArea>
-    </TabsContent>
-  )
-}
-
 export {
   SidePanel,
   SidePanelDescriptionContent,
   SidePanelGroupingContent,
   SidePanelAIReviewContent,
-  SidePanelReviewGuideContent,
 }
 export { PRDescription } from "./pr-description"
 export { PRHeader } from "./pr-header"
 export { PRDescriptionBody } from "./pr-description-body"
-export { ReviewGuide } from "./review-guide"
 export { SidePanelContainer } from "./side-panel-container"
 export { IntelligentGrouping } from "./intelligent-grouping"
 export { AIReviewSummary } from "./ai-review-summary"

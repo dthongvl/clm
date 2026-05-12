@@ -1,5 +1,11 @@
 import { API_BASE, type ApiError } from './client';
-import type { AIReviewPRResponse, ServerChangeGroup, ServerReviewGuide } from './ai';
+import type {
+  AIReviewPRResponse,
+  ServerChangeGroup,
+  ServerNotebookChapter,
+  ServerNotebookCell,
+  ServerNotebookJudgmentThread,
+} from './ai';
 
 /**
  * Mirror of the server's `StreamEvent` discriminated union (see
@@ -78,14 +84,42 @@ export interface GroupingResultEvent {
 
 export type GroupingStreamEvent = StreamEvent | GroupingResultEvent;
 
-export interface ReviewGuideResultEvent {
-  type: 'result';
-  result: ServerReviewGuide;
+// --- Notebook stream events -----------------------------------------------
+
+export interface NotebookOutlineEvent {
+  type: 'notebook_outline';
+  overview: string;
+  outline: ServerNotebookChapter[];
 }
 
-export type ReviewGuideStreamEvent = StreamEvent | ReviewGuideResultEvent;
+export interface NotebookChapterEvent {
+  type: 'notebook_chapter';
+  chapterId: string;
+  cells: ServerNotebookCell[];
+  judgmentThreads: ServerNotebookJudgmentThread[];
+}
+
+export interface NotebookChapterErrorEvent {
+  type: 'notebook_chapter_error';
+  chapterId: string;
+  error: string;
+}
+
+export type ReviewGuideStreamEvent =
+  | StreamEvent
+  | NotebookOutlineEvent
+  | NotebookChapterEvent
+  | NotebookChapterErrorEvent;
 
 export interface StreamRequestBody {
+  additionalContext?: string;
+}
+
+export interface ChapterRegenerationRequestBody {
+  chapterId: string;
+  title: string;
+  intent: string;
+  outlineContext: ServerNotebookChapter[];
   additionalContext?: string;
 }
 
@@ -169,7 +203,7 @@ async function* readSSE<E extends { type: string }>(
 
 async function openStream(
   endpoint: string,
-  body: StreamRequestBody,
+  body: unknown,
   options: StreamOptions = {},
 ): Promise<Response> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -227,13 +261,31 @@ export async function* streamAiGrouping(
 }
 
 /**
- * Open the AI review guide SSE stream and yield typed events as they arrive.
+ * Open the Notebook generation SSE stream and yield typed events as they
+ * arrive. Backed by the `/ai/review-guide/stream` endpoint for compatibility
+ * with the persisted `review-guide` action settings key.
  */
 export async function* streamAiReviewGuide(
   body: StreamRequestBody = {},
   options: StreamOptions = {},
 ): AsyncGenerator<ReviewGuideStreamEvent> {
   const response = await openStream('/ai/review-guide/stream', body, options);
+  for await (const event of readSSE<ReviewGuideStreamEvent>(response)) {
+    yield event;
+    if (event.type === 'done' || event.type === 'error') return;
+  }
+}
+
+/**
+ * Open the per-chapter regeneration SSE stream. Emits a single
+ * `notebook_chapter` event preserving the requested chapterId followed by
+ * `done`, or `notebook_chapter_error` then `done` on failure.
+ */
+export async function* streamAiNotebookChapter(
+  body: ChapterRegenerationRequestBody,
+  options: StreamOptions = {},
+): AsyncGenerator<ReviewGuideStreamEvent> {
+  const response = await openStream('/ai/review-guide/chapter/stream', body, options);
   for await (const event of readSSE<ReviewGuideStreamEvent>(response)) {
     yield event;
     if (event.type === 'done' || event.type === 'error') return;

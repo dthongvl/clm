@@ -65,6 +65,22 @@ export interface InlineCommentThreadProps {
    * (e.g. "AI · needs your judgment"). Persists after resolution.
    */
   aiSourceLabel?: string
+  /**
+   * Optional notebook judgment-thread lifecycle controls. When all are
+   * provided, the action bar renders pin/unpin and resolve/unresolve buttons
+   * alongside the standard Reply affordance. The thread itself is rendered
+   * through the same shared inline-thread chrome as comments and drafts.
+   */
+  threadLifecycle?: {
+    isPinned: boolean
+    isResolved: boolean
+    onPin: () => void
+    onUnpin: () => void
+    onResolve: () => void
+    onUnresolve: () => void
+    /** Optional anchor reason rendered as a one-line subtle banner. */
+    anchorReason?: string
+  }
 }
 
 /**
@@ -348,6 +364,7 @@ function InlineCommentThread({
   onEditReply,
   onDeleteReply,
   aiSourceLabel,
+  threadLifecycle,
 }: InlineCommentThreadProps) {
   const [isReplyFormOpen, setIsReplyFormOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -413,7 +430,19 @@ function InlineCommentThread({
           </div>
         </div>
       ) : (
-        <CommentItem comment={comment} aiSourceLabel={aiSourceLabel} />
+        <>
+          {threadLifecycle?.anchorReason && (
+            <div className="border-b bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground/80">
+                Why this needs you:{" "}
+              </span>
+              <Markdown className="inline [&_p]:my-0 [&_p]:inline">
+                {threadLifecycle.anchorReason}
+              </Markdown>
+            </div>
+          )}
+          <CommentItem comment={comment} aiSourceLabel={aiSourceLabel} />
+        </>
       )}
 
       {hasReplies && (
@@ -493,6 +522,43 @@ function InlineCommentThread({
                   "Add to draft"
                 )}
               </Button>
+            )}
+            {threadLifecycle && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className={cn(
+                    "-ml-2 text-muted-foreground hover:text-foreground",
+                    threadLifecycle.isPinned && "text-primary",
+                  )}
+                  onClick={() =>
+                    threadLifecycle.isPinned
+                      ? threadLifecycle.onUnpin()
+                      : threadLifecycle.onPin()
+                  }
+                  aria-pressed={threadLifecycle.isPinned}
+                  aria-label={threadLifecycle.isPinned ? "Unpin thread" : "Pin thread"}
+                >
+                  {threadLifecycle.isPinned ? "Pinned" : "Pin"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    threadLifecycle.isResolved
+                      ? threadLifecycle.onUnresolve()
+                      : threadLifecycle.onResolve()
+                  }
+                  aria-pressed={threadLifecycle.isResolved}
+                  aria-label={
+                    threadLifecycle.isResolved ? "Reopen thread" : "Resolve thread"
+                  }
+                >
+                  {threadLifecycle.isResolved ? "Reopen" : "Resolve"}
+                </Button>
+              </>
             )}
             {onReplySubmit && !canConvertToDraft && (
               <>

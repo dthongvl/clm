@@ -7,13 +7,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import type { JudgmentThread } from "@/types/review-guide"
+import type { NotebookJudgmentThread } from "@/types/review-guide"
 
 interface RegenerateModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   unresolvedDiscardedCount: number
-  pinnedPreservedThreads: JudgmentThread[]
+  pinnedPreservedThreads: NotebookJudgmentThread[]
   onConfirm: () => void
   isRegenerating?: boolean
 }
@@ -32,11 +32,11 @@ function RegenerateModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Regenerate review guide?</DialogTitle>
+          <DialogTitle>Regenerate notebook?</DialogTitle>
           <DialogDescription>
-            This produces a new guide. Resolved threads, reviewer-authored
-            replies, and pinned threads are preserved; unresolved AI threads are
-            discarded.
+            This produces a new notebook. Resolved threads, reviewer-authored
+            replies, and pinned threads are preserved; unresolved AI threads
+            are discarded. Cell read/check/ack state is reset.
           </DialogDescription>
         </DialogHeader>
 
