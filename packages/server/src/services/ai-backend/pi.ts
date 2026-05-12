@@ -2,7 +2,7 @@
  * PiBackend
  *
  * AiBackend implementation backed by the Pi Agent SDK
- * (@mariozechner/pi-coding-agent), running in-process inside the Hono server.
+ * (@earendil-works/pi-coding-agent), running in-process inside the Hono server.
  *
  * Each `prompt()` call spins up an ephemeral AgentSession with a read-only
  * tool set (Read/Bash/Grep/Find/LS) so the agent can drive `gh` and `git`
@@ -37,7 +37,7 @@ type PiAgentSessionEvent = {
     stopReason?: string;
     errorMessage?: string;
   };
-  // message_update — nested AssistantMessageEvent from @mariozechner/pi-ai
+  // message_update — nested AssistantMessageEvent from @earendil-works/pi-ai
   assistantMessageEvent?: {
     type: string;
     delta?: string;
@@ -101,7 +101,7 @@ async function loadPiSdk(): Promise<PiCachedSdk> {
   if (cached) return cached;
 
   const sdk = (await import(
-    /* @vite-ignore */ '@mariozechner/pi-coding-agent'
+    /* @vite-ignore */ '@earendil-works/pi-coding-agent'
   )) as unknown as PiSdkModule;
 
   const auth = sdk.AuthStorage.inMemory();
